@@ -1,0 +1,242 @@
+import { bytesToHex } from "@helios-lang/codec-utils"
+import { Address, PubKeyHash, TxInput, Value } from "@helios-lang/ledger"
+import { None, expectSome } from "@helios-lang/type-utils"
+import { selectSmallestFirst } from "../coinselection/index.js"
+
+/**
+ * @typedef {import("../coinselection/index.js").CoinSelection} CoinSelection
+ * @typedef {import("../network/Network.js").Network} Network
+ * @typedef {import("./Wallet.js").Wallet} Wallet
+ */
+
+/**
+ * High-level helper class for instances that implement the `Wallet` interface.
+ */
+export class WalletHelper {
+    /**
+     * @readonly
+     * @type {Wallet}
+     */
+    wallet
+
+    /**
+     * @readonly
+     * @type {Option<Network>}
+     */
+    fallback
+
+    /**
+     * @param {Wallet} wallet
+     * @param {Option<Network>} fallback
+     */
+    constructor(wallet, fallback = None) {
+        this.wallet = wallet
+        this.fallback = fallback
+    }
+
+    /**
+     * Concatenation of `usedAddresses` and `unusedAddresses`.
+     * @type {Promise<Address[]>}
+     */
+    get allAddresses() {
+        return this.wallet.usedAddresses.then((usedAddress) =>
+            this.wallet.unusedAddresses.then((unusedAddresses) =>
+                usedAddress.concat(unusedAddresses)
+            )
+        )
+    }
+
+    /**
+     * @returns {Promise<Value>}
+     */
+    async calcBalance() {
+        return (await this.utxos).reduce(
+            (sum, utxo) => sum.add(utxo.value),
+            new Value()
+        )
+    }
+
+    /**
+     * First `Address` in `allAddresses`.
+     * Throws an error if there aren't any addresses
+     * @type {Promise<Address>}
+     */
+    get baseAddress() {
+        return this.allAddresses.then((addresses) => expectSome(addresses[0]))
+    }
+
+    /**
+     * First `Address` in `unusedAddresses` (falls back to last `Address` in `usedAddresses` if `unusedAddresses` is empty or not defined).
+     * @type {Promise<Address>}
+     */
+    get changeAddress() {
+        return this.wallet.unusedAddresses.then((addresses) => {
+            if (addresses.length == 0) {
+                return this.wallet.usedAddresses.then((addresses) => {
+                    if (addresses.length == 0) {
+                        throw new Error("no addresses found")
+                    } else {
+                        return addresses[addresses.length - 1]
+                    }
+                })
+            } else {
+                return addresses[0]
+            }
+        })
+    }
+
+    /**
+     * First UTxO in `utxos`. Can be used to distinguish between preview and preprod networks.
+     * @type {Promise<Option<TxInput>>}
+     */
+    get refUtxo() {
+        return this.utxos.then((utxos) => {
+            if (utxos.length == 0) {
+                return None
+            } else {
+                return expectSome(utxos[0])
+            }
+        })
+    }
+
+    /**
+     * Falls back to using the network
+     * @type {Promise<TxInput[]>}
+     */
+    get utxos() {
+        return (async () => {
+            try {
+                const utxos = await this.wallet.utxos
+
+                if (utxos.length > 0) {
+                    return utxos
+                }
+            } catch (e) {
+                if (!this.fallback) {
+                    console.error("fallback Network not set")
+                    throw e
+                }
+            }
+
+            const fallback = this.fallback
+            if (fallback) {
+                console.log(
+                    "falling back to retrieving UTxOs through query layer"
+                )
+                return (
+                    await Promise.all(
+                        (await this.wallet.usedAddresses).map((a) =>
+                            fallback.getUtxos(a)
+                        )
+                    )
+                ).flat()
+            } else {
+                throw new Error(
+                    "wallet returned 0 utxos, set the helper getUtxosFallback callback to use an Api query layer instead"
+                )
+            }
+        })()
+    }
+
+    /**
+     * Pick a number of UTxOs needed to cover a given Value. The default coin selection strategy is to pick the smallest first.
+     * @param {Value} amount
+     * @param {CoinSelection} coinSelection
+     * @returns {Promise<[TxInput[], TxInput[]]>} The first list contains the selected UTxOs, the second list contains the remaining UTxOs.
+     */
+    async pickUtxos(amount, coinSelection = selectSmallestFirst) {
+        return coinSelection(await this.utxos, amount)
+    }
+
+    /**
+     * Picks a single UTxO intended as collateral.
+     * @param {bigint} amount - defaults to 2 Ada, which should cover most things
+     * @returns {Promise<TxInput>}
+     */
+    async pickCollateral(amount = 2000000n) {
+        // first try the collateral utxos that the wallet (might) provide
+        const defaultCollateral = await this.wallet.collateral
+
+        if (defaultCollateral.length > 0) {
+            const bigEnough = defaultCollateral.filter(
+                (utxo) => utxo.value.lovelace >= amount
+            )
+
+            if (bigEnough.length > 0) {
+                return bigEnough[0]
+            }
+        }
+
+        const pureUtxos = (await this.utxos).filter((utxo) =>
+            utxo.value.assets.isZero()
+        )
+
+        if (pureUtxos.length == 0) {
+            throw new Error("no pure UTxOs in wallet (needed for collateral)")
+        }
+
+        const bigEnough = pureUtxos.filter(
+            (utxo) => utxo.value.lovelace >= amount
+        )
+
+        if (bigEnough.length == 0) {
+            throw new Error(
+                "no UTxO in wallet that is big enough to cover collateral"
+            )
+        }
+
+        bigEnough.sort((a, b) => Number(a.value.lovelace - b.value.lovelace))
+
+        return bigEnough[0]
+    }
+
+    /**
+     * Returns `true` if the `PubKeyHash` in the given `Address` is controlled by the wallet.
+     * @param {Address} addr
+     * @returns {Promise<boolean>}
+     */
+    async isOwnAddress(addr) {
+        const pkh = addr.pubKeyHash
+
+        if (!pkh) {
+            return false
+        } else {
+            return this.isOwnPubKeyHash(pkh)
+        }
+    }
+
+    /**
+     * Returns `true` if the given `PubKeyHash` is controlled by the wallet.
+     * @param {PubKeyHash} pkh
+     * @returns {Promise<boolean>}
+     */
+    async isOwnPubKeyHash(pkh) {
+        const addresses = await this.allAddresses
+
+        for (const addr of addresses) {
+            const aPkh = addr.pubKeyHash
+
+            if (aPkh && aPkh.isEqual(pkh)) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    /**
+     * @returns {Promise<any>}
+     */
+    async toJson() {
+        const isMainnet = await this.wallet.isMainnet()
+        const usedAddresses = await this.wallet.usedAddresses
+        const unusedAddresses = await this.wallet.unusedAddresses
+
+        return {
+            isMainnet: isMainnet,
+            usedAddresses: usedAddresses.map((a) => a.toBech32()),
+            unusedAddresses: unusedAddresses.map((a) => a.toBech32()),
+            utxos: (await this.utxos).map((u) => bytesToHex(u.toCbor(true)))
+        }
+    }
+}

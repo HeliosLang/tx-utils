@@ -1,0 +1,38 @@
+{
+    "name": "@helios-lang/tx-utils",
+    "version": "0.1.0",
+    "description": "Coinselection, query layers, wallets",
+    "main": "src/index.js",
+    "types": "types/index.d.ts",
+    "type": "module",
+    "scripts": {
+        "build": "npm run prettify && npm run build:types && npm run test:suite",
+        "build:types": "npx tsc -p jsconfig.json --noEmit false --emitDeclarationOnly",
+        "prepack": "npm run build",
+        "prettify": "npx prettier . --write",
+        "test": "npm run test:pretty && npm run test:types && npm run test:suite",
+        "test:pretty": "npx prettier . --check",
+        "test:suite": "node --test  --experimental-test-coverage",
+        "test:types": "npm run build:types"
+    },
+    "author": "Christian Schmitz",
+    "license": "BSD-3-Clause",
+    "prettier": {
+        "trailingComma": "none",
+        "tabWidth": 4,
+        "semi": false,
+        "singleQuote": false
+    },
+    "devDependencies": {
+        "@types/node": "^20.12.4",
+        "prettier": "^3.2.5",
+        "typescript": "^5.4.4"
+    },
+    "dependencies": {
+        "@helios-lang/codec-utils": "^0.1.27",
+        "@helios-lang/crypto": "^0.1.7",
+        "@helios-lang/ledger": "^0.1.32",
+        "@helios-lang/type-utils": "^0.1.8",
+        "@helios-lang/uplc": "^0.1.22"
+    }
+}
