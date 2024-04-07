@@ -15,10 +15,10 @@ import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
  *   - parameters: returns the latest network parameters.
  *   - submitTx: submits a transaction to the blockchain and returns the id of that transaction upon success.
  * @typedef {{
- *   networkName: NetworkName
  *   parameters: Promise<NetworkParams>
  *   getUtxo(id: TxOutputId): Promise<TxInput>
  *   getUtxos(address: Address): Promise<TxInput[]>
+ *   isMainnet(): boolean
  *   submitTx(tx: Tx): Promise<TxId>
  * }} Network
  */

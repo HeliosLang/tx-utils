@@ -199,7 +199,7 @@ export class TxBuilder {
      * @param {TxBuilderConfig} config
      * @returns {TxBuilder}
      */
-    static new(config) {
+    static new(config = {}) {
         return new TxBuilder(config)
     }
 

@@ -309,6 +309,13 @@ export class KoiosV0 {
     }
 
     /**
+     * @returns {boolean}
+     */
+    isMainnet() {
+        return this.networkName == "mainnet"
+    }
+
+    /**
      * Used by `KoiosV0.resolveUsingUtxo()`.
      * @param {TxInput} utxo
      * @returns {Promise<boolean>}

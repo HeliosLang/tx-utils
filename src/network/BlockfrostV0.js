@@ -416,6 +416,13 @@ export class BlockfrostV0 {
     }
 
     /**
+     * @returns {boolean}
+     */
+    isMainnet() {
+        return this.networkName == "mainnet"
+    }
+
+    /**
      * Used by `BlockfrostV0.resolve()`.
      * @param {TxInput} utxo
      * @returns {Promise<boolean>}

@@ -111,13 +111,6 @@ export class SimpleWallet {
     }
 
     /**
-     * @type {NetworkName}
-     */
-    get networkName() {
-        return this.network.networkName
-    }
-
-    /**
      * @type {PubKeyHash}
      */
     get spendingPubKeyHash() {
@@ -185,7 +178,7 @@ export class SimpleWallet {
      * @returns {Promise<boolean>}
      */
     async isMainnet() {
-        return this.networkName == "mainnet"
+        return this.network.isMainnet()
     }
 
     /**
