@@ -47,16 +47,6 @@ export class WalletHelper {
     }
 
     /**
-     * @returns {Promise<Value>}
-     */
-    async calcBalance() {
-        return (await this.utxos).reduce(
-            (sum, utxo) => sum.add(utxo.value),
-            new Value()
-        )
-    }
-
-    /**
      * First `Address` in `allAddresses`.
      * Throws an error if there aren't any addresses
      * @type {Promise<Address<null, unknown>>}
@@ -136,6 +126,16 @@ export class WalletHelper {
                 )
             }
         })()
+    }
+
+    /**
+     * @returns {Promise<Value>}
+     */
+    async calcBalance() {
+        return (await this.utxos).reduce(
+            (sum, utxo) => sum.add(utxo.value),
+            new Value()
+        )
     }
 
     /**
