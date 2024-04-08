@@ -1,11 +1,5 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
-import {
-    Address,
-    AssetClass,
-    PubKeyHash,
-    TxInput,
-    Value
-} from "@helios-lang/ledger"
+import { Address, PubKeyHash, TxInput, Value } from "@helios-lang/ledger"
 import { None, expectSome } from "@helios-lang/type-utils"
 import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 
@@ -145,22 +139,6 @@ export class WalletHelper {
     }
 
     /**
-     * Throws an error if token not found
-     * @param {AssetClass} assetClass
-     * @returns {Promise<TxInput<null, unknown>>}
-     */
-    async getToken(assetClass) {
-        const utxos = await this.utxos
-
-        const [selected, _notSelected] = selectSingle(
-            utxos,
-            Value.fromAsset(assetClass, 1n)
-        )
-
-        return expectSome(selected[0])
-    }
-
-    /**
      * Returns `true` if the `PubKeyHash` in the given `Address` is controlled by the wallet.
      * @param {Address} addr
      * @returns {Promise<boolean>}
@@ -234,6 +212,20 @@ export class WalletHelper {
         bigEnough.sort((a, b) => Number(a.value.lovelace - b.value.lovelace))
 
         return bigEnough[0]
+    }
+
+    /**
+     * Throws an error if token not found
+     * Returns only a single utxo
+     * @param {Value} value
+     * @returns {Promise<TxInput<null, unknown>>}
+     */
+    async selectUtxo(value) {
+        const utxos = await this.utxos
+
+        const [selected, _notSelected] = selectSingle(utxos, value)
+
+        return expectSome(selected[0])
     }
 
     /**
