@@ -634,7 +634,7 @@ export class TxBuilder {
      * @overload
      * @param {AddressLike} address
      * @param {ValueLike} value
-     * @param {Option<TxOutputDatum>} datum
+     * @param {TxOutputDatum} datum
      * @returns {TxBuilder}
      *
      * @overload
@@ -644,7 +644,7 @@ export class TxBuilder {
      * @param {[
      *   AddressLike, ValueLike
      * ] | [
-     *   AddressLike, ValueLike, Option<TxOutputDatum>
+     *   AddressLike, ValueLike, TxOutputDatum
      * ] | [
      *   TxOutput | TxOutput[]
      * ]} args
@@ -656,7 +656,7 @@ export class TxBuilder {
             if (args.length == 1) {
                 return args[0]
             } else if (args.length == 2) {
-                return new TxOutput(Address.fromAlike(args[0]), args[1])
+                return new TxOutput(Address.fromAlike(args[0]), args[1], None)
             } else if (args.length == 3) {
                 const datum = args[2]
 
