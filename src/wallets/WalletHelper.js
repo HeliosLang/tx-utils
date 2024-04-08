@@ -42,7 +42,7 @@ export class WalletHelper {
 
     /**
      * Concatenation of `usedAddresses` and `unusedAddresses`.
-     * @type {Promise<Address[]>}
+     * @type {Promise<Address<null, unknown>[]>}
      */
     get allAddresses() {
         return this.wallet.usedAddresses.then((usedAddress) =>
@@ -65,7 +65,7 @@ export class WalletHelper {
     /**
      * First `Address` in `allAddresses`.
      * Throws an error if there aren't any addresses
-     * @type {Promise<Address>}
+     * @type {Promise<Address<null, unknown>>}
      */
     get baseAddress() {
         return this.allAddresses.then((addresses) => expectSome(addresses[0]))
@@ -73,7 +73,7 @@ export class WalletHelper {
 
     /**
      * First `Address` in `unusedAddresses` (falls back to last `Address` in `usedAddresses` if `unusedAddresses` is empty or not defined).
-     * @type {Promise<Address>}
+     * @type {Promise<Address<null, unknown>>}
      */
     get changeAddress() {
         return this.wallet.unusedAddresses.then((addresses) => {
@@ -93,7 +93,7 @@ export class WalletHelper {
 
     /**
      * First UTxO in `utxos`. Can be used to distinguish between preview and preprod networks.
-     * @type {Promise<Option<TxInput>>}
+     * @type {Promise<Option<TxInput<null, unknown>>>}
      */
     get refUtxo() {
         return this.utxos.then((utxos) => {
@@ -107,7 +107,7 @@ export class WalletHelper {
 
     /**
      * Falls back to using the network
-     * @type {Promise<TxInput[]>}
+     * @type {Promise<TxInput<null, unknown>[]>}
      */
     get utxos() {
         return (async () => {
@@ -147,7 +147,7 @@ export class WalletHelper {
     /**
      * Throws an error if token not found
      * @param {AssetClass} assetClass
-     * @returns {Promise<TxInput>}
+     * @returns {Promise<TxInput<null, unknown>>}
      */
     async getToken(assetClass) {
         const utxos = await this.utxos
@@ -197,7 +197,7 @@ export class WalletHelper {
     /**
      * Picks a single UTxO intended as collateral.
      * @param {bigint} amount - defaults to 2 Ada, which should cover most things
-     * @returns {Promise<TxInput>}
+     * @returns {Promise<TxInput<null, unknown>>}
      */
     async selectCollateral(amount = 2000000n) {
         // first try the collateral utxos that the wallet (might) provide
@@ -240,7 +240,7 @@ export class WalletHelper {
      * Pick a number of UTxOs needed to cover a given Value. The default coin selection strategy is to pick the smallest first.
      * @param {Value} amount
      * @param {CoinSelection} coinSelection
-     * @returns {Promise<[TxInput[], TxInput[]]>} The first list contains the selected UTxOs, the second list contains the remaining UTxOs.
+     * @returns {Promise<[TxInput<null, unknown>[], TxInput<null, unknown>[]]>} The first list contains the selected UTxOs, the second list contains the remaining UTxOs.
      */
     async selectUtxos(amount, coinSelection = selectSmallestFirst) {
         return coinSelection(await this.utxos, amount)
