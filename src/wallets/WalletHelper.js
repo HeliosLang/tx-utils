@@ -1,7 +1,13 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
-import { Address, PubKeyHash, TxInput, Value } from "@helios-lang/ledger"
+import {
+    Address,
+    AssetClass,
+    PubKeyHash,
+    TxInput,
+    Value
+} from "@helios-lang/ledger"
 import { None, expectSome } from "@helios-lang/type-utils"
-import { selectSmallestFirst } from "../coinselection/index.js"
+import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 
 /**
  * @typedef {import("../coinselection/index.js").CoinSelection} CoinSelection
@@ -139,13 +145,53 @@ export class WalletHelper {
     }
 
     /**
-     * Pick a number of UTxOs needed to cover a given Value. The default coin selection strategy is to pick the smallest first.
-     * @param {Value} amount
-     * @param {CoinSelection} coinSelection
-     * @returns {Promise<[TxInput[], TxInput[]]>} The first list contains the selected UTxOs, the second list contains the remaining UTxOs.
+     * Throws an error if token not found
+     * @param {AssetClass} assetClass
+     * @returns {Promise<TxInput>}
      */
-    async pickUtxos(amount, coinSelection = selectSmallestFirst) {
-        return coinSelection(await this.utxos, amount)
+    async getToken(assetClass) {
+        const utxos = await this.utxos
+
+        const [selected, _notSelected] = selectSingle(
+            utxos,
+            Value.fromAsset(assetClass, 1n)
+        )
+
+        return expectSome(selected[0])
+    }
+
+    /**
+     * Returns `true` if the `PubKeyHash` in the given `Address` is controlled by the wallet.
+     * @param {Address} addr
+     * @returns {Promise<boolean>}
+     */
+    async isOwnAddress(addr) {
+        const pkh = addr.pubKeyHash
+
+        if (!pkh) {
+            return false
+        } else {
+            return this.isOwnPubKeyHash(pkh)
+        }
+    }
+
+    /**
+     * Returns `true` if the given `PubKeyHash` is controlled by the wallet.
+     * @param {PubKeyHash} pkh
+     * @returns {Promise<boolean>}
+     */
+    async isOwnPubKeyHash(pkh) {
+        const addresses = await this.allAddresses
+
+        for (const addr of addresses) {
+            const aPkh = addr.pubKeyHash
+
+            if (aPkh && aPkh.isEqual(pkh)) {
+                return true
+            }
+        }
+
+        return false
     }
 
     /**
@@ -153,7 +199,7 @@ export class WalletHelper {
      * @param {bigint} amount - defaults to 2 Ada, which should cover most things
      * @returns {Promise<TxInput>}
      */
-    async pickCollateral(amount = 2000000n) {
+    async selectCollateral(amount = 2000000n) {
         // first try the collateral utxos that the wallet (might) provide
         const defaultCollateral = await this.wallet.collateral
 
@@ -191,37 +237,13 @@ export class WalletHelper {
     }
 
     /**
-     * Returns `true` if the `PubKeyHash` in the given `Address` is controlled by the wallet.
-     * @param {Address} addr
-     * @returns {Promise<boolean>}
+     * Pick a number of UTxOs needed to cover a given Value. The default coin selection strategy is to pick the smallest first.
+     * @param {Value} amount
+     * @param {CoinSelection} coinSelection
+     * @returns {Promise<[TxInput[], TxInput[]]>} The first list contains the selected UTxOs, the second list contains the remaining UTxOs.
      */
-    async isOwnAddress(addr) {
-        const pkh = addr.pubKeyHash
-
-        if (!pkh) {
-            return false
-        } else {
-            return this.isOwnPubKeyHash(pkh)
-        }
-    }
-
-    /**
-     * Returns `true` if the given `PubKeyHash` is controlled by the wallet.
-     * @param {PubKeyHash} pkh
-     * @returns {Promise<boolean>}
-     */
-    async isOwnPubKeyHash(pkh) {
-        const addresses = await this.allAddresses
-
-        for (const addr of addresses) {
-            const aPkh = addr.pubKeyHash
-
-            if (aPkh && aPkh.isEqual(pkh)) {
-                return true
-            }
-        }
-
-        return false
+    async selectUtxos(amount, coinSelection = selectSmallestFirst) {
+        return coinSelection(await this.utxos, amount)
     }
 
     /**
