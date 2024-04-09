@@ -789,7 +789,7 @@ export class TxBuilder {
      */
     spendUnsafe(utxos, redeemer = None) {
         if (Array.isArray(utxos)) {
-            utxos.forEach((utxo) => this.spend(utxo, redeemer))
+            utxos.forEach((utxo) => this.spendUnsafe(utxo, redeemer))
 
             return this
         }
