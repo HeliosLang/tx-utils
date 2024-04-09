@@ -409,6 +409,7 @@ export class TxBuilder {
 
     /**
      * @param {UplcProgramV1 | UplcProgramV2} program
+     * @return {TxBuilder}
      */
     attachUplcProgram(program) {
         switch (program.plutusVersion) {
@@ -421,6 +422,8 @@ export class TxBuilder {
             default:
                 throw new Error(`unhandled UplcProgram type`)
         }
+
+        return this
     }
 
     /**
