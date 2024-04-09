@@ -14,8 +14,10 @@ import {
     RootPrivateKey
 } from "../keys/index.js"
 import { None } from "@helios-lang/type-utils"
+import { mulberry32 } from "@helios-lang/crypto"
 
 /**
+ * @typedef {import("@helios-lang/crypto").NumberGenerator} NumberGenerator
  * @typedef {import("../network/Network.js").Network} Network
  * @typedef {import("../network/Network.js").NetworkName} NetworkName
  * @typedef {import("./Wallet.js").Wallet} Wallet
@@ -88,6 +90,20 @@ export class SimpleWallet {
             key.deriveStakingKey(),
             network
         )
+    }
+
+    /**
+     * @param {Network} network
+     * @param {NumberGenerator} rand - the default random number generator IS NOT cryptographically secure
+     * @returns {SimpleWallet}
+     */
+    static random(
+        network,
+        rand = mulberry32(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
+    ) {
+        const key = RootPrivateKey.random(rand)
+
+        return SimpleWallet.fromRootPrivateKey(key, network)
     }
 
     /**

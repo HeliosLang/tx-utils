@@ -191,7 +191,6 @@ export class TxBuilder {
     withdrawals
 
     /**
-     * @private
      * @param {TxBuilderConfig} config
      */
     constructor(config) {
@@ -332,6 +331,9 @@ export class TxBuilder {
         return tx
     }
 
+    /**
+     * @returns {TxBuilder}
+     */
     reset() {
         this.collateral = []
         this.datums = []
@@ -351,6 +353,8 @@ export class TxBuilder {
         this.v2RefScripts = []
         this.v2Scripts = []
         this.withdrawals = []
+
+        return this
     }
 
     /**

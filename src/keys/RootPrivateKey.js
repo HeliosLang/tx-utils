@@ -1,5 +1,5 @@
 import { BitWriter, padBits } from "@helios-lang/codec-utils"
-import { sha2_256 } from "@helios-lang/crypto"
+import { generateBytes, mulberry32, sha2_256 } from "@helios-lang/crypto"
 import { PubKey, Signature } from "@helios-lang/ledger"
 import { isNone } from "@helios-lang/type-utils"
 import { Bip32PrivateKey, BIP32_HARDEN } from "./Bip32PrivateKey.js"
@@ -11,6 +11,7 @@ import {
 } from "./bip39.js"
 
 /**
+ * @typedef {import("@helios-lang/crypto").NumberGenerator} NumberGenerator
  * @typedef {import("./PrivateKey.js").PrivateKey} PrivateKey
  */
 
@@ -61,6 +62,17 @@ export class RootPrivateKey {
     static fromPhrase(phrase, dict = BIP39_DICT_EN) {
         const entropy = convertBip39PhraseToEntropy(phrase, dict)
 
+        return new RootPrivateKey(entropy)
+    }
+
+    /**
+     * @param {NumberGenerator} rand - the default random number generator is not cryptographically secure
+     * @returns {RootPrivateKey}
+     */
+    static random(
+        rand = mulberry32(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
+    ) {
+        const entropy = generateBytes(rand, 32)
         return new RootPrivateKey(entropy)
     }
 
