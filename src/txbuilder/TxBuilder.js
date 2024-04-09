@@ -292,7 +292,7 @@ export class TxBuilder {
                 v2Scripts: this.v2Scripts,
                 v2RefScripts: this.v2RefScripts
             }),
-            false,
+            true,
             metadata
         )
 
