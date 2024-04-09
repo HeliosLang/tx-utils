@@ -23,7 +23,8 @@ import {
     TxRedeemer,
     TxWitnesses,
     ValidatorHash,
-    Value
+    Value,
+    TokenValue
 } from "@helios-lang/ledger"
 import { None, expectSome, isNone } from "@helios-lang/type-utils"
 import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
@@ -445,6 +446,16 @@ export class TxBuilder {
     }
 
     /**
+     * @template TRedeemer
+     * @overload
+     * @param {TokenValue<MintingContext<any, TRedeemer>>} token
+     * @param {TRedeemer} redeemer
+     * @returns {TxBuilder}
+     *
+     * @overload
+     * @param {TokenValue<null>} token
+     * @returns {TxBuilder}
+     *
      * @overload
      * @param {AssetClass<null>} assetClass
      * @param {bigint | number} quantity
@@ -471,8 +482,10 @@ export class TxBuilder {
      *
      * @template TRedeemer
      * @param {[
-     *   AssetClass<null> | MintingPolicyHash<null>,
-     *   bigint | number | [ByteArrayLike, bigint | number][]
+     *   TokenValue<null>
+     * ] | [
+     *   AssetClass<null> | MintingPolicyHash<null> | TokenValue<MintingContext<any, TRedeemer>>,
+     *   bigint | number | [ByteArrayLike, bigint | number][] | TRedeemer
      * ] | [
      *   AssetClass<MintingContext<any, TRedeemer>> | MintingPolicyHash<MintingContext<any, TRedeemer>>,
      *   bigint | number | [ByteArrayLike, bigint | number][],
@@ -481,7 +494,9 @@ export class TxBuilder {
      * @returns {TxBuilder}
      */
     mint(...args) {
-        if (args.length == 2) {
+        if (args.length == 1) {
+            return this.mintUnsafe(args[0].assetClass, args[0].quantity, None)
+        } else if (args.length == 2) {
             const [a, b] = args
 
             if (
@@ -491,6 +506,19 @@ export class TxBuilder {
                 return this.mintUnsafe(a, b, None)
             } else if (a instanceof MintingPolicyHash && Array.isArray(b)) {
                 return this.mintUnsafe(a, b, None)
+            } else if (
+                a instanceof TokenValue &&
+                !(
+                    typeof b == "bigint" ||
+                    typeof b == "number" ||
+                    Array.isArray(b)
+                )
+            ) {
+                return this.mintUnsafe(
+                    a.assetClass,
+                    a.quantity,
+                    a.context.redeemer.toUplcData(b)
+                )
             } else {
                 throw new Error("invalid arguments")
             }
