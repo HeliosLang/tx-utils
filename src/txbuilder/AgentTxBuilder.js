@@ -92,6 +92,10 @@ export class AgentTxBuilder {
             networkParams: await this.network.parameters
         })
 
+        const signatures = await this.agent.signTx(tx)
+
+        tx.addSignatures(signatures)
+
         return tx
     }
 
