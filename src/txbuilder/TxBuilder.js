@@ -69,7 +69,10 @@ import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
  * @template {Tx | Promise<Tx>} [T=Tx]
  * @typedef {{
  *   maxAssetsPerChangeOutput?: number
- *   postBuild?: (tx: Tx) => T
+ *   changeAddress?: AddressLike
+ *   spareUtxos?: TxInput[]
+ *   networkParams?: NetworkParams
+ *   postBuild?: (b: Tx) => T
  * }} TxBuilderConfig
  */
 
@@ -215,19 +218,24 @@ export class TxBuilder {
 
     /**
      * @param {{
-     *   changeAddress: AddressLike
+     *   changeAddress?: AddressLike
      *   networkParams?: NetworkParams | NetworkParamsHelper
      *   spareUtxos?: TxInput[]
      * }} props
      * @returns {T}
      */
-    build(props) {
+    build(props = {}) {
         // extract arguments
-        const changeAddress = Address.fromAlike(props.changeAddress)
-        const networkParams = NetworkParamsHelper.fromAlikeOrDefault(
-            props.networkParams
+        const changeAddress = Address.fromAlike(
+            expectSome(
+                props.changeAddress ?? this.config.changeAddress,
+                "changeAddress unspecified"
+            )
         )
-        const spareUtxos = props.spareUtxos ?? []
+        const networkParams = NetworkParamsHelper.fromAlikeOrDefault(
+            props.networkParams ?? this.config.networkParams
+        )
+        const spareUtxos = props.spareUtxos ?? this.config.spareUtxos ?? []
 
         const { metadata, metadataHash } = this.buildMetadata()
         const { firstValidSlot, lastValidSlot } =
