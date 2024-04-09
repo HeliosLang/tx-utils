@@ -65,15 +65,20 @@ import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
  */
 
 /**
+ * @template {Tx | Promise<Tx>} [T=Tx]
  * @typedef {{
  *   maxAssetsPerChangeOutput?: number
+ *   postBuild?: (tx: Tx) => T
  * }} TxBuilderConfig
  */
 
+/**
+ * @template {Tx | Promise<Tx>} T
+ */
 export class TxBuilder {
     /**
      * @readonly
-     * @type {TxBuilderConfig}
+     * @type {TxBuilderConfig<T>}
      */
     config
 
@@ -191,7 +196,7 @@ export class TxBuilder {
     withdrawals
 
     /**
-     * @param {TxBuilderConfig} config
+     * @param {TxBuilderConfig<T>} config
      */
     constructor(config) {
         this.config = config
@@ -199,7 +204,8 @@ export class TxBuilder {
     }
 
     /**
-     * @param {TxBuilderConfig} config
+     * @template {Tx | Promise<Tx>} T
+     * @param {TxBuilderConfig<T>} config
      * @returns {TxBuilder}
      */
     static new(config = {}) {
@@ -212,7 +218,7 @@ export class TxBuilder {
      *   networkParams?: NetworkParams | NetworkParamsHelper
      *   spareUtxos?: TxInput[]
      * }} props
-     * @returns {Tx}
+     * @returns {T}
      */
     build(props) {
         // extract arguments
@@ -328,7 +334,11 @@ export class TxBuilder {
         // do a final validation of the tx
         tx.validate(networkParams, true)
 
-        return tx
+        if (this.config.postBuild) {
+            return this.config.postBuild(tx)
+        } else {
+            return /** @type {T} */ (tx)
+        }
     }
 
     /**
