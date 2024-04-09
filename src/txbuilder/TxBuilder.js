@@ -42,6 +42,10 @@ import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
  */
 
 /**
+ * @template TDatumPermissive
+ * @typedef {import("@helios-lang/ledger").DatumPaymentContext<TDatumPermissive>} DatumPaymentContext
+ */
+/**
  * @template TRedeemerStrict
  * @template TRedeemerPermissive
  * @typedef {import("@helios-lang/ledger").MintingContext<TRedeemerStrict, TRedeemerPermissive>} MintingContext
@@ -599,7 +603,7 @@ export class TxBuilder {
      *
      * @template TDatum
      * @overload
-     * @param {Address<SpendingContext<any, TDatum, any, any>, any>} address
+     * @param {Address<DatumPaymentContext<TDatum>, any>} address
      * @param {ValueLike} value
      * @param {TxOutputDatumCastable<TDatum>} datum
      * @returns {TxBuilder}
@@ -608,7 +612,7 @@ export class TxBuilder {
      * @param {[
      *   Address<null, any>, ValueLike
      * ] | [
-     *   Address<SpendingContext<any, TDatum, any, any>, any>, ValueLike, TxOutputDatumCastable<TDatum>
+     *   Address<DatumPaymentContext<TDatum>, any>, ValueLike, TxOutputDatumCastable<TDatum>
      * ]} args
      * @returns {TxBuilder}
      */
