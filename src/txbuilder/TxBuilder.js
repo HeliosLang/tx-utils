@@ -434,20 +434,13 @@ export class TxBuilder {
                 return this.mintUnsafe(a, b, None)
             } else if (a instanceof MintingPolicyHash && Array.isArray(b)) {
                 return this.mintUnsafe(a, b, None)
-            } else if (
-                a instanceof TokenValue &&
-                !(
-                    typeof b == "bigint" ||
-                    typeof b == "number" ||
-                    Array.isArray(b)
-                )
-            ) {
+            } else if (a instanceof TokenValue) {
                 this.attachUplcProgram(a.context.program)
 
                 return this.mintUnsafe(
                     a.assetClass,
                     a.quantity,
-                    a.context.redeemer.toUplcData(b)
+                    a.context.redeemer.toUplcData(/** @type {TRedeemer} */ (b))
                 )
             } else {
                 throw new Error("invalid arguments")
