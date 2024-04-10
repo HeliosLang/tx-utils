@@ -85,6 +85,27 @@ export class Emulator {
     }
 
     /**
+     * Ignores the genesis txs
+     * @type {TxId[]}
+     */
+    get txIds() {
+        /**
+         * @type {TxId[]}
+         */
+        const res = []
+
+        for (let block of this.blocks) {
+            for (let tx of block) {
+                if (tx instanceof RegularTx) {
+                    res.push(tx.id())
+                }
+            }
+        }
+
+        return res
+    }
+
+    /**
      * Creates a new SimpleWallet and populates it with a given lovelace quantity and assets.
      * Special genesis transactions are added to the emulated chain in order to create these assets.
      * @param {bigint} lovelace

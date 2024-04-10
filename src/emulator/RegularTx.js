@@ -8,6 +8,9 @@ import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
  * @implements {EmulatorTx}
  */
 export class RegularTx {
+    /**
+     * @type {Tx}
+     */
     #tx
 
     /**
