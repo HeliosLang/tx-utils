@@ -442,6 +442,8 @@ export class TxBuilder {
                     Array.isArray(b)
                 )
             ) {
+                this.attachUplcProgram(a.context.program)
+
                 return this.mintUnsafe(
                     a.assetClass,
                     a.quantity,
