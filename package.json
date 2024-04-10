@@ -1,6 +1,6 @@
 {
     "name": "@helios-lang/tx-utils",
-    "version": "0.1.24",
+    "version": "0.1.25",
     "description": "Coinselection, query layers, wallets",
     "main": "src/index.js",
     "types": "types/index.d.ts",
