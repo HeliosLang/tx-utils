@@ -82,7 +82,7 @@ import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
  * @typedef {{
  *   maxAssetsPerChangeOutput?: number
  *   getFinalConfig?: () => (T extends "sync" ? TxBuilderFinalConfig : Promise<TxBuilderFinalConfig>)
- *   postBuild?: (b: Tx) => T
+ *   postBuild?: (b: Tx) => (T extends "sync" ? Tx : Promise<Tx>)
  * }} TxBuilderConfig
  */
 
