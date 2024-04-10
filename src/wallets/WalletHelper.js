@@ -229,10 +229,10 @@ export class WalletHelper {
      * Pick a number of UTxOs needed to cover a given Value. The default coin selection strategy is to pick the smallest first.
      * @param {Value} amount
      * @param {CoinSelection} coinSelection
-     * @returns {Promise<[TxInput<null, unknown>[], TxInput<null, unknown>[]]>} The first list contains the selected UTxOs, the second list contains the remaining UTxOs.
+     * @returns {Promise<TxInput<null, unknown>[]>}
      */
     async selectUtxos(amount, coinSelection = selectSmallestFirst) {
-        return coinSelection(await this.utxos, amount)
+        return coinSelection(await this.utxos, amount)[0]
     }
 
     /**
