@@ -66,18 +66,28 @@ import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
  */
 
 /**
- * @template {Tx | Promise<Tx>} [T=Tx]
+ * @typedef {"sync" | "async"} TxBuilderKind
+ */
+
+/**
  * @typedef {{
- *   maxAssetsPerChangeOutput?: number
  *   changeAddress?: AddressLike
  *   spareUtxos?: TxInput[]
  *   networkParams?: NetworkParams
+ * }} TxBuilderFinalConfig
+ */
+
+/**
+ * @template {TxBuilderKind} [T="sync"]
+ * @typedef {{
+ *   maxAssetsPerChangeOutput?: number
+ *   getFinalConfig?: () => (T extends "sync" ? TxBuilderFinalConfig : Promise<TxBuilderFinalConfig>)
  *   postBuild?: (b: Tx) => T
  * }} TxBuilderConfig
  */
 
 /**
- * @template {Tx | Promise<Tx>} T
+ * @template {TxBuilderKind} [T="sync"]
  */
 export class TxBuilder {
     /**
@@ -208,9 +218,9 @@ export class TxBuilder {
     }
 
     /**
-     * @template {Tx | Promise<Tx>} T
+     * @template {TxBuilderKind} [T="sync"]
      * @param {TxBuilderConfig<T>} config
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     static new(config = {}) {
         return new TxBuilder(config)
@@ -221,137 +231,47 @@ export class TxBuilder {
      *   changeAddress?: AddressLike
      *   networkParams?: NetworkParams | NetworkParamsHelper
      *   spareUtxos?: TxInput[]
-     * }} props
-     * @returns {T}
+     * }} config
+     * @returns {T extends "sync" ? Tx : Promise<Tx>}
      */
-    build(props = {}) {
-        // extract arguments
-        const changeAddress = Address.fromAlike(
-            expectSome(
-                props.changeAddress ?? this.config.changeAddress,
-                "changeAddress unspecified"
-            )
-        )
-        const networkParams = NetworkParamsHelper.fromAlikeOrDefault(
-            props.networkParams ?? this.config.networkParams
-        )
-        const spareUtxos = props.spareUtxos ?? this.config.spareUtxos ?? []
-
-        const { metadata, metadataHash } = this.buildMetadata()
-        const { firstValidSlot, lastValidSlot } =
-            this.buildValidityTimeRange(networkParams)
-
-        // TODO: there is no check here to assure that there aren't any redundant scripts included, this is left up the validation of Tx itself
-
-        // balance the non-ada assets, adding necessary change outputs
-        this.balanceAssets(changeAddress)
-
-        // start with the max possible fee, minimize later
-        const fee = networkParams.maxTxFee
-
-        // balance collateral (if collateral wasn't already set manually)
-        const collateralChangeOutput = this.balanceCollateral(
-            networkParams,
-            changeAddress,
-            spareUtxos.slice(),
-            fee
-        )
-
-        // make sure that each output contains the necessary minimum amount of lovelace
-        this.correctOutputs(networkParams)
-
-        // balance the lovelace using maxTxFee as the fee
-        const changeOutput = this.balanceLovelace(
-            networkParams,
-            changeAddress,
-            spareUtxos.slice(),
-            fee
-        )
-
-        // the final fee will never be higher than the current `fee`, so the inputs and outputs won't change, and we will get redeemers with the right indices
-        // the scripts executed at this point will not see the correct txHash nor the correct fee
-        const redeemers = this.buildRedeemers({
-            networkParams,
-            fee,
-            firstValidSlot,
-            lastValidSlot
-        })
-
-        const scriptDataHash = this.buildScriptDataHash(
-            networkParams,
-            redeemers
-        )
-
-        // TODO: correct the fee and the changeOutput
-
-        const tx = new Tx(
-            new TxBody({
-                inputs: this.inputs,
-                outputs: this.outputs,
-                refInputs: this.refInputs,
-                collateral: this.collateral,
-                collateralReturn: this.collateralReturn,
-                minted: this.mintedTokens,
-                withdrawals: this.withdrawals,
-                fee,
-                firstValidSlot,
-                lastValidSlot,
-                signers: this.signers,
-                dcerts: this.dcerts,
-                metadataHash,
-                scriptDataHash
-            }),
-            new TxWitnesses({
-                signatures: [],
-                datums: this.datums,
-                redeemers,
-                nativeScripts: this.nativeScripts,
-                v1Scripts: this.v1Scripts,
-                v2Scripts: this.v2Scripts,
-                v2RefScripts: this.v2RefScripts
-            }),
-            true,
-            metadata
-        )
-
-        // calculate the min fee
-        const finalFee = tx.calcMinFee(networkParams)
-        const feeDiff = fee - finalFee
-
-        if (feeDiff < 0n) {
-            throw new Error(
-                "internal error: expected finalFee to be smaller than maxTxFee"
+    build(config = {}) {
+        /**
+         * @param {any} config
+         */
+        const buildWithConfig = (config) => {
+            const tx = this.buildInternal(/** @type {any} */ (config))
+            return /** @type {any} */ (
+                this.config.postBuild ? this.config.postBuild(tx) : tx
             )
         }
 
-        // correct the change outputs
-        tx.body.fee = finalFee
-        changeOutput.value.lovelace += feeDiff // return part of the fee by adding
+        if (
+            config.changeAddress &&
+            config.networkParams &&
+            config.networkParams
+        ) {
+            return buildWithConfig(config)
+        } else if (this.config.getFinalConfig) {
+            const config = this.config.getFinalConfig()
 
-        if (collateralChangeOutput) {
-            const minCollateral = tx.calcMinCollateral(networkParams)
-
-            if (minCollateral > collateralChangeOutput.value.lovelace) {
-                throw new Error(
-                    "internal error: expected final Collateral to be smaller than initial collateral"
+            if (config instanceof Promise) {
+                return /** @type {any} */ (
+                    config.then((config) => {
+                        return buildWithConfig(config)
+                    })
                 )
+            } else {
+                return buildWithConfig(config)
             }
-
-            collateralChangeOutput.value.lovelace = minCollateral
-        }
-
-        // do a final validation of the tx
-        tx.validate(networkParams, true)
-
-        if (this.config.postBuild) {
-            return this.config.postBuild(tx)
+        } else if (config.changeAddress) {
+            return buildWithConfig(config)
         } else {
-            return /** @type {T} */ (tx)
+            throw new Error("changeAddress unspecified")
         }
     }
 
     /**
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     reset() {
         this.collateral = []
@@ -378,7 +298,7 @@ export class TxBuilder {
 
     /**
      * @param {TxInput | TxInput[]} utxo
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     addCollateral(utxo) {
         if (Array.isArray(utxo)) {
@@ -392,7 +312,7 @@ export class TxBuilder {
 
     /**
      * @param {DCert} dcert
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     addDCert(dcert) {
         this.dcerts.push(dcert)
@@ -410,7 +330,7 @@ export class TxBuilder {
 
     /**
      * @param {PubKeyHash[]} hash
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     addSigners(...hash) {
         hash.forEach((hash) => {
@@ -424,7 +344,7 @@ export class TxBuilder {
 
     /**
      * @param {NativeScript} script
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     attachNativeScript(script) {
         if (!this.hasNativeScript(script.hash())) {
@@ -436,7 +356,7 @@ export class TxBuilder {
 
     /**
      * @param {UplcProgramV1 | UplcProgramV2} program
-     * @return {TxBuilder}
+     * @return {TxBuilder<T>}
      */
     attachUplcProgram(program) {
         switch (program.plutusVersion) {
@@ -458,35 +378,35 @@ export class TxBuilder {
      * @overload
      * @param {TokenValue<MintingContext<any, TRedeemer>>} token
      * @param {TRedeemer} redeemer
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {TokenValue<null>} token
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {AssetClass<null>} assetClass
      * @param {bigint | number} quantity
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {MintingPolicyHash<null>} policy
      * @param {[ByteArrayLike, bigint | number][]} tokens
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @template TRedeemer
      * @overload
      * @param {AssetClass<MintingContext<any, TRedeemer>>} assetClass
      * @param {bigint | number} quantity
      * @param {TRedeemer} redeemer
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @template TRedeemer
      * @overload
      * @param {MintingPolicyHash<MintingContext<any, TRedeemer>>} policy
      * @param {[ByteArrayLike, bigint | number][]} tokens
      * @param {TRedeemer} redeemer
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @template TRedeemer
      * @param {[
@@ -499,7 +419,7 @@ export class TxBuilder {
      *   bigint | number | [ByteArrayLike, bigint | number][],
      *   TRedeemer
      * ]} args
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     mint(...args) {
         if (args.length == 1) {
@@ -571,13 +491,13 @@ export class TxBuilder {
      * @param {AssetClassLike} assetClass
      * @param {bigint | number} quantity
      * @param {Option<UplcData>} redeemer - can be None when minting from a Native script (but not set by default)
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {MintingPolicyHashLike} policy
      * @param {[ByteArrayLike, number | bigint][]} tokens - list of pairs of [tokenName, quantity], tokenName can be list of bytes or hex-string
      * @param {Option<UplcData>} redeemer - can be None when minting from a Native script (but not set by default)
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @template TRedeemer
      * @param {[
@@ -585,7 +505,7 @@ export class TxBuilder {
      * ] | [
      *   MintingPolicyHashLike, [ByteArrayLike, number | bigint][], Option<UplcData>
      * ]} args
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     mintUnsafe(...args) {
         const [a, b, redeemer] = args
@@ -649,14 +569,14 @@ export class TxBuilder {
      * @overload
      * @param {Address<null, any>} address
      * @param {ValueLike} value
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @template TDatum
      * @overload
      * @param {Address<DatumPaymentContext<TDatum>, any>} address
      * @param {ValueLike} value
      * @param {TxOutputDatumCastable<TDatum>} datum
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @template TDatum
      * @param {[
@@ -664,7 +584,7 @@ export class TxBuilder {
      * ] | [
      *   Address<DatumPaymentContext<TDatum>, any>, ValueLike, TxOutputDatumCastable<TDatum>
      * ]} args
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     pay(...args) {
         if (args.length == 2) {
@@ -686,17 +606,17 @@ export class TxBuilder {
      * @overload
      * @param {AddressLike} address
      * @param {ValueLike} value
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {AddressLike} address
      * @param {ValueLike} value
      * @param {TxOutputDatum} datum
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {TxOutput | TxOutput[]} output
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @param {[
      *   AddressLike, ValueLike
@@ -705,7 +625,7 @@ export class TxBuilder {
      * ] | [
      *   TxOutput | TxOutput[]
      * ]} args
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     payUnsafe(...args) {
         // handle overloads
@@ -737,7 +657,7 @@ export class TxBuilder {
     /**
      * Include a reference input
      * @param {TxInput[]} utxos
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     refer(...utxos) {
         utxos.forEach((utxo) => {
@@ -763,14 +683,14 @@ export class TxBuilder {
      * @overload
      * @param {number} key
      * @param {TxMetadataAttr} value
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {{[key: number]: TxMetadataAttr}} attributes
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @param {[number, TxMetadataAttr] | [{[key: number]: TxMetadataAttr}]} args
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     setMetadata(...args) {
         if (args.length == 2) {
@@ -788,13 +708,13 @@ export class TxBuilder {
     /**
      * @overload
      * @param {TxInput<null, any> | TxInput<null, any>[]} utxos
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      *
      * @template TRedeemer
      * @overload
      * @param {TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[]} utxos
      * @param {TRedeemer} redeemer
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     /**
      * @template TRedeemer
@@ -804,7 +724,7 @@ export class TxBuilder {
      *   TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[],
      *   TRedeemer
      * ]} args
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     spend(...args) {
         if (args.length == 1) {
@@ -842,7 +762,7 @@ export class TxBuilder {
      * Throws an error if the UTxO is locked at a script address but a redeemer isn't specified (unless the script is a known `NativeScript`).
      * @param {TxInput | TxInput[]} utxos
      * @param {Option<UplcData>} redeemer
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     spendUnsafe(utxos, redeemer = None) {
         if (Array.isArray(utxos)) {
@@ -910,7 +830,7 @@ export class TxBuilder {
     /**
      * Set the start of the valid time range by specifying a slot.
      * @param {bigint | number} slot
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     validFromSlot(slot) {
         this.validFrom = BigInt(slot)
@@ -921,7 +841,7 @@ export class TxBuilder {
     /**
      * Set the start of the valid time range by specifying a time.
      * @param {TimeLike} time
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     validFromTime(time) {
         this.validFrom = timeToDate(time)
@@ -932,7 +852,7 @@ export class TxBuilder {
     /**
      * Set the end of the valid time range by specifying a slot.
      * @param {bigint | number} slot
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     validToSlot(slot) {
         this.validTo = BigInt(slot)
@@ -943,7 +863,7 @@ export class TxBuilder {
     /**
      * Set the end of the valid time range by specifying a time.
      * @param {TimeLike} time
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     validToTime(time) {
         this.validTo = timeToDate(time)
@@ -954,7 +874,7 @@ export class TxBuilder {
     /**
      * @param {StakingAddressLike} addr
      * @param {bigint | number} lovelace
-     * @returns {TxBuilder}
+     * @returns {TxBuilder<T>}
      */
     withdraw(addr, lovelace) {
         const stakingAddress = StakingAddress.fromAlike(addr)
@@ -1446,6 +1366,131 @@ export class TxBuilder {
         })
 
         return changeOutput
+    }
+
+    /**
+     * @param {{
+     *   changeAddress: AddressLike
+     *   networkParams?: NetworkParams | NetworkParamsHelper
+     *   spareUtxos?: TxInput[]
+     * }} props
+     * @returns {Tx}
+     */
+    buildInternal(props) {
+        // extract arguments
+        const changeAddress = Address.fromAlike(props.changeAddress)
+        const networkParams = NetworkParamsHelper.fromAlikeOrDefault(
+            props.networkParams
+        )
+        const spareUtxos = props.spareUtxos ?? []
+
+        const { metadata, metadataHash } = this.buildMetadata()
+        const { firstValidSlot, lastValidSlot } =
+            this.buildValidityTimeRange(networkParams)
+
+        // TODO: there is no check here to assure that there aren't any redundant scripts included, this is left up the validation of Tx itself
+
+        // balance the non-ada assets, adding necessary change outputs
+        this.balanceAssets(changeAddress)
+
+        // start with the max possible fee, minimize later
+        const fee = networkParams.maxTxFee
+
+        // balance collateral (if collateral wasn't already set manually)
+        const collateralChangeOutput = this.balanceCollateral(
+            networkParams,
+            changeAddress,
+            spareUtxos.slice(),
+            fee
+        )
+
+        // make sure that each output contains the necessary minimum amount of lovelace
+        this.correctOutputs(networkParams)
+
+        // balance the lovelace using maxTxFee as the fee
+        const changeOutput = this.balanceLovelace(
+            networkParams,
+            changeAddress,
+            spareUtxos.slice(),
+            fee
+        )
+
+        // the final fee will never be higher than the current `fee`, so the inputs and outputs won't change, and we will get redeemers with the right indices
+        // the scripts executed at this point will not see the correct txHash nor the correct fee
+        const redeemers = this.buildRedeemers({
+            networkParams,
+            fee,
+            firstValidSlot,
+            lastValidSlot
+        })
+
+        const scriptDataHash = this.buildScriptDataHash(
+            networkParams,
+            redeemers
+        )
+
+        // TODO: correct the fee and the changeOutput
+
+        const tx = new Tx(
+            new TxBody({
+                inputs: this.inputs,
+                outputs: this.outputs,
+                refInputs: this.refInputs,
+                collateral: this.collateral,
+                collateralReturn: this.collateralReturn,
+                minted: this.mintedTokens,
+                withdrawals: this.withdrawals,
+                fee,
+                firstValidSlot,
+                lastValidSlot,
+                signers: this.signers,
+                dcerts: this.dcerts,
+                metadataHash,
+                scriptDataHash
+            }),
+            new TxWitnesses({
+                signatures: [],
+                datums: this.datums,
+                redeemers,
+                nativeScripts: this.nativeScripts,
+                v1Scripts: this.v1Scripts,
+                v2Scripts: this.v2Scripts,
+                v2RefScripts: this.v2RefScripts
+            }),
+            true,
+            metadata
+        )
+
+        // calculate the min fee
+        const finalFee = tx.calcMinFee(networkParams)
+        const feeDiff = fee - finalFee
+
+        if (feeDiff < 0n) {
+            throw new Error(
+                "internal error: expected finalFee to be smaller than maxTxFee"
+            )
+        }
+
+        // correct the change outputs
+        tx.body.fee = finalFee
+        changeOutput.value.lovelace += feeDiff // return part of the fee by adding
+
+        if (collateralChangeOutput) {
+            const minCollateral = tx.calcMinCollateral(networkParams)
+
+            if (minCollateral > collateralChangeOutput.value.lovelace) {
+                throw new Error(
+                    "internal error: expected final Collateral to be smaller than initial collateral"
+                )
+            }
+
+            collateralChangeOutput.value.lovelace = minCollateral
+        }
+
+        // do a final validation of the tx
+        tx.validate(networkParams, true)
+
+        return tx
     }
 
     /**
