@@ -28,14 +28,11 @@ export class NetworkHelper {
     }
 
     /**
-     *
      * @param {Address} address
      * @returns {Promise<Value>}
      */
     async calcBalance(address) {
-        const utxos = await this.getUtxos(address)
-
-        return Value.sum(utxos.map((utxo) => utxo.value))
+        return Value.sum(await this.getUtxos(address))
     }
 
     /**

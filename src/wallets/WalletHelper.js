@@ -132,10 +132,7 @@ export class WalletHelper {
      * @returns {Promise<Value>}
      */
     async calcBalance() {
-        return (await this.utxos).reduce(
-            (sum, utxo) => sum.add(utxo.value),
-            new Value()
-        )
+        return Value.sum(await this.utxos)
     }
 
     /**
