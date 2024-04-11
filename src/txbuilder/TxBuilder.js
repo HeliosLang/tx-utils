@@ -1694,11 +1694,13 @@ export class TxBuilder {
 
                 if (isLeft(profile.result)) {
                     if (script.alt) {
-                        const profile = script.eval(
+                        const profile = script.alt.eval(
                             args.map((a) => new UplcDataValue(a))
                         )
 
                         throw new Error(expectLeft(profile.result).error)
+                    } else {
+                        console.error("no alt script attached")
                     }
 
                     throw new Error(profile.result.left.error)
@@ -1739,11 +1741,13 @@ export class TxBuilder {
 
                 if (isLeft(profile.result)) {
                     if (script.alt) {
-                        const profile = script.eval(
+                        const profile = script.alt.eval(
                             args.map((a) => new UplcDataValue(a))
                         )
 
                         throw new Error(expectLeft(profile.result).error)
+                    } else {
+                        console.error("no alt script attached")
                     }
 
                     throw new Error(profile.result.left.error)
