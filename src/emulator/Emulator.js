@@ -12,8 +12,10 @@ import { RootPrivateKey } from "../keys/index.js"
 import { SimpleWallet } from "../wallets/index.js"
 import { GenesisTx } from "./GenesisTx.js"
 import { RegularTx } from "./RegularTx.js"
+import { SECOND } from "../duration/index.js"
 
 /**
+ * @typedef {import("@helios-lang/codec-utils").IntLike} IntLike
  * @typedef {import("@helios-lang/crypto").NumberGenerator} NumberGenerator
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
  * @typedef {import("../network/Network.js").Network} Network
@@ -65,6 +67,14 @@ export class Emulator {
         this.genesis = []
         this.mempool = []
         this.blocks = []
+    }
+
+    /**
+     * Each slot is assumed to be 1000 milliseconds
+     * @returns {number} - milliseconds since start of emulation
+     */
+    get now() {
+        return SECOND * this.currentSlot
     }
 
     /**
@@ -239,7 +249,7 @@ export class Emulator {
 
     /**
      * Mint a block with the current mempool, and advance the slot by a number of slots.
-     * @param {number | bigint} nSlots
+     * @param {IntLike} nSlots
      */
     tick(nSlots) {
         if (Number(nSlots) == 0) {

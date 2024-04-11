@@ -66,6 +66,15 @@ export class KoiosV0 {
     }
 
     /**
+     * ms since 1970
+     * Note: the emulator uses an arbitrary reference, so to be able to treat all Networks equally this must be implemented
+     * @type {number}
+     */
+    get now() {
+        return Date.now()
+    }
+
+    /**
      * @type {Promise<NetworkParams>}
      */
     get parameters() {

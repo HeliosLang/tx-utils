@@ -29,9 +29,9 @@
         "typescript": "^5.4.4"
     },
     "dependencies": {
-        "@helios-lang/codec-utils": "^0.1.27",
+        "@helios-lang/codec-utils": "^0.1.28",
         "@helios-lang/crypto": "^0.1.7",
-        "@helios-lang/ledger": "^0.1.43",
+        "@helios-lang/ledger": "^0.1.44",
         "@helios-lang/type-utils": "^0.1.8",
         "@helios-lang/uplc": "^0.1.24"
     }

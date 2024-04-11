@@ -1,4 +1,4 @@
-import { bytesToHex, equalsBytes } from "@helios-lang/codec-utils"
+import { bytesToHex, equalsBytes, toInt } from "@helios-lang/codec-utils"
 import {
     Address,
     Assets,
@@ -12,7 +12,6 @@ import {
     ScriptPurpose,
     SpendingCredential,
     StakingAddress,
-    timeToDate,
     Tx,
     TxBody,
     TxId,
@@ -24,19 +23,22 @@ import {
     TxWitnesses,
     ValidatorHash,
     Value,
-    TokenValue
+    TokenValue,
+    toTime
 } from "@helios-lang/ledger"
 import {
     None,
     expectLeft,
     expectSome,
     isLeft,
-    isNone
+    isNone,
+    isRight
 } from "@helios-lang/type-utils"
 import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
 
 /**
  * @typedef {import("@helios-lang/codec-utils").ByteArrayLike} ByteArrayLike
+ * @typedef {import("@helios-lang/codec-utils").IntLike} IntLike
  * @typedef {import("@helios-lang/ledger").AddressLike} AddressLike
  * @typedef {import("@helios-lang/ledger").AssetClassLike} AssetClassLike
  * @typedef {import("@helios-lang/ledger").MintingPolicyHashLike} MintingPolicyHashLike
@@ -177,17 +179,15 @@ export class TxBuilder {
 
     /**
      * Upon finalization the slot is calculated and stored in the body
-     * bigint: slot, Date: regular time
      * @private
-     * @type {Option<bigint | Date>}
+     * @type {Option<Either<{slot: number}, {timestamp: number}>>}
      */
     validTo
 
     /**
      * Upon finalization the slot is calculated and stored in the body
-     * bigint: slot, Date: regular time
      * @private
-     * @type {Option<bigint | Date>}
+     * @type {Option<Either<{slot: number}, {timestamp: number}>>}
      */
     validFrom
 
@@ -349,6 +349,14 @@ export class TxBuilder {
     }
 
     /**
+     * @param {(b: TxBuilder<T>) => TxBuilder<T>} fn
+     * @returns {TxBuilder<T>}
+     */
+    apply(fn) {
+        return fn(this)
+    }
+
+    /**
      * @param {NativeScript} script
      * @returns {TxBuilder<T>}
      */
@@ -392,25 +400,25 @@ export class TxBuilder {
      *
      * @overload
      * @param {AssetClass<null>} assetClass
-     * @param {bigint | number} quantity
+     * @param {IntLike} quantity
      * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {MintingPolicyHash<null>} policy
-     * @param {[ByteArrayLike, bigint | number][]} tokens
+     * @param {[ByteArrayLike, IntLike][]} tokens
      * @returns {TxBuilder<T>}
      *
      * @template TRedeemer
      * @overload
      * @param {AssetClass<MintingContext<any, TRedeemer>>} assetClass
-     * @param {bigint | number} quantity
+     * @param {IntLike} quantity
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder<T>}
      *
      * @template TRedeemer
      * @overload
      * @param {MintingPolicyHash<MintingContext<any, TRedeemer>>} policy
-     * @param {[ByteArrayLike, bigint | number][]} tokens
+     * @param {[ByteArrayLike, IntLike][]} tokens
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder<T>}
      *
@@ -419,10 +427,10 @@ export class TxBuilder {
      *   TokenValue<null>
      * ] | [
      *   AssetClass<null> | MintingPolicyHash<null> | TokenValue<MintingContext<any, TRedeemer>>,
-     *   bigint | number | [ByteArrayLike, bigint | number][] | TRedeemer
+     *   IntLike | [ByteArrayLike, IntLike][] | TRedeemer
      * ] | [
      *   AssetClass<MintingContext<any, TRedeemer>> | MintingPolicyHash<MintingContext<any, TRedeemer>>,
-     *   bigint | number | [ByteArrayLike, bigint | number][],
+     *   IntLike | [ByteArrayLike, IntLike][],
      *   TRedeemer
      * ]} args
      * @returns {TxBuilder<T>}
@@ -490,21 +498,21 @@ export class TxBuilder {
      *
      * @overload
      * @param {AssetClassLike} assetClass
-     * @param {bigint | number} quantity
+     * @param {IntLike} quantity
      * @param {Option<UplcData>} redeemer - can be None when minting from a Native script (but not set by default)
      * @returns {TxBuilder<T>}
      *
      * @overload
      * @param {MintingPolicyHashLike} policy
-     * @param {[ByteArrayLike, number | bigint][]} tokens - list of pairs of [tokenName, quantity], tokenName can be list of bytes or hex-string
+     * @param {[ByteArrayLike, IntLike][]} tokens - list of pairs of [tokenName, quantity], tokenName can be list of bytes or hex-string
      * @param {Option<UplcData>} redeemer - can be None when minting from a Native script (but not set by default)
      * @returns {TxBuilder<T>}
      *
      * @template TRedeemer
      * @param {[
-     *   AssetClassLike, bigint | number, Option<UplcData>
+     *   AssetClassLike, IntLike, Option<UplcData>
      * ] | [
-     *   MintingPolicyHashLike, [ByteArrayLike, number | bigint][], Option<UplcData>
+     *   MintingPolicyHashLike, [ByteArrayLike, IntLike][], Option<UplcData>
      * ]} args
      * @returns {TxBuilder<T>}
      */
@@ -521,7 +529,7 @@ export class TxBuilder {
                 return [
                     assetClass.mph,
                     [
-                        /** @type {[number[], bigint | number]} */ ([
+                        /** @type {[number[], IntLike]} */ ([
                             assetClass.tokenName,
                             b
                         ])
@@ -830,11 +838,11 @@ export class TxBuilder {
 
     /**
      * Set the start of the valid time range by specifying a slot.
-     * @param {bigint | number} slot
+     * @param {IntLike} slot
      * @returns {TxBuilder<T>}
      */
     validFromSlot(slot) {
-        this.validFrom = BigInt(slot)
+        this.validFrom = { left: { slot: toInt(slot) } }
 
         return this
     }
@@ -845,18 +853,18 @@ export class TxBuilder {
      * @returns {TxBuilder<T>}
      */
     validFromTime(time) {
-        this.validFrom = timeToDate(time)
+        this.validFrom = { right: { timestamp: toTime(time) } }
 
         return this
     }
 
     /**
      * Set the end of the valid time range by specifying a slot.
-     * @param {bigint | number} slot
+     * @param {IntLike} slot
      * @returns {TxBuilder<T>}
      */
     validToSlot(slot) {
-        this.validTo = BigInt(slot)
+        this.validTo = { left: { slot: toInt(slot) } }
 
         return this
     }
@@ -867,14 +875,14 @@ export class TxBuilder {
      * @returns {TxBuilder<T>}
      */
     validToTime(time) {
-        this.validTo = timeToDate(time)
+        this.validTo = { right: { timestamp: toTime(time) } }
 
         return this
     }
 
     /**
      * @param {StakingAddressLike} addr
-     * @param {bigint | number} lovelace
+     * @param {IntLike} lovelace
      * @returns {TxBuilder<T>}
      */
     withdraw(addr, lovelace) {
@@ -1607,8 +1615,8 @@ export class TxBuilder {
      * @param {{
      *   fee: bigint
      *   networkParams: NetworkParamsHelper
-     *   firstValidSlot: Option<bigint>
-     *   lastValidSlot: Option<bigint>
+     *   firstValidSlot: Option<number>
+     *   lastValidSlot: Option<number>
      * }} execContext
      * @returns {TxRedeemer[]}
      */
@@ -1642,8 +1650,8 @@ export class TxBuilder {
     /**
      * @private
      * @param {bigint} fee
-     * @param {Option<bigint>} firstValidSlot
-     * @param {Option<bigint>} lastValidSlot
+     * @param {Option<number>} firstValidSlot
+     * @param {Option<number>} lastValidSlot
      * @returns {TxBody}
      */
     buildDummyTxBody(fee, firstValidSlot, lastValidSlot) {
@@ -1778,19 +1786,20 @@ export class TxBuilder {
      * @private
      * @param {NetworkParamsHelper} networkParams
      * @returns {{
-     *   firstValidSlot: Option<bigint>
-     *   lastValidSlot: Option<bigint>
+     *   firstValidSlot: Option<number>
+     *   lastValidSlot: Option<number>
      * }}
      */
     buildValidityTimeRange(networkParams) {
         /**
-         * @param {bigint | Date} slotOrTime
+         * @param {Either<{slot: number}, {timestamp: number}>} slotOrTime
+         * @return {number}
          */
         function slotOrTimeToSlot(slotOrTime) {
-            if (slotOrTime instanceof Date) {
-                return networkParams.timeToSlot(slotOrTime.getTime())
+            if (isRight(slotOrTime)) {
+                return networkParams.timeToSlot(slotOrTime.right.timestamp)
             } else {
-                return slotOrTime
+                return slotOrTime.left.slot
             }
         }
 

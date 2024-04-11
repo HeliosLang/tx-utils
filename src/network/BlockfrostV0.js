@@ -217,6 +217,15 @@ export class BlockfrostV0 {
     }
 
     /**
+     * ms since 1970
+     * Note: the emulator uses an arbitrary reference, so to be able to treat all Networks equally this must be implemented
+     * @type {number}
+     */
+    get now() {
+        return Date.now()
+    }
+
+    /**
      * Note: this requires two API calls to blockfrost, because we also need information about the tip
      * @returns {Promise<NetworkParams>}
      */

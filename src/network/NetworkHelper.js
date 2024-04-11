@@ -9,6 +9,7 @@ import { selectSmallestFirst } from "../coinselection/index.js"
 import { None } from "@helios-lang/type-utils"
 
 /**
+ * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
  * @typedef {import("../coinselection/index.js").CoinSelection} CoinSelection
  * @typedef {import("./Network.js").Network} Network
  */
@@ -25,6 +26,20 @@ export class NetworkHelper {
      */
     constructor(network) {
         this.network = network
+    }
+
+    /**
+     * @type {number}
+     */
+    get now() {
+        return this.network.now
+    }
+
+    /**
+     * @type {Promise<NetworkParams>}
+     */
+    get parameters() {
+        return this.network.parameters
     }
 
     /**
