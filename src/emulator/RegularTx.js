@@ -50,7 +50,10 @@ export class RegularTx {
         txOutputs.forEach((txOutput, utxoId) => {
             if (equalsBytes(txOutput.address.bytes, address.bytes)) {
                 utxos.push(
-                    new TxInput(new TxOutputId(this.id(), utxoId), txOutput)
+                    new TxInput(
+                        new TxOutputId(this.id(), utxoId),
+                        txOutput.copy()
+                    )
                 )
             }
         })
@@ -74,7 +77,7 @@ export class RegularTx {
 
         this.#tx.body.outputs.forEach((output, i) => {
             if (i == id.utxoIdx) {
-                utxo = new TxInput(id, output)
+                utxo = new TxInput(id, output.copy())
             }
         })
 

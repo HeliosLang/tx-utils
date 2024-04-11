@@ -72,7 +72,7 @@ export class GenesisTx {
                     new TxOutputId(this.id(), 0),
                     new TxOutput(
                         this.#address,
-                        new Value(this.#lovelace, this.#assets)
+                        new Value(this.#lovelace, this.#assets.copy())
                     )
                 )
             )
