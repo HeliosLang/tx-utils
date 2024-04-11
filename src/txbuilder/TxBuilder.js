@@ -508,7 +508,7 @@ export class TxBuilder {
         // handle the overloads
         const [mph, tokens] = (() => {
             if (typeof b == "bigint" || typeof b == "number") {
-                const assetClass = AssetClass.fromAlike(
+                const assetClass = AssetClass.new(
                     /** @type {AssetClassLike} */ (a)
                 )
 
@@ -523,7 +523,7 @@ export class TxBuilder {
                 ]
             } else if (Array.isArray(b)) {
                 return [
-                    MintingPolicyHash.fromAlike(
+                    MintingPolicyHash.new(
                         /** @type {MintingPolicyHashLike} */ (a)
                     ),
                     b
@@ -628,11 +628,11 @@ export class TxBuilder {
             if (args.length == 1) {
                 return args[0]
             } else if (args.length == 2) {
-                return new TxOutput(Address.fromAlike(args[0]), args[1], None)
+                return new TxOutput(Address.new(args[0]), args[1], None)
             } else if (args.length == 3) {
                 const datum = args[2]
 
-                return new TxOutput(Address.fromAlike(args[0]), args[1], datum)
+                return new TxOutput(Address.new(args[0]), args[1], datum)
             } else {
                 throw new Error("invalid arguments")
             }
@@ -872,7 +872,7 @@ export class TxBuilder {
      * @returns {TxBuilder<T>}
      */
     withdraw(addr, lovelace) {
-        const stakingAddress = StakingAddress.fromAlike(addr)
+        const stakingAddress = StakingAddress.new(addr)
 
         /**
          * @type {[StakingAddress, bigint]}
@@ -925,7 +925,7 @@ export class TxBuilder {
      * @param {UplcData} data
      */
     addMintingRedeemer(policy, data) {
-        const mph = MintingPolicyHash.fromAlike(policy)
+        const mph = MintingPolicyHash.new(policy)
 
         if (this.hasMintingRedeemer(mph)) {
             throw new Error("redeemer already added")
@@ -1373,7 +1373,7 @@ export class TxBuilder {
      */
     buildInternal(props) {
         // extract arguments
-        const changeAddress = Address.fromAlike(props.changeAddress)
+        const changeAddress = Address.new(props.changeAddress)
         const networkParams = NetworkParamsHelper.fromAlikeOrDefault(
             props.networkParams
         )

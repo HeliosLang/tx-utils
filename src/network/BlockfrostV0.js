@@ -508,7 +508,7 @@ export class BlockfrostV0 {
         }
 
         return new TxInput(
-            new TxOutputId(TxId.fromAlike(obj.tx_hash), obj.output_index),
+            new TxOutputId(TxId.new(obj.tx_hash), obj.output_index),
             new TxOutput(
                 Address.fromBech32(obj.address),
                 Value.fromBlockfrost(obj.amount),

@@ -221,7 +221,7 @@ export class KoiosV0 {
                     }
 
                     assets.push([
-                        AssetClass.fromAlike(
+                        AssetClass.new(
                             `${rawAsset.policy_id}.${rawAsset.asset_name ?? ""}`
                         ),
                         qty
