@@ -26,7 +26,13 @@ import {
     Value,
     TokenValue
 } from "@helios-lang/ledger"
-import { None, expectSome, isNone } from "@helios-lang/type-utils"
+import {
+    None,
+    expectLeft,
+    expectSome,
+    isLeft,
+    isNone
+} from "@helios-lang/type-utils"
 import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
 
 /**
@@ -1686,6 +1692,18 @@ export class TxBuilder {
                     args.map((a) => new UplcDataValue(a))
                 )
 
+                if (isLeft(profile.result)) {
+                    if (script.alt) {
+                        const profile = script.eval(
+                            args.map((a) => new UplcDataValue(a))
+                        )
+
+                        throw new Error(expectLeft(profile.result).error)
+                    }
+
+                    throw new Error(profile.result.left.error)
+                }
+
                 redeemer = TxRedeemer.Minting(i, data, profile.cost)
             }
 
@@ -1718,6 +1736,18 @@ export class TxBuilder {
                 const profile = script.eval(
                     args.map((a) => new UplcDataValue(a))
                 )
+
+                if (isLeft(profile.result)) {
+                    if (script.alt) {
+                        const profile = script.eval(
+                            args.map((a) => new UplcDataValue(a))
+                        )
+
+                        throw new Error(expectLeft(profile.result).error)
+                    }
+
+                    throw new Error(profile.result.left.error)
+                }
 
                 redeemer = TxRedeemer.Spending(i, data, profile.cost)
             }
