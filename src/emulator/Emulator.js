@@ -3,6 +3,7 @@ import {
     Address,
     Assets,
     DEFAULT_NETWORK_PARAMS,
+    NetworkParamsHelper,
     Tx,
     TxId,
     TxInput,
@@ -81,17 +82,22 @@ export class Emulator {
      * @returns {Promise<NetworkParams>}
      */
     get parameters() {
-        return new Promise((resolve, _) =>
-            resolve({
-                ...DEFAULT_NETWORK_PARAMS,
-                latestTip: {
-                    epoch: 0,
-                    hash: "",
-                    slot: this.currentSlot,
-                    time: 0
-                }
-            })
-        )
+        return new Promise((resolve, _) => resolve(this.parametersSync))
+    }
+
+    /**
+     * @returns {NetworkParams}
+     */
+    get parametersSync() {
+        return {
+            ...DEFAULT_NETWORK_PARAMS,
+            latestTip: {
+                epoch: 0,
+                hash: "",
+                slot: this.currentSlot,
+                time: 0
+            }
+        }
     }
 
     /**
@@ -234,7 +240,9 @@ export class Emulator {
         this.warnMempool()
 
         if (!tx.isValidSlot(BigInt(this.currentSlot))) {
-            throw new Error("tx invalid (not finalized or slot out of range)")
+            throw new Error(
+                `tx invalid (slot out of range, ${this.currentSlot} not in ${tx.body.getValidityTimeRange(new NetworkParamsHelper(this.parametersSync)).toString()})`
+            )
         }
 
         // make sure that none of the inputs have been consumed before
