@@ -93,9 +93,9 @@ export class Emulator {
             ...DEFAULT_NETWORK_PARAMS,
             latestTip: {
                 epoch: 0,
-                hash: "",
+                hash: "", // there are no block hashes in the emulator currently
                 slot: this.currentSlot,
-                time: 0
+                time: this.currentSlot
             }
         }
     }
