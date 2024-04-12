@@ -22,6 +22,8 @@ export const selectSmallestFirst = (utxos, amount) => {
 }
 
 /**
+ * Loops through the policies and tokens of `amount`
+ *   - if for a given asset there isn't enough already included, select the previously unselected utxos until the necessary quantity is filled (starting the extremum first)
  * @param {TxInput[]} utxos
  * @param {Value} amount
  * @param {boolean} largestFirst
