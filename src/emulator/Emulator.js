@@ -95,7 +95,7 @@ export class Emulator {
                 epoch: 0,
                 hash: "", // there are no block hashes in the emulator currently
                 slot: this.currentSlot,
-                time: this.currentSlot
+                time: this.now
             }
         }
     }
