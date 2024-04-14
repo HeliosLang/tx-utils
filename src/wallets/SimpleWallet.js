@@ -111,6 +111,7 @@ export class SimpleWallet {
      */
     get address() {
         return Address.fromHashes(
+            this.network.isMainnet(),
             this.spendingPubKeyHash,
             this.stakingPubKeyHash
         )
@@ -138,7 +139,10 @@ export class SimpleWallet {
      */
     get stakingAddress() {
         if (this.stakingPubKey) {
-            return StakingAddress.fromHash(this.stakingPubKey.toHash())
+            return StakingAddress.fromHash(
+                this.network.isMainnet(),
+                this.stakingPubKey.toHash()
+            )
         } else {
             return None
         }

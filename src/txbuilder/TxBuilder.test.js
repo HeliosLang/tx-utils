@@ -26,7 +26,7 @@ describe(`basic ${TxBuilder.name}`, () => {
             "d4b22d33611fb2b3764080cb349b3f12d353aef1d4319ee33e44594bbebe5e83#0",
             new TxOutput(wallet1, 10_000_000_000n)
         )
-        const tx = TxBuilder.new()
+        const tx = TxBuilder.new({ isMainnet: false })
             .spendUnsafe(input1)
             .payUnsafe(wallet2, 10_000_000n)
             .build({ changeAddress: wallet1 })

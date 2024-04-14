@@ -88,6 +88,7 @@ import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
 /**
  * @template {TxBuilderKind} [T="sync"]
  * @typedef {{
+ *   isMainnet: boolean
  *   maxAssetsPerChangeOutput?: number
  *   getFinalConfig?: () => (T extends "sync" ? TxBuilderFinalConfig : Promise<TxBuilderFinalConfig>)
  *   postBuild?: (b: Tx) => (T extends "sync" ? Tx : Promise<Tx>)
@@ -228,7 +229,7 @@ export class TxBuilder {
      * @param {TxBuilderConfig<T>} config
      * @returns {TxBuilder<T>}
      */
-    static new(config = {}) {
+    static new(config) {
         return new TxBuilder(config)
     }
 
@@ -886,7 +887,7 @@ export class TxBuilder {
      * @returns {TxBuilder<T>}
      */
     withdraw(addr, lovelace) {
-        const stakingAddress = StakingAddress.new(addr)
+        const stakingAddress = StakingAddress.new(this.config.isMainnet, addr)
 
         /**
          * @type {[StakingAddress, bigint]}
@@ -1388,9 +1389,7 @@ export class TxBuilder {
     buildInternal(props) {
         // extract arguments
         const changeAddress = Address.new(props.changeAddress)
-        const networkParams = NetworkParamsHelper.fromAlikeOrDefault(
-            props.networkParams
-        )
+        const networkParams = NetworkParamsHelper.new(props.networkParams)
         const spareUtxos = props.spareUtxos ?? []
 
         const { metadata, metadataHash } = this.buildMetadata()

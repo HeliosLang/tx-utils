@@ -201,11 +201,11 @@ export class KoiosV0 {
                     : None
 
                 const address = Address.fromHashes(
+                    this.networkName == "mainnet",
                     expectSome(
                         paymentAddr.pubKeyHash ?? paymentAddr.validatorHash
                     ),
-                    stakeAddr?.stakingHash?.hash,
-                    this.networkName != "mainnet"
+                    stakeAddr?.stakingHash?.hash
                 )
 
                 const lovelace = BigInt(parseInt(expectSome(rawOutput.value)))
