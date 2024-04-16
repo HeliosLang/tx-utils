@@ -816,7 +816,9 @@ export class TxBuilder {
                 throw new Error("expected non-null datum")
             }
 
-            this.addDatum(datum.data)
+            if (datum.isHash()) {
+                this.addDatum(datum.data)
+            }
         } else if (spendingCredential.isValidator()) {
             // redeemerless spending from a validator is only possible if it is a native script
 
@@ -916,6 +918,7 @@ export class TxBuilder {
 
     /**
      * Doesn't throw an error if already added before
+     * @private
      * @param {UplcData} data
      */
     addDatum(data) {
