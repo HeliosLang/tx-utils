@@ -88,7 +88,19 @@ export class NetworkHelper {
      * @returns {Promise<TxInput<CSpending, CStaking>[]>}
      */
     async getUtxos(address) {
-        return this.network.getUtxos(address)
+        const utxos = await this.network.getUtxos(address)
+
+        return utxos.map((utxo) => {
+            return new TxInput(
+                utxo.id,
+                new TxOutput(
+                    address,
+                    utxo.value,
+                    utxo.datum,
+                    utxo.output.refScript
+                )
+            )
+        })
     }
 
     /**
