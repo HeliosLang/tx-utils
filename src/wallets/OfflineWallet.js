@@ -76,7 +76,7 @@ export class OfflineWallet {
             return OfflineWallet.fromJson(JSON.parse(obj))
         } else {
             return new OfflineWallet(
-                obj.networkName,
+                obj.networkName ?? (obj.isMainnet ? "mainnet" : "preprod"),
                 obj.usedAddresses.map((a) => Address.fromBech32(a)),
                 obj.unusedAddresses.map((a) => Address.fromBech32(a)),
                 obj.utxos.map((u) => TxInput.fromCbor(u))
