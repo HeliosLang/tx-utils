@@ -31,7 +31,7 @@
     "dependencies": {
         "@helios-lang/codec-utils": "^0.1.29",
         "@helios-lang/crypto": "^0.1.8",
-        "@helios-lang/ledger": "^0.2.2",
+        "@helios-lang/ledger": "^0.2.3",
         "@helios-lang/type-utils": "^0.1.8",
         "@helios-lang/uplc": "^0.1.27"
     }
