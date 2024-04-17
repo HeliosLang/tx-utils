@@ -106,6 +106,7 @@ function selectExtremumFirst(utxos, amount, largestFirst) {
 
     /**
      * Select UTxOs while looping through (MintingPolicyHash,TokenName) entries
+     * If the UTxOs happen to contain Asset classes that shouldn't be involved, then those are mixed in
      */
     const mphs = amount.assets.getPolicies()
 
@@ -126,14 +127,42 @@ function selectExtremumFirst(utxos, amount, largestFirst) {
         }
     }
 
-    // now use the same strategy for lovelace
+    /**
+     * Now use the same strategy for lovelace
+     * Except that UTxOs containing Asset classes not involved in this transaction are ignored
+     */
     const need = amount.lovelace
     const have = sum.lovelace
 
     if (have < need) {
         const diff = need - have
 
+        /**
+         * @param {TxInput} utxo
+         * @returns {boolean}
+         */
+        const canSelectUtxoForLovelace = (utxo) => {
+            const acs = utxo.value.assets.assetClasses
+
+            if (acs.length == 0) {
+                return true
+            } else {
+                return acs.some((ac) =>
+                    amount.assetClasses.some((act) => act.isEqual(ac))
+                )
+            }
+        }
+
+        const usuableForLovelace = notSelected.filter(canSelectUtxoForLovelace)
+        const unusableForLovelace = notSelected.filter(
+            (utxo) => !canSelectUtxoForLovelace(utxo)
+        )
+
+        notSelected = usuableForLovelace
+
         select(diff, (utxo) => utxo.value.lovelace)
+
+        notSelected = notSelected.concat(unusableForLovelace)
     }
 
     if (selected.length + notSelected.length != utxos.length) {
