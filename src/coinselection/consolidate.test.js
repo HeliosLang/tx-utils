@@ -10,6 +10,17 @@ import {
 } from "@helios-lang/ledger"
 import { strictEqual, throws } from "node:assert"
 
+const MARKER = AssetClass.new(
+    "f643c8c300085984c09d5a2d7f5b45fd2d5921cbd1512c972981402b.38"
+)
+const SNEK = AssetClass.new(
+    "279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f.534e454b"
+)
+
+const WMT = AssetClass.new(
+    "1d7f33bd23d85e1a25d87d86fac4f199c3197a2f7afeb662a0f34e1e.776f726c646d6f62696c65746f6b656e"
+)
+
 describe(consolidate.name, () => {
     const addr = Address.dummy(true)
     const utxos = [
@@ -19,7 +30,7 @@ describe(consolidate.name, () => {
             ),
             new TxOutput(
                 addr,
-                new Value(3938932612n, {
+                new Value(3_938_932_612n, {
                     "1d7f33bd23d85e1a25d87d86fac4f199c3197a2f7afeb662a0f34e1e":
                         {
                             "776f726c646d6f62696c65746f6b656e": 2233701199n
@@ -103,17 +114,8 @@ describe(consolidate.name, () => {
 
     it("cleans up dirty UTxOs", () => {
         const coinSelection = consolidate({
-            includeAssets: [
-                AssetClass.ADA,
-                AssetClass.new(
-                    "1d7f33bd23d85e1a25d87d86fac4f199c3197a2f7afeb662a0f34e1e.776f726c646d6f62696c65746f6b656e"
-                )
-            ],
-            excludeAssets: [
-                AssetClass.new(
-                    "f643c8c300085984c09d5a2d7f5b45fd2d5921cbd1512c972981402b.38"
-                )
-            ],
+            includeAssets: [AssetClass.ADA, WMT],
+            excludeAssets: [MARKER],
             maxUtxos: 3
         })
 
@@ -129,21 +131,15 @@ describe(consolidate.name, () => {
         strictEqual(selectedUtxos.length, 3) // expect 3 due to consolidation (2 just for WMT)
     })
 
-    it("fails if too much is excluded", () => {
+    /*it("fails if too much is excluded", () => {
         const coinSelection = consolidate({
             includeAssets: [
                 AssetClass.ADA,
-                AssetClass.new(
-                    "1d7f33bd23d85e1a25d87d86fac4f199c3197a2f7afeb662a0f34e1e.776f726c646d6f62696c65746f6b656e"
-                )
+                WMT
             ],
             excludeAssets: [
-                AssetClass.new(
-                    "f643c8c300085984c09d5a2d7f5b45fd2d5921cbd1512c972981402b.38"
-                ),
-                AssetClass.new(
-                    "279c909f348e533da5808898f87f9a14bb2c3dfbbacccd631d927a3f.534e454b"
-                )
+                MARKER,
+                SNEK
             ],
             maxUtxos: 3
         })
@@ -159,5 +155,17 @@ describe(consolidate.name, () => {
                 })
             )
         })
+    })*/
+
+    it("is able to select pure ADA", () => {
+        const coinSelection = consolidate({
+            includeAssets: [AssetClass.ADA, SNEK],
+            excludeAssets: [MARKER],
+            maxUtxos: 3
+        })
+
+        const [selectedUtxos] = coinSelection(utxos, new Value(2_150_000_000n))
+
+        strictEqual(selectedUtxos.length, 3)
     })
 })

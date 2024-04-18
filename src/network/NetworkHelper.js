@@ -134,7 +134,7 @@ export class NetworkHelper {
      * @param {CoinSelection} coinSelection
      * @returns {Promise<TxInput<CSpending, CStaking>[]>}
      */
-    async selectUtxos(address, value, coinSelection = selectSmallestFirst) {
+    async selectUtxos(address, value, coinSelection = selectSmallestFirst()) {
         const utxos = await this.getUtxos(address)
 
         return /** @type {TxInput<CSpending, CStaking>[]} */ (

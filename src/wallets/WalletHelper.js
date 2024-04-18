@@ -231,7 +231,7 @@ export class WalletHelper {
      * @param {CoinSelection} coinSelection
      * @returns {Promise<TxInput<null, unknown>[]>}
      */
-    async selectUtxos(amount, coinSelection = selectSmallestFirst) {
+    async selectUtxos(amount, coinSelection = selectSmallestFirst()) {
         return coinSelection(await this.utxos, amount)[0]
     }
 

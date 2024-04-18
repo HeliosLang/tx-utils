@@ -53,7 +53,7 @@ describe(selectSmallestFirst.name, () => {
     ]
 
     it("don't select UTxOs containing assets no involved in the selection", () => {
-        const [selected] = selectSmallestFirst(utxos, new Value(10_000_000n))
+        const [selected] = selectSmallestFirst()(utxos, new Value(10_000_000n))
 
         const valueSelected = Value.sum(selected)
         const lovelaceSelected = valueSelected.lovelace
