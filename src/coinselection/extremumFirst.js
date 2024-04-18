@@ -1,4 +1,5 @@
 import { TxInput, Value } from "@helios-lang/ledger"
+import { InsufficientFundsError } from "./InsufficientFundsError.js"
 
 /**
  * @typedef {import("./CoinSelection.js").CoinSelection} CoinSelection
@@ -81,13 +82,7 @@ function selectExtremumFirst(utxos, amount, largestFirst) {
             const utxo = notSelected.shift()
 
             if (utxo === undefined) {
-                console.error(
-                    selected.map((s) =>
-                        JSON.stringify(s.dump(), undefined, "  ")
-                    )
-                )
-                console.error(JSON.stringify(amount.dump(), undefined, "  "))
-                throw new Error("not enough utxos to cover amount")
+                throw new InsufficientFundsError(amount, selected)
             } else {
                 const qty = getQuantity(utxo)
 
