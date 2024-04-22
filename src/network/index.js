@@ -4,4 +4,5 @@ export { NetworkHelper } from "./NetworkHelper.js"
 
 /**
  * @typedef {import("./Network.js").Network} Network
+ * @typedef {import("./Network.js").ReadonlyNetwork} ReadonlyNetwork
  */
