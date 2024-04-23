@@ -11,18 +11,18 @@ import { None } from "@helios-lang/type-utils"
 /**
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
  * @typedef {import("../coinselection/index.js").CoinSelection} CoinSelection
- * @typedef {import("./Network.js").Network} Network
+ * @typedef {import("./Network.js").ReadonlyNetwork} ReadonlyNetwork
  */
 
 export class NetworkHelper {
     /**
      * @readonly
-     * @type {Network}
+     * @type {ReadonlyNetwork}
      */
     network
 
     /**
-     * @param {Network} network
+     * @param {ReadonlyNetwork} network
      */
     constructor(network) {
         this.network = network
