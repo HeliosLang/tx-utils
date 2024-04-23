@@ -5,7 +5,7 @@ import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 
 /**
  * @typedef {import("../coinselection/index.js").CoinSelection} CoinSelection
- * @typedef {import("../network/Network.js").Network} Network
+ * @typedef {import("../network/Network.js").ReadonlyNetwork} ReadonlyNetwork
  * @typedef {import("./Wallet.js").Wallet} Wallet
  */
 
@@ -21,13 +21,13 @@ export class WalletHelper {
 
     /**
      * @readonly
-     * @type {Option<Network>}
+     * @type {Option<ReadonlyNetwork>}
      */
     fallback
 
     /**
      * @param {Wallet} wallet
-     * @param {Option<Network>} fallback
+     * @param {Option<ReadonlyNetwork>} fallback
      */
     constructor(wallet, fallback = None) {
         this.wallet = wallet
