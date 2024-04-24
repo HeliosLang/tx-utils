@@ -330,13 +330,18 @@ export class TxBuilder {
         if (collateralChangeOutput) {
             const minCollateral = tx.calcMinCollateral(params)
 
-            if (minCollateral > collateralChangeOutput.value.lovelace) {
+            const collateralInput = Value.sum(tx.body.collateral).lovelace
+            const currentCollateralValue =
+                collateralInput - collateralChangeOutput.value.lovelace
+
+            if (minCollateral > currentCollateralValue) {
                 throw new Error(
                     "internal error: expected final Collateral to be smaller than initial collateral"
                 )
             }
 
-            collateralChangeOutput.value.lovelace = minCollateral
+            collateralChangeOutput.value.lovelace =
+                collateralInput - minCollateral
         }
 
         // do a final validation of the tx
