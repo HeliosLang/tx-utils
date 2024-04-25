@@ -10,8 +10,12 @@ import { None } from "@helios-lang/type-utils"
 
 /**
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
- * @typedef {import("../coinselection/index.js").CoinSelection} CoinSelection
  * @typedef {import("./Network.js").ReadonlyNetwork} ReadonlyNetwork
+ */
+
+/**
+ * @template CSpending
+ * @typedef {import("../coinselection/index.js").CoinSelection<CSpending>} CoinSelection
  */
 
 export class NetworkHelper {
@@ -131,7 +135,7 @@ export class NetworkHelper {
      * @template CStaking
      * @param {Address<CSpending, CStaking>} address
      * @param {Value} value
-     * @param {CoinSelection} coinSelection
+     * @param {CoinSelection<CSpending>} coinSelection
      * @returns {Promise<TxInput<CSpending, CStaking>[]>}
      */
     async selectUtxos(address, value, coinSelection = selectSmallestFirst()) {

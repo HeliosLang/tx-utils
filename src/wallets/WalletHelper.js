@@ -4,9 +4,14 @@ import { None, expectSome } from "@helios-lang/type-utils"
 import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 
 /**
- * @typedef {import("../coinselection/index.js").CoinSelection} CoinSelection
+ 
  * @typedef {import("../network/Network.js").ReadonlyNetwork} ReadonlyNetwork
  * @typedef {import("./Wallet.js").Wallet} Wallet
+ */
+
+/**
+ * @template CSpending
+ * @typedef {import("../coinselection/index.js").CoinSelection<CSpending>} CoinSelection
  */
 
 /**
@@ -228,7 +233,7 @@ export class WalletHelper {
     /**
      * Pick a number of UTxOs needed to cover a given Value. The default coin selection strategy is to pick the smallest first.
      * @param {Value} amount
-     * @param {CoinSelection} coinSelection
+     * @param {CoinSelection<null>} coinSelection
      * @returns {Promise<TxInput<null, unknown>[]>}
      */
     async selectUtxos(amount, coinSelection = selectSmallestFirst()) {

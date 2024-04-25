@@ -3,5 +3,6 @@ export { selectLargestFirst, selectSmallestFirst } from "./extremumFirst.js"
 export { selectSingle } from "./single.js"
 
 /**
- * @typedef {import("./CoinSelection.js").CoinSelection} CoinSelection
+ * @template CSpending
+ * @typedef {import("./CoinSelection.js").CoinSelection<CSpending>} CoinSelection
  */

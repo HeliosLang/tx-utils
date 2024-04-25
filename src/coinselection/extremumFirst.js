@@ -2,7 +2,8 @@ import { TxInput, Value } from "@helios-lang/ledger"
 import { InsufficientFundsError } from "./InsufficientFundsError.js"
 
 /**
- * @typedef {import("./CoinSelection.js").CoinSelection} CoinSelection
+ * @template CSpending
+ * @typedef {import("./CoinSelection.js").CoinSelection<CSpending>} CoinSelection
  */
 
 /**
@@ -14,7 +15,6 @@ import { InsufficientFundsError } from "./InsufficientFundsError.js"
 /**
  * * Selects UTxOs from a list by iterating through the tokens in the given `Value` and picking the UTxOs containing the largest corresponding amount first.
  * @param {SelectLargestFirstProps} props
- * @returns {CoinSelection}
  */
 export function selectLargestFirst(props = {}) {
     return selectExtremumFirst({ ...props, largestFirst: true })
@@ -30,7 +30,6 @@ export function selectLargestFirst(props = {}) {
  * Selects UTxOs from a list by iterating through the tokens in the given `Value` and picking the UTxOs containing the smallest corresponding amount first.
  * This method can be used to eliminate dust UTxOs from a wallet.
  * @param {SelectSmallestFirstProps} props
- * @returns {CoinSelection}
  */
 export function selectSmallestFirst(props = {}) {
     return selectExtremumFirst({ ...props, largestFirst: false })
@@ -47,9 +46,14 @@ export function selectSmallestFirst(props = {}) {
  * Loops through the policies and tokens of `amount`
  *   - if for a given asset there isn't enough already included, select the previously unselected utxos until the necessary quantity is filled (starting the extremum first)
  * @param {SelectExtremumFirstProps} props
- * @returns {CoinSelection}
  */
 function selectExtremumFirst({ largestFirst, allowSelectingUninvolvedAssets }) {
+    /**
+     * @template CSpending
+     * @param {TxInput<CSpending, unknown>[]} utxos
+     * @param {Value} amount
+     * @returns {[TxInput<CSpending, unknown>[], TxInput<CSpending, unknown>[]]}
+     */
     return (utxos, amount) => {
         let sum = new Value()
 
