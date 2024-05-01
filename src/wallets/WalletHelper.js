@@ -2,10 +2,12 @@ import { bytesToHex } from "@helios-lang/codec-utils"
 import { Address, PubKeyHash, TxInput, Value } from "@helios-lang/ledger"
 import { None, expectSome } from "@helios-lang/type-utils"
 import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
+import { OfflineWallet } from "./OfflineWallet.js"
 
 /**
  
  * @typedef {import("../network/Network.js").ReadonlyNetwork} ReadonlyNetwork
+ * @typedef {import("./OfflineWalletJsonSafe.js").OfflineWalletJsonSafe} OfflineWalletJsonSafe
  * @typedef {import("./Wallet.js").ReadonlyWallet} ReadonlyWallet
  */
 
@@ -242,18 +244,41 @@ export class WalletHelper {
     }
 
     /**
-     * @returns {Promise<any>}
+     * @returns {Promise<OfflineWalletJsonSafe>}
      */
-    async toJson() {
-        const isMainnet = await this.wallet.isMainnet()
-        const usedAddresses = await this.wallet.usedAddresses
-        const unusedAddresses = await this.wallet.unusedAddresses
+    async toJsonSafe() {
+        const offlineWallet = await this.toOfflineWallet()
 
-        return {
-            isMainnet: isMainnet,
-            usedAddresses: usedAddresses.map((a) => a.toBech32()),
-            unusedAddresses: unusedAddresses.map((a) => a.toBech32()),
-            utxos: (await this.utxos).map((u) => bytesToHex(u.toCbor(true)))
-        }
+        return offlineWallet.toJsonSafe()
+    }
+
+    /**
+     * @returns {Promise<OfflineWallet>}
+     */
+    async toOfflineWallet() {
+        const [
+            isMainnet,
+            usedAddresses,
+            unusedAddresses,
+            utxos,
+            collateral,
+            stakingAddresses
+        ] = await Promise.all([
+            this.wallet.isMainnet(),
+            this.wallet.usedAddresses,
+            this.wallet.unusedAddresses,
+            this.wallet.utxos,
+            this.wallet.collateral,
+            this.wallet.stakingAddresses
+        ])
+
+        return new OfflineWallet({
+            isMainnet,
+            usedAddresses,
+            unusedAddresses,
+            utxos,
+            collateral,
+            stakingAddresses
+        })
     }
 }

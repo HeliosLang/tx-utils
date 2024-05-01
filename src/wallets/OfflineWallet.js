@@ -1,8 +1,10 @@
+import { bytesToHex } from "@helios-lang/codec-utils"
 import { Address, StakingAddress, TxInput } from "@helios-lang/ledger"
 import { expectOfflineWalletJsonSafe } from "./OfflineWalletJsonSafe.js"
 
 /**
  * @typedef {import("../network/Network.js").NetworkName} NetworkName
+ * @typedef {import("./OfflineWalletJsonSafe.js").OfflineWalletJsonSafe} OfflineWalletJsonSafe
  * @typedef {import("./Wallet.js").ReadonlyWallet} ReadonlyWallet
  */
 
@@ -15,11 +17,6 @@ import { expectOfflineWalletJsonSafe } from "./OfflineWalletJsonSafe.js"
  *   collateral?: TxInput[]
  *   stakingAddresses?: StakingAddress[]
  * }} OfflineWalletProps
- */
-
-/**
- * @typedef {{
- * }} OfflineWalletJsonSafe
  */
 
 /**
@@ -145,5 +142,21 @@ export class OfflineWallet {
      */
     get stakingAddresses() {
         return new Promise((resolve, _) => resolve(this.stakingAddressesSync))
+    }
+
+    /**
+     * @returns {OfflineWalletJsonSafe}
+     */
+    toJsonSafe() {
+        return {
+            isMainnet: this.isMainnetSync,
+            usedAddresses: this.usedAddressesSync.map((a) => a.toBech32()),
+            unusedAddresses: this.unusedAddressesSync.map((a) => a.toBech32()),
+            utxos: this.utxosSync.map((u) => bytesToHex(u.toCbor(true))),
+            collateral: this.collateralSync.map((u) =>
+                bytesToHex(u.toCbor(true))
+            ),
+            stakingAddresses: this.stakingAddressesSync.map((a) => a.toBech32())
+        }
     }
 }
