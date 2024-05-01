@@ -1,157 +1,149 @@
-import {
-    Address,
-    Signature,
-    StakingAddress,
-    Tx,
-    TxId,
-    TxInput
-} from "@helios-lang/ledger"
+import { Address, StakingAddress, TxInput } from "@helios-lang/ledger"
+import { expectOfflineWalletJsonSafe } from "./OfflineWalletJsonSafe.js"
 
 /**
  * @typedef {import("../network/Network.js").NetworkName} NetworkName
- * @typedef {import("./Wallet.js").Wallet} Wallet
+ * @typedef {import("./Wallet.js").ReadonlyWallet} ReadonlyWallet
  */
 
 /**
- * @implements {Wallet}
+ * @typedef {{
+ *   isMainnet: boolean
+ *   usedAddresses: Address[]
+ *   unusedAddresses: Address[]
+ *   utxos: TxInput[]
+ *   collateral?: TxInput[]
+ *   stakingAddresses?: StakingAddress[]
+ * }} OfflineWalletProps
+ */
+
+/**
+ * @typedef {{
+ * }} OfflineWalletJsonSafe
+ */
+
+/**
+ * @implements {ReadonlyWallet}
  */
 export class OfflineWallet {
     /**
      * @readonly
-     * @type {NetworkName}
+     * @type {boolean}
      */
-    networkName
+    isMainnetSync
 
     /**
      * @readonly
      * @type {Address[]}
      */
-    #usedAddresses
+    usedAddressesSync
 
     /**
      * @readonly
      * @type {Address[]}
      */
-    #unusedAddresses
-
-    /**
-     * @readonly
-     * @type {StakingAddress[]}
-     */
-    #stakingAddresses
+    unusedAddressesSync
 
     /**
      * @readonly
      * @type {TxInput[]}
      */
-    #utxos
+    utxosSync
 
     /**
-     * @param {NetworkName} networkName
-     * @param {Address[]} usedAddresses
-     * @param {Address[]} unusedAddresses
-     * @param {TxInput[]} utxos
-     * @param {StakingAddress[]} stakingAddresses
+     * @readonly
+     * @type {TxInput[]}
      */
-    constructor(
-        networkName,
+    collateralSync
+
+    /**
+     * @readonly
+     * @type {StakingAddress[]}
+     */
+    stakingAddressesSync
+
+    /**
+     * @param {OfflineWalletProps} props
+     */
+    constructor({
+        isMainnet,
         usedAddresses,
         unusedAddresses,
         utxos,
+        collateral = [],
         stakingAddresses = []
-    ) {
-        this.networkName = networkName
-        this.#usedAddresses = usedAddresses
-        this.#unusedAddresses = unusedAddresses
-        this.#stakingAddresses = stakingAddresses
-        this.#utxos = utxos
+    }) {
+        this.isMainnetSync = isMainnet
+        this.usedAddressesSync = usedAddresses
+        this.unusedAddressesSync = unusedAddresses
+        this.utxosSync = utxos
+        this.collateralSync = collateral
+        this.stakingAddressesSync = stakingAddresses
     }
 
     /**
-     * @param {string | Object} obj
+     * Throws an error if the input is invalid
+     * @param {string | JsonSafe} input
      * @returns {OfflineWallet}
      */
-    static fromJson(obj) {
-        if (typeof obj == "string") {
-            return OfflineWallet.fromJson(JSON.parse(obj))
+    static fromJson(input) {
+        if (typeof input == "string") {
+            return OfflineWallet.fromJson(JSON.parse(input))
         } else {
-            return new OfflineWallet(
-                obj.networkName ?? (obj.isMainnet ? "mainnet" : "preprod"),
-                obj.usedAddresses.map((a) => Address.fromBech32(a)),
-                obj.unusedAddresses.map((a) => Address.fromBech32(a)),
-                obj.utxos.map((u) => TxInput.fromCbor(u))
-            )
+            expectOfflineWalletJsonSafe(input)
+
+            return new OfflineWallet({
+                isMainnet: input.isMainnet,
+                usedAddresses: input.usedAddresses.map(Address.fromBech32),
+                unusedAddresses: input.unusedAddresses.map(Address.fromBech32),
+                utxos: input.utxos.map(TxInput.fromCbor),
+                collateral: input.collateral?.map(TxInput.fromCbor),
+                stakingAddresses: input.stakingAddresses?.map(
+                    StakingAddress.fromBech32
+                )
+            })
         }
-    }
-
-    /**
-     * @type {Promise<TxInput[]>}
-     */
-    get collateral() {
-        return new Promise((resolve, _) => resolve([]))
-    }
-
-    /**
-     * @type {Promise<StakingAddress[]>}
-     */
-    get stakingAddresses() {
-        return new Promise((resolve, _) => resolve(this.#stakingAddresses))
-    }
-
-    /**
-     * @type {Promise<Address[]>}
-     */
-    get usedAddresses() {
-        return new Promise((resolve, _) => resolve(this.#usedAddresses))
-    }
-
-    /**
-     * @type {Promise<Address[]>}
-     */
-    get unusedAddresses() {
-        return new Promise((resolve, _) => resolve(this.#unusedAddresses))
-    }
-
-    /**
-     * @type {Promise<TxInput[]>}
-     */
-    get utxos() {
-        return new Promise((resolve, _) => resolve(this.#utxos))
     }
 
     /**
      * @returns {Promise<boolean>}
      */
     async isMainnet() {
-        return this.networkName == "mainnet"
+        return this.isMainnetSync
     }
 
     /**
-     * Throws an error because OfflineWallets can't sign anything
-     * @param {Address} addr
-     * @param {number[]} data
-     * @return {Promise<Signature>}
+     * @type {Promise<Address[]>}
      */
-    async signData(addr, data) {
-        throw new Error("an OfflineWallet can't sign data")
+    get usedAddresses() {
+        return new Promise((resolve, _) => resolve(this.usedAddressesSync))
     }
 
     /**
-     * Throws an error because OfflineWallets can't sign anything
-     * @param {Tx} tx
-     * @returns {Promise<Signature[]>}
+     * @type {Promise<Address[]>}
      */
-    async signTx(tx) {
-        throw new Error("an OfflineWallet can't sign transactions")
+    get unusedAddresses() {
+        return new Promise((resolve, _) => resolve(this.unusedAddressesSync))
     }
 
     /**
-     * @param {Tx} tx
-     * @returns {Promise<TxId>}
+     * @type {Promise<TxInput[]>}
      */
-    async submitTx(tx) {
-        throw new Error(
-            "transactions can't be submitted through an OfflineWallet"
-        )
+    get utxos() {
+        return new Promise((resolve, _) => resolve(this.utxosSync))
+    }
+
+    /**
+     * @type {Promise<TxInput[]>}
+     */
+    get collateral() {
+        return new Promise((resolve, _) => resolve(this.collateralSync))
+    }
+
+    /**
+     * @type {Promise<StakingAddress[]>}
+     */
+    get stakingAddresses() {
+        return new Promise((resolve, _) => resolve(this.stakingAddressesSync))
     }
 }

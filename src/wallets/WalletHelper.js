@@ -6,7 +6,7 @@ import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 /**
  
  * @typedef {import("../network/Network.js").ReadonlyNetwork} ReadonlyNetwork
- * @typedef {import("./Wallet.js").Wallet} Wallet
+ * @typedef {import("./Wallet.js").ReadonlyWallet} ReadonlyWallet
  */
 
 /**
@@ -16,11 +16,12 @@ import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 
 /**
  * High-level helper class for instances that implement the `Wallet` interface.
+ * @template {ReadonlyWallet} W
  */
 export class WalletHelper {
     /**
      * @readonly
-     * @type {Wallet}
+     * @type {W}
      */
     wallet
 
@@ -31,7 +32,7 @@ export class WalletHelper {
     fallback
 
     /**
-     * @param {Wallet} wallet
+     * @param {W} wallet
      * @param {Option<ReadonlyNetwork>} fallback
      */
     constructor(wallet, fallback = None) {

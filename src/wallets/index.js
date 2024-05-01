@@ -6,5 +6,6 @@ export { WalletHelper } from "./WalletHelper.js"
 /**
  * @typedef {import("./Cip30Handle.js").Cip30Handle} Cip30Handle
  * @typedef {import("./Cip30Handle.js").Cip30FullHandle} Cip30FullHandle
+ * @typedef {import("./Wallet.js").ReadonlyWallet} ReadonlyWallet
  * @typedef {import("./Wallet.js").Wallet} Wallet
  */
