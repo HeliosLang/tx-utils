@@ -63,7 +63,9 @@ export class TxSummary {
     }
 
     /**
-     * If chain order is inconsistent with timestamps an error is thrown
+     * Mostly based on timestamp, spend chain only used in rare cases where timestamp is the same
+     *
+     * This is so that reversed TxSummaries (due to rollbacks) can be superimposed as well
      * @param {TxSummary} a
      * @param {TxSummary} b
      * @returns {number}
@@ -73,20 +75,15 @@ export class TxSummary {
             return 0
         }
 
-        if (a.outputs.some((output) => b.spends(output))) {
-            if (a.timestamp > b.timestamp) {
-                throw new Error("timestamp inconsistent with chain")
+        if (a.timestamp == b.timestamp) {
+            if (a.outputs.some((output) => b.spends(output))) {
+                return -1
+            } else if (b.outputs.some((output) => a.spends(output))) {
+                return 1
+            } else {
+                return 0
             }
-
-            return -1
-        } else if (b.outputs.some((output) => a.spends(output))) {
-            if (b.timestamp > a.timestamp) {
-                throw new Error("timestamp inconsistent with chain")
-            }
-
-            return 1
         } else {
-            // if timestamps are equal order doesn't matter
             return a.timestamp - b.timestamp
         }
     }
