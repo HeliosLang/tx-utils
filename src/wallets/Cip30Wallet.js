@@ -63,7 +63,7 @@ export class Cip30Wallet {
 
     /**
      * Gets a list of addresses which contain(ed) UTxOs.
-     * @type {Promise<Address[]>}
+     * @type {Promise<Address<null, unknown>[]>}
      */
     get usedAddresses() {
         return this.handle
@@ -73,7 +73,7 @@ export class Cip30Wallet {
 
     /**
      * Gets a list of unique unused addresses which can be used to UTxOs to.
-     * @type {Promise<Address[]>}
+     * @type {Promise<Address<null, unknown>[]>}
      */
     get unusedAddresses() {
         return this.handle
@@ -83,22 +83,32 @@ export class Cip30Wallet {
 
     /**
      * Gets the complete list of UTxOs (as `TxInput` instances) sitting at the addresses owned by the wallet.
-     * @type {Promise<TxInput[]>}
+     * @type {Promise<TxInput<null, unknown>[]>}
      */
     get utxos() {
         return this.handle
             .getUtxos()
-            .then((utxos) => utxos.map((u) => TxInput.fromCbor(u)))
+            .then((utxos) =>
+                utxos.map(
+                    (u) =>
+                        /** @type {TxInput<null, unknown>} */ (
+                            TxInput.fromCbor(u)
+                        )
+                )
+            )
     }
 
     /**
-     * @type {Promise<TxInput[]>}
+     * @type {Promise<TxInput<null, unknown>[]>}
      */
     get collateral() {
         const getCollateral =
             this.handle.getCollateral || this.handle.experimental.getCollateral
         return getCollateral().then((utxos) =>
-            utxos.map((u) => TxInput.fromCbor(u))
+            utxos.map(
+                (u) =>
+                    /** @type {TxInput<null, unknown>} */ (TxInput.fromCbor(u))
+            )
         )
     }
 
