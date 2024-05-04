@@ -1,6 +1,10 @@
 export { Cip30Wallet } from "./Cip30Wallet.js"
 export { OfflineWallet } from "./OfflineWallet.js"
-export { expectOfflineWalletJsonSafe } from "./OfflineWalletJsonSafe.js"
+export {
+    assertOfflineWalletJsonSafe,
+    expectOfflineWalletJsonSafe,
+    isOfflineWalletJsonSafe
+} from "./OfflineWalletJsonSafe.js"
 export { SimpleWallet } from "./SimpleWallet.js"
 export { WalletHelper } from "./WalletHelper.js"
 

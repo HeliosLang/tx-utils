@@ -1,4 +1,8 @@
 /**
+ * @typedef {import("@helios-lang/type-utils").NotifyOnFalse} NotifyOnFalse
+ */
+
+/**
  * OfflineWalletJsonSafe is useful when building transactions remotely as it can be (de)serialized using JSON.parse/JSON.stringify:
  *   - isMainnet
  *   - usedAddresses: array of bech32 encoded `Address`es
@@ -17,6 +21,15 @@
  */
 
 import { Address, StakingAddress, TxInput } from "@helios-lang/ledger"
+import {
+    None,
+    assert,
+    expect,
+    isArray,
+    isBoolean,
+    isFormattedString,
+    isObject
+} from "@helios-lang/type-utils"
 
 /**
  * @param {unknown} input
@@ -37,79 +50,64 @@ function expectStringArray(input, msg) {
  * Asserts the content of input
  * Superfluous properties are ignored
  * @param {unknown} input
- * @param {Option<string>} msg - optional error message
- * @returns {asserts input is OfflineWalletJsonSafe}
+ * @param {NotifyOnFalse} onFalse - optional error message notifier
+ * @returns {input is OfflineWalletJsonSafe}
  */
-export function expectOfflineWalletJsonSafe(input, msg = undefined) {
-    if (!(input instanceof Object)) {
-        throw new TypeError(msg ?? "invalid OfflineWalletJsonSafe")
+export function isOfflineWalletJsonSafe(input, onFalse = undefined) {
+    if (
+        !isObject(input, {
+            isMainnet: isBoolean,
+            usedAddresses: isArray(isFormattedString(Address.isValidBech32)),
+            unusedAddresses: isArray(isFormattedString(Address.isValidBech32)),
+            utxos: isArray(isFormattedString(TxInput.isValidCbor(true)))
+        })
+    ) {
+        if (onFalse) {
+            onFalse("invalid OfflineWalletJsonSafe")
+        }
+        return false
     }
 
     if (
-        "isMainnet" in input &&
-        "usedAddresses" in input &&
-        "unusedAddresses" in input &&
-        "utxos" in input
+        "collateral" in input &&
+        !isArray(input.collateral, isFormattedString(TxInput.isValidCbor(true)))
     ) {
-        if (typeof input.isMainnet != "boolean") {
-            throw new TypeError(
-                msg ?? "invalid OfflineWalletJsonSafe.isMainnet"
-            )
+        if (onFalse) {
+            onFalse("invalid OfflineWalletJsonSafe.collateral")
         }
-
-        expectStringArray(
-            input.usedAddresses,
-            "invalid OfflineWalletJsonSafe.usedAddresses"
-        )
-        if (!input.usedAddresses.every((addr) => Address.isValidBech32(addr))) {
-            throw new TypeError("invalid OfflineWalletJsonSafe.usedAddresses")
-        }
-
-        expectStringArray(
-            input.unusedAddresses,
-            "invalid OfflineWalletJsonSafe.unusedAddresses"
-        )
-        if (
-            !input.unusedAddresses.every((addr) => Address.isValidBech32(addr))
-        ) {
-            throw new TypeError("invalid OfflineWalletJsonSafe.unusedAddresses")
-        }
-
-        expectStringArray(input.utxos, "invalid OfflineWalletJsonSafe.utxos")
-        if (!input.utxos.every((utxo) => TxInput.isValidCbor(utxo, true))) {
-            throw new TypeError("invalid OfflineWalletJsonSafe.utxos")
-        }
-
-        if ("collateral" in input) {
-            expectStringArray(
-                input.collateral,
-                "invalid OfflineWalletJsonSafe.collateral"
-            )
-            if (
-                !input.collateral.every((utxo) =>
-                    TxInput.isValidCbor(utxo, true)
-                )
-            ) {
-                throw new TypeError("invalid OfflineWalletJsonSafe.collateral")
-            }
-        }
-
-        if ("stakingAddresses" in input) {
-            expectStringArray(
-                input.stakingAddresses,
-                "invalid OfflineWalletJsonSafe.stakingAddresses"
-            )
-            if (
-                !input.stakingAddresses.every((addr) =>
-                    StakingAddress.isValidBech32(addr)
-                )
-            ) {
-                throw new TypeError(
-                    "invalid OfflineWalletJsonSafe.stakingAddresses"
-                )
-            }
-        }
-    } else {
-        throw new TypeError(msg ?? "invalid OfflineWalletJsonSafe")
+        return false
     }
+
+    if (
+        "stakingAddresses" in input &&
+        !isArray(
+            input.stakingAddresses,
+            isFormattedString(StakingAddress.isValidBech32)
+        )
+    ) {
+        if (onFalse) {
+            onFalse("invalid OfflineWalletJsonSafe.stakingAddresses")
+        }
+        return false
+    }
+
+    return true
+}
+
+/**
+ * @param {unknown} input
+ * @param {Option<string>} msg
+ * @returns {asserts input is OfflineWalletJsonSafe}
+ */
+export function assertOfflineWalletJsonSafe(input, msg = None) {
+    return assert(input, isOfflineWalletJsonSafe, msg ?? undefined)
+}
+
+/**
+ * @param {unknown} input
+ * @param {Option<string>} msg
+ * @returns {OfflineWalletJsonSafe}
+ */
+export function expectOfflineWalletJsonSafe(input, msg = None) {
+    return expect(input, isOfflineWalletJsonSafe, msg ?? undefined)
 }

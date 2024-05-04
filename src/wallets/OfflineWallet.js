@@ -1,6 +1,7 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
 import { Address, StakingAddress, TxInput } from "@helios-lang/ledger"
-import { expectOfflineWalletJsonSafe } from "./OfflineWalletJsonSafe.js"
+import { isOfflineWalletJsonSafe } from "./OfflineWalletJsonSafe.js"
+import { assert } from "@helios-lang/type-utils"
 
 /**
  * @typedef {import("../network/Network.js").NetworkName} NetworkName
@@ -87,7 +88,7 @@ export class OfflineWallet {
         if (typeof input == "string") {
             return OfflineWallet.fromJson(JSON.parse(input))
         } else {
-            expectOfflineWalletJsonSafe(input)
+            assert(input, isOfflineWalletJsonSafe)
 
             return new OfflineWallet({
                 isMainnet: input.isMainnet,
