@@ -4,9 +4,7 @@ import {
     isArray,
     isFormattedString,
     isNumber,
-    isObject,
-    isString,
-    isStringArray
+    isObject
 } from "@helios-lang/type-utils"
 
 /**
