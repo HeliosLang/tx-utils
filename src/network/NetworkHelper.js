@@ -126,7 +126,7 @@ export class NetworkHelper {
         }
 
         throw new Error(
-            `no UTxO found at ${address.toBech32()} that is large enough`
+            `no UTxO found at ${address.toBech32()} that is large enough to cover ${JSON.stringify(value.dump(), undefined, 4)}`
         )
     }
 
