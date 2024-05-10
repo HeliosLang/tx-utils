@@ -11,6 +11,7 @@ import {
 } from "@helios-lang/ledger"
 import { expectSome } from "@helios-lang/type-utils"
 import { UplcProgramV2, decodeUplcData } from "@helios-lang/uplc"
+import { TxSummary } from "../chain/TxSummary.js"
 
 /**
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
@@ -323,6 +324,61 @@ export class BlockfrostV0 {
         })
 
         console.log(await response.text())
+    }
+
+    /**
+     * @param {TxId} id
+     * @returns {Promise<TxSummary>}
+     */
+    async getTx(id) {
+        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${id.toHex()}/utxos`
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                project_id: this.projectId
+            }
+        })
+
+        if (!response.ok) {
+            throw new Error(`Tx ${id.toString()} not found`)
+        } else if (response.status != 200) {
+            throw new Error(`Blockfrost error: ${await response.text()}`)
+        }
+
+        const responseObj = /** @type {any} */ (await response.json())
+
+        const inputs = responseObj.inputs
+
+        if (!inputs || !Array.isArray(inputs)) {
+            console.log(responseObj)
+            throw new Error(`unexpected response from Blockfrost`)
+        }
+
+        const outputs = responseObj.outputs
+
+        if (!outputs || !Array.isArray(outputs)) {
+            console.log(responseObj)
+            throw new Error(`unexpected response from Blockfrost`)
+        }
+
+        return new TxSummary({
+            id: id,
+            timestamp: Date.now(),
+            inputs: await Promise.all(
+                inputs.map((input) => {
+                    return this.restoreTxInput(input)
+                })
+            ),
+            outputs: await Promise.all(
+                outputs.map((output) => {
+                    return this.restoreTxInput({
+                        ...output,
+                        tx_hash: id.toHex()
+                    })
+                })
+            )
+        })
     }
 
     /**

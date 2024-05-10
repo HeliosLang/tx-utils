@@ -1,4 +1,5 @@
 import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+import { TxSummary } from "../chain/TxSummary.js"
 
 /**
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
@@ -10,6 +11,7 @@ import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
 
 /**
  *   - isMainnet: returns true for mainnet
+ *   - getTx: optional more efficient method of getting all the inputs and outputs of a transaction
  *   - getUtxos: returns a complete list of UTxOs at a given address.
  *   - getUtxo: returns a single TxInput (that might already have been spent).
  *   - now: returns the number of ms since some reference (for mainnet -> since 1970, for emulator -> arbitrary reference)
@@ -17,6 +19,7 @@ import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
  * @typedef {{
  *   now: number
  *   parameters: Promise<NetworkParams>
+ *   getTx?: (id: TxId) => Promise<TxSummary>
  *   getUtxo(id: TxOutputId): Promise<TxInput>
  *   getUtxos(address: Address): Promise<TxInput[]>
  *   isMainnet(): boolean
