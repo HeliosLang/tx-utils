@@ -178,7 +178,11 @@ export class TxSummary {
     superimpose(utxos, addresses) {
         utxos = utxos.filter((utxo) => !this.spends(utxo))
 
-        return utxos.concat(this.getUtxosPaidTo(addresses))
+        const extraUtxos = this.getUtxosPaidTo(addresses).filter(
+            (extraUtxo) => !utxos.some((utxo) => utxo.isEqual(extraUtxo))
+        )
+
+        return utxos.concat(extraUtxos)
     }
 
     /**

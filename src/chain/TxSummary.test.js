@@ -1,5 +1,5 @@
 import { describe, it } from "node:test"
-import { isTxSummaryJsonSafe } from "./TxSummary.js"
+import { TxSummary, isTxSummaryJsonSafe } from "./TxSummary.js"
 import {
     Address,
     TxId,
@@ -9,7 +9,7 @@ import {
     Value
 } from "@helios-lang/ledger"
 import { bytesToHex } from "@helios-lang/codec-utils"
-import { strictEqual } from "node:assert"
+import { deepEqual, strictEqual } from "node:assert"
 
 describe(isTxSummaryJsonSafe.name, () => {
     it("ok for valid", () => {
@@ -60,5 +60,32 @@ describe(isTxSummaryJsonSafe.name, () => {
         }
 
         strictEqual(isTxSummaryJsonSafe(valid), false)
+    })
+})
+
+describe(TxSummary.name, () => {
+    it("superimpose ignores utxos that have already been included", () => {
+        const utxos = [
+            new TxInput(
+                TxOutputId.dummy(),
+                new TxOutput(Address.dummy(false), new Value(0))
+            )
+        ]
+
+        const summary = new TxSummary({
+            id: TxId.dummy(),
+            inputs: [],
+            outputs: [
+                new TxInput(
+                    TxOutputId.dummy(),
+                    new TxOutput(Address.dummy(false), new Value(0))
+                )
+            ],
+            timestamp: 0
+        })
+
+        const newUtxos = summary.superimpose(utxos, [Address.dummy(false)])
+
+        deepEqual(newUtxos, utxos)
     })
 })
