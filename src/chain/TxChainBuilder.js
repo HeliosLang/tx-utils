@@ -83,9 +83,11 @@ export class TxChainBuilder {
         const chainInputs = chain.collectInputs(false, false)
         const chainOutputs = chain.collectOutputs()
 
-        utxos = utxos.filter((utxo) =>
-            chainInputs.some((ci) => ci.isEqual(utxo))
+        // keep the utxos that haven't been spent by the chai yet
+        utxos = utxos.filter(
+            (utxo) => !chainInputs.some((ci) => ci.isEqual(utxo))
         )
+
         utxos = utxos.concat(
             chainOutputs.filter((co) => co.address.isEqual(addr))
         )
