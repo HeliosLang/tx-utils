@@ -32,15 +32,15 @@ export class TxChain {
         /**
          *
          * @param {TxInput} inp
-         * @param {number} txI
          * @returns {void}
          */
-        const pushInput = (inp, txI) => {
+        const pushInput = (inp) => {
+            // don't include if already included
             if (res.some((prev) => prev.isEqual(inp))) {
                 return
             }
 
-            if (txIds.slice(0, txI).some((txId) => txId.isEqual(inp.id.txId))) {
+            if (txIds.some((txId) => txId.isEqual(inp.id.txId))) {
                 return
             }
 
@@ -49,21 +49,20 @@ export class TxChain {
 
         /**
          * @param {TxInput[]} inps
-         * @param {number} txI
          */
-        const pushInputs = (inps, txI) => {
-            inps.forEach(pushInput, txI)
+        const pushInputs = (inps) => {
+            inps.forEach(pushInput)
         }
 
-        this.txs.forEach((tx, i) => {
-            pushInputs(tx.body.inputs, i)
+        this.txs.forEach((tx) => {
+            pushInputs(tx.body.inputs)
 
             if (includeRefInputs) {
-                pushInputs(tx.body.refInputs, i)
+                pushInputs(tx.body.refInputs)
             }
 
             if (includeCollateral) {
-                pushInputs(tx.body.collateral, i)
+                pushInputs(tx.body.collateral)
             }
         })
 
