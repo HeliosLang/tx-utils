@@ -21,6 +21,10 @@ export function selectSingle(utxos, value) {
     }
 
     throw new Error(
-        `no UTxO found containing ${JSON.stringify(value.dump(), undefined, 2)}`
+        `no UTxO found containing ${JSON.stringify(value.dump(), undefined, 2)} in utxos ${JSON.stringify(
+            utxos.map((utxo) => utxo.dump()),
+            undefined,
+            4
+        )}`
     )
 }

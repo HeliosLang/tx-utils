@@ -18,6 +18,9 @@ import { None } from "@helios-lang/type-utils"
  * @typedef {import("../coinselection/index.js").CoinSelection<CSpending>} CoinSelection
  */
 
+/**
+ * @implements {ReadonlyNetwork}
+ */
 export class NetworkHelper {
     /**
      * @readonly
@@ -44,6 +47,13 @@ export class NetworkHelper {
      */
     get parameters() {
         return this.network.parameters
+    }
+
+    /**
+     * @returns {boolean}
+     */
+    isMainnet() {
+        return this.network.isMainnet()
     }
 
     /**
