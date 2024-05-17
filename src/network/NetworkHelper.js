@@ -19,6 +19,12 @@ import { None } from "@helios-lang/type-utils"
  */
 
 /**
+ * @typedef {{
+ *   onSelectUtxoFail?: (address: Address, value: Value) => Promise<void>
+ * }} NetworkHelperOptions
+ */
+
+/**
  * @implements {ReadonlyNetwork}
  */
 export class NetworkHelper {
@@ -29,10 +35,18 @@ export class NetworkHelper {
     network
 
     /**
-     * @param {ReadonlyNetwork} network
+     * @readonly
+     * @type {NetworkHelperOptions}
      */
-    constructor(network) {
+    options
+
+    /**
+     * @param {ReadonlyNetwork} network
+     * @param {NetworkHelperOptions} options
+     */
+    constructor(network, options = {}) {
         this.network = network
+        this.options = options
     }
 
     /**
@@ -118,6 +132,9 @@ export class NetworkHelper {
     }
 
     /**
+     * This method is used to select very specific UTxOs that contain known tokens/NFTs
+     * If the UTxO isn't found that usually means something is wrong with the network synchronization
+     * The onSelectUtxoFail callback can be used to trigger a synchronization action if the UTxO isn' found
      * @template CSpending
      * @template CStaking
      * @param {Address<CSpending, CStaking>} address
@@ -125,12 +142,32 @@ export class NetworkHelper {
      * @returns {Promise<TxInput<CSpending, CStaking>>}
      */
     async selectUtxo(address, value) {
-        const utxos = /** @type {TxInput<CSpending, CStaking>[]} */ (
-            await this.getUtxos(address)
-        )
+        const findUtxo = async () => {
+            const utxos = /** @type {TxInput<CSpending, CStaking>[]} */ (
+                await this.getUtxos(address)
+            )
 
-        for (let utxo of utxos) {
-            if (utxo.value.isGreaterOrEqual(value)) {
+            for (let utxo of utxos) {
+                if (utxo.value.isGreaterOrEqual(value)) {
+                    return utxo
+                }
+            }
+
+            return
+        }
+
+        const utxo = await findUtxo()
+
+        if (utxo) {
+            return utxo
+        }
+
+        if (this.options.onSelectUtxoFail) {
+            await this.options.onSelectUtxoFail(address, value)
+
+            const utxo = await findUtxo()
+
+            if (utxo) {
                 return utxo
             }
         }
