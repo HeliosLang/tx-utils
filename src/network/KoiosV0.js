@@ -80,7 +80,7 @@ export class KoiosV0 {
     get parameters() {
         return (async () => {
             const response = await fetch(
-                `https://d1t0d7c2nekuk0.cloudfront.net/${this.networkName}.json`
+                `https://network-status.helios-lang.io/${this.networkName}/config`
             )
 
             // TODO: build networkParams from Koios endpoints instead

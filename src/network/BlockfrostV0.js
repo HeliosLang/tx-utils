@@ -12,11 +12,10 @@ import {
 import { expectSome } from "@helios-lang/type-utils"
 import { UplcProgramV2, decodeUplcData } from "@helios-lang/uplc"
 import { TxSummary } from "../chain/TxSummary.js"
+import { SHELLEY_GENESIS_PARAMS } from "@helios-lang/ledger-shelley"
 
 /**
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
- * @typedef {import("@helios-lang/uplc").CostModelParamsV1} CostModelParamsV1
- * @typedef {import("@helios-lang/uplc").CostModelParamsV2} CostModelParamsV2
  * @typedef {import("./Network.js").Network} Network
  * @typedef {import("./Network.js").NetworkName} NetworkName
  */
@@ -31,37 +30,80 @@ import { TxSummary } from "../chain/TxSummary.js"
  */
 
 /**
+ * @typedef {string} LargeNumber
+ */
+
+/**
+ * TODO: what is the type of `extraEntropy`
  * @typedef {{
+ *   a0: number
+ *   coins_per_utxo_size: LargeNumber
+ *   coins_per_utxo_word: LargeNumber
  *   collateral_percent: number
  *   cost_models: {
- *       PlutusV1: CostModelParamsV1
- *       PlutusV2: CostModelParamsV2
+ *       PlutusV1: Record<string, number>
+ *       PlutusV2: Record<string, number>
+ *       PlutusV3: number[]
  *   }
- *   price_mem: number
- *   price_step: number
+ *   e_max: number
+ *   extra_entropy: null
+ *   key_deposit: LargeNumber
  *   max_block_size: number
- *   max_block_ex_mem: string
+ *   max_block_ex_mem: LargeNumber
  *   max_block_ex_steps: string
  *   max_block_header_size: number
  *   max_collateral_inputs: number
- *   max_tx_ex_mem: string
- *   max_tx_ex_steps: string
- *   max_tx_size: string
- *   max_val_size: string
- *   min_pool_cost: string
- *   rho: number
- *   a0: number
- *   e_max: number
+ *   max_tx_ex_mem: LargeNumber
+ *   max_tx_ex_steps: LargeNumber
+ *   max_tx_size: number
+ *   max_val_size: LargeNumber
+ *   min_fee_a: number
+ *   min_fee_b: number
+ *   min_pool_cost: LargeNumber
+ *   min_utxo: LargeNumber
+ *   n_opt: number
+ *   nonce: string
+ *   pool_deposit: LargeNumber
+ *   price_mem: number
+ *   price_step: number
  *   protocol_major_ver: number
  *   protocol_minor_ver: number
- *   key_deposit: string
- *   pool_deposit: string
- *   n_opt: number
+ *   rho: number
  *   tau: number
- *   min_fee_b: number
- *   min_fee_a: number
- *   coins_per_utxo_size: string
- * }} BlockfrostParamsResponse
+ * }} BabbageBlockfrostParamsResponse
+ */
+
+/**
+ * @typedef {BabbageBlockfrostParamsResponse & {
+ *   decentralization_param: number
+ *   pvt_motion_no_confidence: number
+ *   pvt_committee_normal: number
+ *   pvt_committee_no_confidence: number
+ *   pvt_hard_fork_initiation: number
+ *   dvt_motion_no_confidence: number
+ *   dvt_committee_normal: number
+ *   dvt_committee_no_confidence: number
+ *   dvt_update_to_constitution: number
+ *   dvt_hard_fork_initiation: number
+ *   dvt_p_p_network_group: number
+ *   dvt_p_p_economic_group: number
+ *   dvt_p_p_technical_group: number
+ *   dvt_p_p_gov_group: number
+ *   dvt_treasury_withdrawal: number
+ *   committee_min_size: LargeNumber
+ *   committee_max_term_length: LargeNumber
+ *   gov_action_lifetime: LargeNumber
+ *   gov_action_deposit: LargeNumber
+ *   drep_deposit: LargeNumber
+ *   drep_activity: LargeNumber
+ *   pvtpp_security_group: number
+ *   min_fee_ref_script_cost_per_byte: number
+ * }} ConwayBlockfrostParamsResponse
+ */
+
+/**
+ * Union type as long as the Chang HFC hasn't passed on all networks
+ * @typedef {BabbageBlockfrostParamsResponse | ConwayBlockfrostParamsResponse} BlockfrostParamsResponse
  */
 
 /**
@@ -253,56 +295,44 @@ export class BlockfrostV0 {
             )
 
             /**
+             * @param {Record<string, number>} obj
+             * @returns {number[]}
+             */
+            const convertOldCostModels = (obj) => {
+                const keys = Object.keys(obj).sort()
+
+                return keys.map((k) => obj[k])
+            }
+
+            /**
              * @type {NetworkParams}
              */
             const params = {
-                shelleyGenesis: DEFAULT_NETWORK_PARAMS.shelleyGenesis,
-                alonzoGenesis: DEFAULT_NETWORK_PARAMS.alonzoGenesis,
-                latestParams: {
-                    collateralPercentage: bfParams.collateral_percent,
-                    costModels: {
-                        PlutusScriptV1: bfParams.cost_models.PlutusV1,
-                        PlutusScriptV2: bfParams.cost_models.PlutusV2
-                    },
-                    executionUnitPrices: {
-                        priceMemory: bfParams.price_mem,
-                        priceSteps: bfParams.price_step
-                    },
-                    maxBlockBodySize: bfParams.max_block_size,
-                    maxBlockExecutionUnits: {
-                        memory: parseInt(bfParams.max_block_ex_mem),
-                        steps: parseInt(bfParams.max_block_ex_steps)
-                    },
-                    maxBlockHeaderSize: bfParams.max_block_header_size,
-                    maxCollateralInputs: bfParams.max_collateral_inputs,
-                    maxTxExecutionUnits: {
-                        memory: parseInt(bfParams.max_tx_ex_mem),
-                        steps: parseInt(bfParams.max_tx_ex_steps)
-                    },
-                    maxTxSize: parseInt(bfParams.max_tx_size),
-                    maxValueSize: parseInt(bfParams.max_val_size),
-                    minPoolCost: parseInt(bfParams.min_pool_cost),
-                    monetaryExpansion: bfParams.rho,
-                    poolPledgeInfluence: bfParams.a0,
-                    poolRetireMaxEpoch: bfParams.e_max,
-                    protocolVersion: {
-                        major: bfParams.protocol_major_ver,
-                        minor: bfParams.protocol_minor_ver
-                    },
-                    stakeAddressDeposit: parseInt(bfParams.key_deposit),
-                    stakePoolDeposit: parseInt(bfParams.pool_deposit),
-                    stakePoolTargetNum: bfParams.n_opt,
-                    treasuryCut: bfParams.tau,
-                    txFeeFixed: bfParams.min_fee_b,
-                    txFeePerByte: bfParams.min_fee_a,
-                    utxoCostPerByte: parseInt(bfParams.coins_per_utxo_size)
-                },
-                latestTip: {
-                    epoch: bfTip.epoch,
-                    hash: bfTip.hash,
-                    slot: bfTip.slot,
-                    time: bfTip.time * 1000
-                }
+                secondsPerSlot: SHELLEY_GENESIS_PARAMS.slotLength,
+                collateralPercentage: bfParams.collateral_percent,
+                costModelParamsV1: convertOldCostModels(
+                    bfParams.cost_models.PlutusV1
+                ),
+                costModelParamsV2: convertOldCostModels(
+                    bfParams.cost_models.PlutusV2
+                ),
+                costModelParamsV3: bfParams.cost_models?.PlutusV3 ?? [],
+                exCpuFeePerUnit: bfParams.price_step,
+                exMemFeePerUnit: bfParams.price_mem,
+                maxCollateralInputs: 3,
+                maxTxExCpu: parseInt(bfParams.max_tx_ex_steps),
+                maxTxExMem: parseInt(bfParams.max_tx_ex_mem),
+                maxTxSize: bfParams.max_tx_size,
+                refScriptFeePerByte:
+                    "min_fee_ref_script_cost_per_byte" in bfParams
+                        ? bfParams.min_fee_ref_script_cost_per_byte
+                        : 0,
+                stakeAddrDeposit: parseInt(bfParams.key_deposit),
+                txFeeFixed: bfParams.min_fee_b,
+                txFeePerByte: bfParams.min_fee_a,
+                utxoDepositPerByte: parseInt(bfParams.coins_per_utxo_size),
+                refTipSlot: bfTip.slot,
+                refTipTime: bfTip.time * 1000
             }
 
             return params

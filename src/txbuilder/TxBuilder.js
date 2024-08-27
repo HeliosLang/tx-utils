@@ -24,7 +24,10 @@ import {
     ValidatorHash,
     Value,
     TokenValue,
-    toTime
+    toTime,
+    ScriptContextV2,
+    DEFAULT_NETWORK_PARAMS,
+    calcRefScriptsSize
 } from "@helios-lang/ledger"
 import {
     None,
@@ -45,6 +48,7 @@ import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
  * @typedef {import("@helios-lang/ledger").StakingAddressLike} StakingAddressLike
  * @typedef {import("@helios-lang/ledger").TimeLike} TimeLike
+ * @typedef {import("@helios-lang/ledger").TxInfo} TxInfo
  * @typedef {import("@helios-lang/ledger").TxMetadataAttr} TxMetadataAttr
  * @typedef {import("@helios-lang/ledger").ValueLike} ValueLike
  * @typedef {import("@helios-lang/uplc").UplcData} UplcData
@@ -229,11 +233,11 @@ export class TxBuilder {
     async build(config) {
         // extract arguments
         const changeAddress = Address.new(await config.changeAddress)
-        const rawNetworkParams =
+        const params =
             config?.networkParams instanceof Promise
                 ? await config.networkParams
-                : config?.networkParams ?? None
-        const params = NetworkParamsHelper.new(rawNetworkParams)
+                : config?.networkParams ?? DEFAULT_NETWORK_PARAMS()
+        const helper = new NetworkParamsHelper(params)
         const spareUtxos =
             config.spareUtxos instanceof Promise
                 ? await config.spareUtxos
@@ -249,7 +253,9 @@ export class TxBuilder {
         this.balanceAssets(changeAddress, config.maxAssetsPerChangeOutput ?? 1)
 
         // start with the max possible fee, minimize later
-        const fee = params.maxTxFee
+        const fee = helper.calcMaxConwayTxFee(
+            calcRefScriptsSize(this.inputs, this.refInputs)
+        )
 
         // balance collateral (if collateral wasn't already set manually)
         const collateralChangeOutput = this.balanceCollateral(
@@ -1372,20 +1378,22 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {NetworkParamsHelper} networkParams
+     * @param {NetworkParams} params
      * @param {Address} changeAddress
      * @param {TxInput[]} spareUtxos
      * @param {bigint} baseFee
      * @returns {Option<TxOutput>} - collateral change output which can be corrected later
      */
-    balanceCollateral(networkParams, changeAddress, spareUtxos, baseFee) {
+    balanceCollateral(params, changeAddress, spareUtxos, baseFee) {
         // don't do this step if collateral was already added explicitly
         if (this.collateral.length > 0 || !this.hasUplcScripts()) {
             return
         }
 
+        const helper = new NetworkParamsHelper(params)
+
         const minCollateral =
-            (baseFee * BigInt(networkParams.minCollateralPct) + 100n) / 100n // integer division that rounds up
+            (baseFee * BigInt(helper.minCollateralPct) + 100n) / 100n // integer division that rounds up
 
         let collateral = 0n
         /**
@@ -1411,9 +1419,7 @@ export class TxBuilder {
                     break
                 }
 
-                while (
-                    collateralInputs.length >= networkParams.maxCollateralInputs
-                ) {
+                while (collateralInputs.length >= params.maxCollateralInputs) {
                     collateralInputs.shift()
                 }
 
@@ -1427,7 +1433,7 @@ export class TxBuilder {
 
         // create the collateral return output if there is enough lovelace
         const changeOutput = new TxOutput(changeAddress, new Value(0n))
-        changeOutput.correctLovelace(networkParams)
+        changeOutput.correctLovelace(params)
 
         if (collateral < minCollateral) {
             throw new Error("unable to find enough collateral input")
@@ -1435,7 +1441,7 @@ export class TxBuilder {
             if (collateral > minCollateral + changeOutput.value.lovelace) {
                 changeOutput.value = new Value(0n)
 
-                changeOutput.correctLovelace(networkParams)
+                changeOutput.correctLovelace(params)
 
                 if (collateral > minCollateral + changeOutput.value.lovelace) {
                     changeOutput.value = new Value(collateral - minCollateral)
@@ -1462,20 +1468,20 @@ export class TxBuilder {
      * Throws error if transaction can't be balanced.
      * Shouldn't be used directly
      * @private
-     * @param {NetworkParamsHelper} networkParams
+     * @param {NetworkParams} params
      * @param {Address} changeAddress
      * @param {TxInput[]} spareUtxos - used when there are yet enough inputs to cover everything (eg. due to min output lovelace requirements, or fees)
      * @param {bigint} fee
      * @returns {TxOutput} - change output, will be corrected once the final fee is known
      */
-    balanceLovelace(networkParams, changeAddress, spareUtxos, fee) {
+    balanceLovelace(params, changeAddress, spareUtxos, fee) {
         // don't include the changeOutput in this value
         let nonChangeOutputValue = this.sumOutputValue()
 
         // assume a change output is always needed
         const changeOutput = new TxOutput(changeAddress, new Value(0n))
 
-        changeOutput.correctLovelace(networkParams)
+        changeOutput.correctLovelace(params)
 
         this.addOutput(changeOutput)
 
@@ -1486,8 +1492,10 @@ export class TxBuilder {
 
         nonChangeOutputValue = feeValue.add(nonChangeOutputValue)
 
+        const helper = new NetworkParamsHelper(params)
+
         // stake certificates
-        const stakeAddrDeposit = new Value(networkParams.stakeAddressDeposit)
+        const stakeAddrDeposit = new Value(helper.stakeAddressDeposit)
         this.dcerts.forEach((dcert) => {
             if (dcert.isRegister()) {
                 // in case of stake registrations, count stake key deposits as additional output ADA
@@ -1567,7 +1575,7 @@ export class TxBuilder {
      * @private
      * @param {{
      *   fee: bigint
-     *   networkParams: NetworkParamsHelper
+     *   networkParams: NetworkParams
      *   firstValidSlot: Option<number>
      *   lastValidSlot: Option<number>
      * }} execContext
@@ -1585,7 +1593,7 @@ export class TxBuilder {
             execContext.lastValidSlot
         )
 
-        const txData = dummyTx.toTxUplcData(
+        const txInfo = dummyTx.toTxInfo(
             execContext.networkParams,
             dummyRedeemers,
             this.datums,
@@ -1593,8 +1601,8 @@ export class TxBuilder {
         )
 
         // rebuild the redeemers now that we can generate the correct ScriptContext
-        const redeemers = this.buildMintingRedeemers({ txData }).concat(
-            this.buildSpendingRedeemers({ txData })
+        const redeemers = this.buildMintingRedeemers({ txInfo: txInfo }).concat(
+            this.buildSpendingRedeemers({ txInfo: txInfo })
         )
 
         return redeemers
@@ -1624,7 +1632,7 @@ export class TxBuilder {
 
     /**
      * @typedef {{
-     *   txData: UplcData
+     *   txInfo: TxInfo
      * }} RedeemerExecContext
      */
 
@@ -1644,10 +1652,12 @@ export class TxBuilder {
 
             if (execContext) {
                 const purpose = ScriptPurpose.Minting(redeemer, mph)
-                const scriptContext = purpose.toScriptContextUplcData(
-                    execContext.txData
+                const scriptContext = new ScriptContextV2(
+                    execContext.txInfo,
+                    purpose
                 )
-                const args = [redeemer.data, scriptContext]
+                const scriptContextData = scriptContext.toUplcData()
+                const args = [redeemer.data, scriptContextData]
 
                 const profile = script.eval(
                     args.map((a) => new UplcDataValue(a))
@@ -1690,11 +1700,13 @@ export class TxBuilder {
             if (execContext) {
                 const datum = expectSome(utxo.datum?.data)
                 const purpose = ScriptPurpose.Spending(redeemer, utxo.id)
-                const scriptContext = purpose.toScriptContextUplcData(
-                    execContext.txData
+                const scriptContext = new ScriptContextV2(
+                    execContext.txInfo,
+                    purpose
                 )
+                const scriptContextData = scriptContext.toUplcData()
 
-                const args = [datum, data, scriptContext]
+                const args = [datum, data, scriptContextData]
 
                 const profile = script.eval(
                     args.map((a) => new UplcDataValue(a))
@@ -1723,13 +1735,13 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {NetworkParamsHelper} networkParams
+     * @param {NetworkParams} params
      * @param {TxRedeemer[]} redeemers
      * @returns {Option<number[]>} - returns null if there are no redeemers
      */
-    buildScriptDataHash(networkParams, redeemers) {
+    buildScriptDataHash(params, redeemers) {
         if (redeemers.length > 0) {
-            return calcScriptDataHash(networkParams, this.datums, redeemers)
+            return calcScriptDataHash(params, this.datums, redeemers)
         } else {
             return None
         }
@@ -1737,20 +1749,22 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {NetworkParamsHelper} networkParams
+     * @param {NetworkParams} params
      * @returns {{
      *   firstValidSlot: Option<number>
      *   lastValidSlot: Option<number>
      * }}
      */
-    buildValidityTimeRange(networkParams) {
+    buildValidityTimeRange(params) {
+        const helper = new NetworkParamsHelper(params)
+
         /**
          * @param {Either<{slot: number}, {timestamp: number}>} slotOrTime
          * @return {number}
          */
         function slotOrTimeToSlot(slotOrTime) {
             if (isRight(slotOrTime)) {
-                return networkParams.timeToSlot(slotOrTime.right.timestamp)
+                return helper.timeToSlot(slotOrTime.right.timestamp)
             } else {
                 return slotOrTime.left.slot
             }
@@ -1767,9 +1781,9 @@ export class TxBuilder {
     /**
      * Makes sure each output contains the necessary min lovelace.
      * @private
-     * @param {NetworkParamsHelper} networkParams
+     * @param {NetworkParams} params
      */
-    correctOutputs(networkParams) {
-        this.outputs.forEach((output) => output.correctLovelace(networkParams))
+    correctOutputs(params) {
+        this.outputs.forEach((output) => output.correctLovelace(params))
     }
 }

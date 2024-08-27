@@ -90,13 +90,9 @@ export class Emulator {
      */
     get parametersSync() {
         return {
-            ...DEFAULT_NETWORK_PARAMS,
-            latestTip: {
-                epoch: 0,
-                hash: "", // there are no block hashes in the emulator currently
-                slot: this.currentSlot,
-                time: this.now
-            }
+            ...DEFAULT_NETWORK_PARAMS(),
+            refTipSlot: this.currentSlot,
+            refTipTime: this.now
         }
     }
 
@@ -241,7 +237,7 @@ export class Emulator {
 
         if (!tx.isValidSlot(BigInt(this.currentSlot))) {
             throw new Error(
-                `tx invalid (slot out of range, ${this.currentSlot} not in ${tx.body.getValidityTimeRange(new NetworkParamsHelper(this.parametersSync)).toString()})`
+                `tx invalid (slot out of range, ${this.currentSlot} not in ${tx.body.getValidityTimeRange(this.parametersSync).toString()})`
             )
         }
 

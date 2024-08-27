@@ -54,7 +54,7 @@ describe(TxChainBuilder.name, async () => {
             .pay(wallet2Addr, token)
             .build({
                 changeAddress: wallet1Addr,
-                networkParams: DEFAULT_NETWORK_PARAMS
+                networkParams: DEFAULT_NETWORK_PARAMS()
             })
 
         chain.with(tx1)
@@ -65,7 +65,7 @@ describe(TxChainBuilder.name, async () => {
             .pay(wallet1Addr, token)
             .build({
                 changeAddress: wallet2Addr,
-                networkParams: DEFAULT_NETWORK_PARAMS,
+                networkParams: DEFAULT_NETWORK_PARAMS(),
                 spareUtxos: (await helper.getUtxos(wallet2Addr)).filter(
                     (utxo) => utxo.value.assets.isZero()
                 )
