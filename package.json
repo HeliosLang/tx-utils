@@ -29,11 +29,11 @@
         "typescript": "^5.4.4"
     },
     "dependencies": {
-        "@helios-lang/codec-utils": "^0.1.30",
+        "@helios-lang/codec-utils": "^0.1.33",
         "@helios-lang/crypto": "^0.1.9",
-        "@helios-lang/ledger": "^0.4.3",
-        "@helios-lang/ledger-shelley": "^0.1.2",
-        "@helios-lang/type-utils": "^0.1.19",
-        "@helios-lang/uplc": "^0.2.0"
+        "@helios-lang/ledger": "^0.4.4",
+        "@helios-lang/ledger-shelley": "^0.1.3",
+        "@helios-lang/type-utils": "^0.1.21",
+        "@helios-lang/uplc": "^0.3.0"
     }
 }

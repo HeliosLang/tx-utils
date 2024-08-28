@@ -755,7 +755,7 @@ export class TxBuilder {
             const refScript = utxo.output.refScript
 
             if (refScript) {
-                if (refScript instanceof UplcProgramV2) {
+                if (refScript.plutusVersion == "PlutusScriptV2") {
                     this.addV2RefScript(refScript)
                 } else {
                     throw new Error(
