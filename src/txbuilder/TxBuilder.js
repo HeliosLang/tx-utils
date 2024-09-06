@@ -27,7 +27,8 @@ import {
     toTime,
     ScriptContextV2,
     DEFAULT_NETWORK_PARAMS,
-    calcRefScriptsSize
+    calcRefScriptsSize,
+    StakingValidatorHash
 } from "@helios-lang/ledger"
 import {
     None,
@@ -211,6 +212,12 @@ export class TxBuilder {
     withdrawals
 
     /**
+     * @private
+     * @type {[StakingAddress, UplcData][]}
+     */
+    rewardingRedeemers
+
+    /**
      * @param {TxBuilderConfig} config
      */
     constructor(config) {
@@ -378,6 +385,7 @@ export class TxBuilder {
         this.v2RefScripts = []
         this.v2Scripts = []
         this.withdrawals = []
+        this.rewardingRedeemers = []
 
         return this
     }
@@ -965,9 +973,10 @@ export class TxBuilder {
     /**
      * @param {StakingAddressLike} addr
      * @param {IntLike} lovelace
+     * @param {Option<UplcData>} redeemer - TOO: typeSafe redeemer n
      * @returns {TxBuilder}
      */
-    withdraw(addr, lovelace) {
+    withdraw(addr, lovelace, redeemer = None) {
         const stakingAddress = StakingAddress.new(this.config.isMainnet, addr)
 
         /**
@@ -978,6 +987,11 @@ export class TxBuilder {
         const i = this.withdrawals.findIndex(([prev]) =>
             prev.isEqual(stakingAddress)
         )
+
+        // TODO: more checks required to assure addr has a StakingValidatorHash
+        if (redeemer) {
+            this.addRewardingRedeemer(stakingAddress, redeemer)
+        }
 
         if (i == -1) {
             this.withdrawals.push(entry)
@@ -1085,6 +1099,20 @@ export class TxBuilder {
     }
 
     /**
+     * Index is calculated later
+     * @private
+     * @param {StakingAddress} sa
+     * @param {UplcData} data
+     */
+    addRewardingRedeemer(sa, data) {
+        if (this.hasRewardingRedeemer(sa)) {
+            throw new Error("redeemer already added")
+        }
+
+        this.rewardingRedeemers.push([sa, data])
+    }
+
+    /**
      * Doesn't throw an error if already added before
      * @private
      * @param {UplcProgramV1} script
@@ -1122,7 +1150,7 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {number[] | MintingPolicyHash | ValidatorHash} hash
+     * @param {number[] | MintingPolicyHash | ValidatorHash | StakingValidatorHash} hash
      * @returns {UplcProgramV1 | UplcProgramV2}
      */
     getUplcScript(hash) {
@@ -1150,6 +1178,10 @@ export class TxBuilder {
             )
         } else if (hash instanceof ValidatorHash) {
             throw new Error(`script for validator ${hash.toHex()} not found`)
+        } else if (hash instanceof StakingValidatorHash) {
+            throw new Error(
+                `script for staking validator ${hash.toHex()} not found`
+            )
         } else {
             throw new Error(`script for ${bytesToHex(hash)} not found`)
         }
@@ -1260,6 +1292,15 @@ export class TxBuilder {
      */
     hasSpendingRedeemer(utxo) {
         return this.spendingRedeemers.some(([prev]) => prev.isEqual(utxo))
+    }
+
+    /**
+     * @private
+     * @param {StakingAddress} addr
+     * @returns {boolean}
+     */
+    hasRewardingRedeemer(addr) {
+        return this.rewardingRedeemers.some(([sa]) => sa.isEqual(addr))
     }
 
     /**
@@ -1582,9 +1623,9 @@ export class TxBuilder {
      * @returns {TxRedeemer[]}
      */
     buildRedeemers(execContext) {
-        const dummyRedeemers = this.buildMintingRedeemers().concat(
-            this.buildSpendingRedeemers()
-        )
+        const dummyRedeemers = this.buildMintingRedeemers()
+            .concat(this.buildSpendingRedeemers())
+            .concat(this.buildRewardingRedeemers())
 
         // we have all the information to create a dummy tx
         const dummyTx = this.buildDummyTxBody(
@@ -1601,9 +1642,9 @@ export class TxBuilder {
         )
 
         // rebuild the redeemers now that we can generate the correct ScriptContext
-        const redeemers = this.buildMintingRedeemers({ txInfo: txInfo }).concat(
-            this.buildSpendingRedeemers({ txInfo: txInfo })
-        )
+        const redeemers = this.buildMintingRedeemers({ txInfo })
+            .concat(this.buildSpendingRedeemers({ txInfo }))
+            .concat(this.buildRewardingRedeemers({ txInfo }))
 
         return redeemers
     }
@@ -1727,6 +1768,62 @@ export class TxBuilder {
                 }
 
                 redeemer = TxRedeemer.Spending(i, data, profile.cost)
+            }
+
+            return redeemer
+        })
+    }
+
+    /**
+     * @private
+     * @param {Option<RedeemerExecContext>} execContext - execution and budget calculation is only performed when this is set
+     * @returns {TxRedeemer[]}
+     */
+    buildRewardingRedeemers(execContext = None) {
+        return this.rewardingRedeemers.map(([stakingAddress, data]) => {
+            const i = this.withdrawals.findIndex(([sa]) =>
+                sa.isEqual(stakingAddress)
+            )
+            let redeemer = TxRedeemer.Rewarding(i, data)
+
+            const svh = expectSome(
+                stakingAddress.toCredential().expectStakingHash()
+                    .stakingValidatorHash
+            )
+            const script = this.getUplcScript(svh)
+
+            if (execContext) {
+                const purpose = ScriptPurpose.Rewarding(
+                    redeemer,
+                    stakingAddress.toCredential()
+                )
+                const scriptContext = new ScriptContextV2(
+                    execContext.txInfo,
+                    purpose
+                )
+                const scriptContextData = scriptContext.toUplcData()
+
+                const args = [data, scriptContextData]
+
+                const profile = script.eval(
+                    args.map((a) => new UplcDataValue(a))
+                )
+
+                if (isLeft(profile.result)) {
+                    if (script.alt) {
+                        const profile = script.alt.eval(
+                            args.map((a) => new UplcDataValue(a))
+                        )
+
+                        throw new Error(expectLeft(profile.result).error)
+                    } else {
+                        console.error("no alt script attached")
+                    }
+
+                    throw new Error(profile.result.left.error)
+                }
+
+                redeemer = TxRedeemer.Rewarding(i, data, profile.cost)
             }
 
             return redeemer
