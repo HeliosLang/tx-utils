@@ -243,12 +243,12 @@ export class TxBuilder {
         const params =
             config?.networkParams instanceof Promise
                 ? await config.networkParams
-                : config?.networkParams ?? DEFAULT_NETWORK_PARAMS()
+                : (config?.networkParams ?? DEFAULT_NETWORK_PARAMS())
         const helper = new NetworkParamsHelper(params)
         const spareUtxos =
             config.spareUtxos instanceof Promise
                 ? await config.spareUtxos
-                : config.spareUtxos ?? []
+                : (config.spareUtxos ?? [])
 
         const { metadata, metadataHash } = this.buildMetadata()
         const { firstValidSlot, lastValidSlot } =
@@ -1113,7 +1113,7 @@ export class TxBuilder {
     }
 
     /**
-     * Doesn't throw an error if already added before
+     * Doesn't re-add or throw an error if the script was previously added
      * @private
      * @param {UplcProgramV1} script
      */
@@ -1125,7 +1125,7 @@ export class TxBuilder {
     }
 
     /**
-     * Doesn't throw an error if already added before
+     * Doesn't re-add or throw an error if the script was previously added
      * @private
      * @param {UplcProgramV2} script
      */
@@ -1137,7 +1137,7 @@ export class TxBuilder {
     }
 
     /**
-     * Doesn't throw an error if already added before
+     * Doesn't re-add or throw an error if the script was previously added
      * @private
      * @param {UplcProgramV2} script
      */
