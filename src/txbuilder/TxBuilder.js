@@ -476,51 +476,62 @@ export class TxBuilder {
     }
 
     /**
+     * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
+     * @remarks Use {@link mintUnsafe} if you don't have such a transaction context.
      * @template TRedeemer
      * @overload
      * @param {TokenValue<MintingContext<any, TRedeemer>>} token
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
-     *
+     */
+    /**
      * @overload
+     * Adds minting instructions to the transaction without a redeemer
      * @param {TokenValue<null>} token
      * @returns {TxBuilder}
-     *
+     */
+    /**
      * @overload
+     * Adds minting instructions to the transaction without a redeemer
      * @param {AssetClass<null>} assetClass
      * @param {IntLike} quantity
      * @returns {TxBuilder}
-     *
+     */
+    /**
      * @overload
-     * @param {MintingPolicyHash<null>} policy
+     * Adds minting instructions to the transaction without a redeemer
+     * @param {MintingPolicyHash<null | unknown>} policy
      * @param {[ByteArrayLike, IntLike][]} tokens
      * @returns {TxBuilder}
-     *
+     */
+    /**
      * @template TRedeemer
      * @overload
+     * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
      * @param {AssetClass<MintingContext<any, TRedeemer>>} assetClass
      * @param {IntLike} quantity
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
-     *
+     */
+    /**
      * @template TRedeemer
      * @overload
+     * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
      * @param {MintingPolicyHash<MintingContext<any, TRedeemer>>} policy
      * @param {[ByteArrayLike, IntLike][]} tokens
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
-     *
+     */
+    /**
      * @template TRedeemer
-     * @param {[
-     *   TokenValue<null>
-     * ] | [
-     *   AssetClass<null> | MintingPolicyHash<null> | TokenValue<MintingContext<any, TRedeemer>>,
-     *   IntLike | [ByteArrayLike, IntLike][] | TRedeemer
-     * ] | [
-     *   AssetClass<MintingContext<any, TRedeemer>> | MintingPolicyHash<MintingContext<any, TRedeemer>>,
-     *   IntLike | [ByteArrayLike, IntLike][],
-     *   TRedeemer
-     * ]} args
+     * @param {
+     *  | [ TokenValue<null>]  // 1-arg
+     *  | [ TokenValue<MintingContext<any, TRedeemer>>, TRedeemer ] // 2-arg form A
+     *  | [ AssetClass<null>, IntLike ]  // 2-arg form B
+     *  | [ MintingPolicyHash<null>, [ByteArrayLike, IntLike][] ] // 2-arg form C
+     *  | [ AssetClass<MintingContext<any, TRedeemer>>, IntLike, TRedeemer ] // 3-arg form A
+     *  | [ MintingPolicyHash<MintingContext<any, TRedeemer>>, [ByteArrayLike, IntLike][], TRedeemer ]// 3-arg form B
+     * } args
      * @returns {TxBuilder}
      */
     mint(...args) {
@@ -533,10 +544,13 @@ export class TxBuilder {
                 a instanceof AssetClass &&
                 (typeof b == "bigint" || typeof b == "number")
             ) {
+                // 2-arg form B
                 return this.mintUnsafe(a, b, None)
             } else if (a instanceof MintingPolicyHash && Array.isArray(b)) {
+                // 2-arg form C
                 return this.mintUnsafe(a, b, None)
             } else if (a instanceof TokenValue) {
+                // 2-arg form A
                 this.attachUplcProgram(a.context.program)
 
                 return this.mintUnsafe(
@@ -554,6 +568,7 @@ export class TxBuilder {
                 a instanceof AssetClass &&
                 (typeof b == "bigint" || typeof b == "number")
             ) {
+                // 3-arg form A
                 this.attachUplcProgram(a.context.program)
 
                 return this.mintUnsafe(
@@ -562,6 +577,7 @@ export class TxBuilder {
                     a.context.redeemer.toUplcData(redeemer)
                 )
             } else if (a instanceof MintingPolicyHash && Array.isArray(b)) {
+                // 3-arg form B
                 this.attachUplcProgram(a.context.program)
 
                 return this.mintUnsafe(
@@ -579,6 +595,7 @@ export class TxBuilder {
 
     /**
      * Mint a list of tokens associated with a given `MintingPolicyHash`.
+     * @remarks
      * Throws an error if the given `MintingPolicyHash` was already used in a previous call to `mint()`.
      * The token names can either by a list of bytes or a hexadecimal string.
      *
