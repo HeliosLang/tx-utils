@@ -39,12 +39,7 @@ import {
     isRight
 } from "@helios-lang/type-utils"
 import { UplcProgramV3 } from "@helios-lang/uplc"
-import {
-    UplcProgramV1,
-    UplcProgramV2,
-    UplcDataValue,
-    BasicUplcLogger
-} from "@helios-lang/uplc"
+import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
 
 /**
  * @typedef {import("@helios-lang/codec-utils").ByteArrayLike} ByteArrayLike
@@ -125,12 +120,6 @@ export class TxBuilder {
      * @type {TxBuilderConfig}
      */
     config
-
-    /**
-     * @private
-     * @type {string}
-     */
-    scriptError
 
     /**
      * @private
@@ -454,7 +443,6 @@ export class TxBuilder {
      * @returns {TxBuilder}
      */
     reset() {
-        this.scriptError = ""
         this.collateral = []
         this.addedCollatoral = false
         this.datums = []
@@ -562,13 +550,6 @@ export class TxBuilder {
         }
 
         return this
-    }
-
-    /**
-     * returns any script error that occurred during a built transaction
-     */
-    get hasScriptError() {
-        return this.scriptError
     }
 
     /**
@@ -1971,8 +1952,7 @@ export class TxBuilder {
      * @returns {UplcLoggingI}
      */
     mkNullLogger() {
-        //@ts-expect-error
-        return { logPrint() {}, lastMsg: "", isMine: true }
+        return { logPrint() {}, lastMsg: "" }
     }
 
     /**
