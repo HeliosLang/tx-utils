@@ -38,13 +38,17 @@ import {
     isNone,
     isRight
 } from "@helios-lang/type-utils"
-import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
-import { BasicUplcLogger } from "@helios-lang/uplc/node_modules/@helios-lang/compiler-utils/src/errors/BasicUplcLogger.js"
+import { UplcProgramV3 } from "@helios-lang/uplc"
+import {
+    UplcProgramV1,
+    UplcProgramV2,
+    UplcDataValue,
+    BasicUplcLogger
+} from "@helios-lang/uplc"
 
 /**
  * @typedef {import("@helios-lang/codec-utils").ByteArrayLike} ByteArrayLike
  * @typedef {import("@helios-lang/codec-utils").IntLike} IntLike
- * @typedef {import("@helios-lang/compiler-utils").UplcLoggingI} UplcLoggingI
  * @typedef {import("@helios-lang/ledger").AddressLike} AddressLike
  * @typedef {import("@helios-lang/ledger").AssetClassLike} AssetClassLike
  * @typedef {import("@helios-lang/ledger").MintingPolicyHashLike} MintingPolicyHashLike
@@ -54,6 +58,8 @@ import { BasicUplcLogger } from "@helios-lang/uplc/node_modules/@helios-lang/com
  * @typedef {import("@helios-lang/ledger").TxInfo} TxInfo
  * @typedef {import("@helios-lang/ledger").TxMetadataAttr} TxMetadataAttr
  * @typedef {import("@helios-lang/ledger").ValueLike} ValueLike
+ * @typedef {import("@helios-lang/uplc").CekResult} CekResult
+ * @typedef {import("@helios-lang/uplc").UplcLoggingI} UplcLoggingI
  * @typedef {import("@helios-lang/uplc").UplcData} UplcData
  */
 
@@ -92,8 +98,25 @@ import { BasicUplcLogger } from "@helios-lang/uplc/node_modules/@helios-lang/com
  *   spareUtxos?: TxInput[] | Promise<TxInput[]>
  *   networkParams?: NetworkParams | Promise<NetworkParams>
  *   maxAssetsPerChangeOutput?: number
- *   logOptions?: Partial<UplcLoggingI>
+ *   logOptions?: UplcLoggingI
+ *   throwBuildPhaseScriptErrors?: boolean
+ *   beforeValidate?: (tx: Tx) => any | Promise<any>
  * }} TxBuilderFinalConfig
+ */
+
+/**
+ * @private
+ * @typedef {Object} RedeemerExecContext
+ * @property {bigint} fee
+ * @property {Option<number>} firstValidSlot
+ * @property {Option<number>} lastValidSlot
+ * @property {boolean} [throwBuildPhaseScriptErrors] - if false, script errors will be thrown only during validate phase of the build.  Default is true for build(), false for buildUnsafe()
+ * @property {UplcLoggingI} [logOptions] - an externally-provided logger
+ * @property {NetworkParams} networkParams
+ */
+/**
+ * @private
+ * @typedef {RedeemerExecContext & {txInfo: TxInfo;}} RedeemerBuildContext
  */
 
 export class TxBuilder {
@@ -104,6 +127,7 @@ export class TxBuilder {
     config
 
     /**
+     * @private
      * @type {string}
      */
     scriptError
@@ -260,30 +284,33 @@ export class TxBuilder {
      *
      * The
      * {@link tx.validate|transaction-validation logic} run will throw an
-     * error if the transaction is invalid.
+     * error if the transaction is invalid for any reason, including script errors.
+     *
+     * The `config.throwBuildPhaseScriptErrors` default (true) will throw script errors
+     * during the build phase, but you can set it to false to defer those errors to the validate
+     * phase (
      *
      * Use {@link buildUnsafe} to get a transaction with possible
      * {@link Tx.hasValidationError} set, and no thrown exception.
      *
      * @param {TxBuilderFinalConfig} config
-     * @param {Option<UplcLoggingI>} logOptions
      * @returns {Promise<Tx>}
      */
-    async build(config, logOptions = new BasicUplcLogger()) {
+    async build(config) {
         const params =
             config?.networkParams instanceof Promise
                 ? await config.networkParams
                 : (config?.networkParams ?? DEFAULT_NETWORK_PARAMS())
-        const tx = await this.buildUnsafe(config, logOptions)
-
-        // do a final validation of the tx; throws if it fails any check
-        tx.validate(params, true, logOptions)
+        const tx = await this.buildUnsafe({
+            throwBuildPhaseScriptErrors: true,
+            ...config
+        })
 
         return tx
     }
 
     /**
-     * Builds and runs validation logic on the transactionx
+     * Builds and runs validation logic on the transaction
      * @remarks
      * Always returns a built transaction that has been validation-checked.
      *
@@ -294,15 +321,16 @@ export class TxBuilder {
      *
      * Use {@link TxBuilder.build} if you want validation errors to be thrown.
      *
-     * WIP: if there are any script errors, txb.scriptErrors will be truthy.
+     * Any validation error will be found in the resulting `tx.hasValidationError`, including script validations.
      *
      * @param {TxBuilderFinalConfig} config
-     * @param {Option<UplcLoggingI>} logOptions
      * @returns {Promise<Tx>}
      */
-    async buildUnsafe(config, logOptions = new BasicUplcLogger()) {
+    async buildUnsafe(config) {
         // extract arguments
         const changeAddress = Address.new(await config.changeAddress)
+        const throwBuildPhaseScriptErrors =
+            config.throwBuildPhaseScriptErrors ?? false
         const params =
             config?.networkParams instanceof Promise
                 ? await config.networkParams
@@ -348,16 +376,14 @@ export class TxBuilder {
 
         // the final fee will never be higher than the current `fee`, so the inputs and outputs won't change, and we will get redeemers with the right indices
         // the scripts executed at this point will not see the correct txHash nor the correct fee
-        const redeemers = this.buildRedeemers(
-            {
-                networkParams: params,
-                fee,
-                firstValidSlot,
-                lastValidSlot,
-                throwOnScriptError: false
-            },
-            logOptions
-        )
+        const redeemers = this.buildRedeemers({
+            networkParams: params,
+            fee,
+            firstValidSlot,
+            lastValidSlot,
+            throwBuildPhaseScriptErrors,
+            logOptions: config.logOptions // NOTE: has an internal default null-logger
+        })
 
         const scriptDataHash = this.buildScriptDataHash(params, redeemers)
 
@@ -418,8 +444,10 @@ export class TxBuilder {
             collateralChangeOutput.value.lovelace =
                 collateralInput - minCollateral
         }
-
-        return tx.validateUnsafe(params, true, logOptions)
+        if (config.beforeValidate) {
+            await config.beforeValidate(tx)
+        }
+        return tx.validateUnsafe(params, { ...config, strict: true })
     }
 
     /**
@@ -534,6 +562,13 @@ export class TxBuilder {
         }
 
         return this
+    }
+
+    /**
+     * returns any script error that occurred during a built transaction
+     */
+    get hasScriptError() {
+        return this.scriptError
     }
 
     /**
@@ -1650,6 +1685,10 @@ export class TxBuilder {
                         `need ${totalOutputValue.lovelace} lovelace, but only have ${inputValue.lovelace}`
                     )
                 }
+            } else if (
+                this.inputs.some((prevInput) => prevInput.isEqual(spare))
+            ) {
+                // no need to log any warning about a "spare" that's already in the transaction
             } else {
                 this.addInput(spare)
 
@@ -1697,17 +1736,10 @@ export class TxBuilder {
      * (I'm not sure if the sorting is actually necessary)
      * TODO: return profiling information?
      * @private
-     * @param {{
-     *   fee: bigint
-     *   networkParams: NetworkParams
-     *   firstValidSlot: Option<number>
-     *   lastValidSlot: Option<number>
-     *   throwOnScriptError? : boolean
-     * }} execContext
-     * @param {Option<UplcLoggingI>} logOptions
+     * @param {RedeemerExecContext} execContext
      * @returns {TxRedeemer[]}
      */
-    buildRedeemers(execContext, logOptions = None) {
+    buildRedeemers(execContext) {
         const dummyRedeemers = this.buildMintingRedeemers()
             .concat(this.buildSpendingRedeemers())
             .concat(this.buildRewardingRedeemers())
@@ -1726,25 +1758,14 @@ export class TxBuilder {
             TxId.dummy()
         )
 
-        const { throwOnScriptError } = execContext
-
+        const buildContext = {
+            ...execContext,
+            txInfo
+        }
         // rebuild the redeemers now that we can generate the correct ScriptContext
-        const redeemers = this.buildMintingRedeemers(
-            { txInfo, throwOnScriptError },
-            logOptions
-        )
-            .concat(
-                this.buildSpendingRedeemers(
-                    { txInfo, throwOnScriptError },
-                    logOptions
-                )
-            )
-            .concat(
-                this.buildRewardingRedeemers(
-                    { txInfo, throwOnScriptError },
-                    logOptions
-                )
-            )
+        const redeemers = this.buildMintingRedeemers(buildContext)
+            .concat(this.buildSpendingRedeemers(buildContext))
+            .concat(this.buildRewardingRedeemers(buildContext))
 
         return redeemers
     }
@@ -1772,20 +1793,12 @@ export class TxBuilder {
     }
 
     /**
-     * @typedef {{
-     *   txInfo: TxInfo
-     *   throwOnScriptError? : boolean
-     * }} RedeemerExecContext
-     */
-
-    /**
      * The execution itself might depend on the redeemers, so we must also be able to return the redeemers without any execution first
      * @private
-     * @param {Option<RedeemerExecContext>} execContext - execution and budget calculation is only performed when this is set
-     * @param {Option<UplcLoggingI>} logOptions
+     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
      * @returns {TxRedeemer[]}
      */
-    buildMintingRedeemers(execContext = None, logOptions = None) {
+    buildMintingRedeemers(buildContext = None) {
         // const logOpts = logOptions || { accumulate: true, logPrint: null }
         return this.mintingRedeemers.map(([mph, data]) => {
             const i = this.mintedTokens
@@ -1794,50 +1807,19 @@ export class TxBuilder {
             let redeemer = TxRedeemer.Minting(i, data)
             const script = this.getUplcScript(mph)
 
-            if (execContext) {
-                const purpose = ScriptPurpose.Minting(redeemer, mph)
-                const scriptContext = new ScriptContextV2(
-                    execContext.txInfo,
-                    purpose
-                )
-                const scriptContextData = scriptContext.toUplcData()
-                const args = [redeemer.data, scriptContextData]
-                const logger = logOptions || new BasicUplcLogger()
-
-                const profile = script.eval(
-                    args.map((a) => new UplcDataValue(a)),
-                    undefined,
-                    logger
-                )
-                if (isLeft(profile.result)) {
-                    //@ts-expect-error - why typescript why?
-                    logger.flush?.()
-                    const throwOnScriptError =
-                        execContext.throwOnScriptError ?? true
-                    if (script.alt) {
-                        const profile = script.alt.eval(
-                            args.map((a) => new UplcDataValue(a)),
-                            undefined,
-                            logOptions
-                        )
-                        if (throwOnScriptError)
-                            throw new Error(
-                                logger.lastMsg
-                                //expectLeft(profile.result).error
-                            )
-                    } else {
-                        console.warn("NOTE: no alt script attached")
-                    }
-                    // throw new Error(profile.result.left.error)
-                    if (throwOnScriptError)
-                        throw new Error(
-                            logger.lastMsg || expectLeft(profile.result).error
-                        )
-                    this.scriptError = logger.lastMsg
-                }
-
+            if (buildContext) {
+                const profile = this.buildRedeemerProfile(script, {
+                    summary: `mint @${i}`,
+                    args: [
+                        redeemer.data,
+                        new ScriptContextV2(
+                            buildContext.txInfo,
+                            ScriptPurpose.Minting(redeemer, mph)
+                        ).toUplcData()
+                    ],
+                    buildContext
+                })
                 redeemer = TxRedeemer.Minting(i, data, profile.cost)
-                logger.reset?.("build")
             }
             return redeemer
         })
@@ -1845,71 +1827,37 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {Option<RedeemerExecContext>} execContext - execution and budget calculation is only performed when this is set
-     * @param {Option<UplcLoggingI>} logOptions
+     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
      * @returns {TxRedeemer[]}
      */
-    buildSpendingRedeemers(execContext = None, logOptions = None) {
+    buildSpendingRedeemers(buildContext = None) {
         return this.spendingRedeemers.map(([utxo, data]) => {
             const i = this.inputs.findIndex((inp) => inp.isEqual(utxo))
             let redeemer = TxRedeemer.Spending(i, data)
 
+            // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
+            // this finds the index based on staking address, but ^ uses the index we found here.
+            // Possibly the other thing should do the same as this.
             const vh = expectSome(utxo.address.validatorHash)
             const script = this.getUplcScript(vh)
 
-            if (execContext) {
+            if (buildContext) {
                 const datum = expectSome(utxo.datum?.data)
-                const purpose = ScriptPurpose.Spending(redeemer, utxo.id)
-                const scriptContext = new ScriptContextV2(
-                    execContext.txInfo,
-                    purpose
-                )
-                const scriptContextData = scriptContext.toUplcData()
 
-                const args = [datum, data, scriptContextData]
-
-                // ??? this type annotation doesn't seem to work; -> BasicUplcLogger, not UplcLoggingI
-                const logger =
-                    /* @type {UplcLoggingI} */ logOptions ||
-                    new BasicUplcLogger()
-
-                const profile = script.eval(
-                    args.map((a) => new UplcDataValue(a)),
-                    undefined,
-                    logger
-                )
-
-                if (isLeft(profile.result)) {
-                    //@ts-expect-error - why typescript why?
-                    logger.flush?.()
-                    const throwOnScriptError =
-                        execContext.throwOnScriptError ?? true
-
-                    if (script.alt) {
-                        const profile = script.alt.eval(
-                            args.map((a) => new UplcDataValue(a))
-                        )
-
-                        // throw new Error(expectLeft(profile.result).error)
-                        if (throwOnScriptError)
-                            throw new Error(
-                                logger.lastMsg ||
-                                    expectLeft(profile.result).error
-                            )
-                    } else {
-                        console.warn("NOTE: no alt script attached")
-                    }
-
-                    // throw new Error(profile.result.left.error)
-                    if (throwOnScriptError)
-                        throw new Error(
-                            logger.lastMsg || expectLeft(profile.result).error
-                        )
-                    this.scriptError = logger.lastMsg
-                }
+                const profile = this.buildRedeemerProfile(script, {
+                    summary: `input @${i}`,
+                    args: [
+                        datum,
+                        data,
+                        new ScriptContextV2(
+                            buildContext.txInfo,
+                            ScriptPurpose.Spending(redeemer, utxo.id)
+                        ).toUplcData()
+                    ],
+                    buildContext
+                })
 
                 redeemer = TxRedeemer.Spending(i, data, profile.cost)
-                logger.reset?.("build")
             }
 
             return redeemer
@@ -1918,12 +1866,15 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {Option<RedeemerExecContext>} execContext - execution and budget calculation is only performed when this is set
-     * @param {Option<UplcLoggingI>} logOptions
+     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
      * @returns {TxRedeemer[]}
      */
-    buildRewardingRedeemers(execContext = None, logOptions = None) {
+    buildRewardingRedeemers(buildContext = None) {
         return this.rewardingRedeemers.map(([stakingAddress, data]) => {
+            // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
+            // this finds the index based on staking address, but ^ uses the index we found here.
+            // Possibly the other thing should do the same as this.
+
             const i = this.withdrawals.findIndex(([sa]) =>
                 sa.isEqual(stakingAddress)
             )
@@ -1935,63 +1886,93 @@ export class TxBuilder {
             )
             const script = this.getUplcScript(svh)
 
-            if (execContext) {
-                const purpose = ScriptPurpose.Rewarding(
-                    redeemer,
-                    stakingAddress.toCredential()
-                )
-                const scriptContext = new ScriptContextV2(
-                    execContext.txInfo,
-                    purpose
-                )
-                const scriptContextData = scriptContext.toUplcData()
-
-                const args = [data, scriptContextData]
-                // why typescript no like this?
-                const logger =
-                    /* @type {UplcLoggingI} */ logOptions ||
-                    new BasicUplcLogger()
-
-                const profile = script.eval(
-                    args.map((a) => new UplcDataValue(a)),
-                    undefined,
-                    logger
-                )
-
-                if (isLeft(profile.result)) {
-                    //@ts-expect-error - why typescript why?
-                    logger.flush?.()
-                    const throwOnScriptError =
-                        execContext.throwOnScriptError ?? true
-
-                    if (script.alt) {
-                        const profile = script.alt.eval(
-                            args.map((a) => new UplcDataValue(a))
-                        )
-
-                        // throw new Error(expectLeft(profile.result).error)
-                        if (throwOnScriptError)
-                            throw new Error(
-                                logger.lastMsg ||
-                                    expectLeft(profile.result).error
+            if (buildContext) {
+                const profile = this.buildRedeemerProfile(script, {
+                    summary: `rewards @${i}`,
+                    args: [
+                        data,
+                        new ScriptContextV2(
+                            buildContext.txInfo,
+                            ScriptPurpose.Rewarding(
+                                redeemer,
+                                stakingAddress.toCredential()
                             )
-                    } else {
-                        console.warn("NOTE: no alt script attached")
-                    }
-
-                    // throw new Error(profile.result.left.error)
-                    if (throwOnScriptError)
-                        throw new Error(
-                            logger.lastMsg || expectLeft(profile.result).error
-                        )
-                }
+                        ).toUplcData()
+                    ],
+                    buildContext
+                })
 
                 redeemer = TxRedeemer.Rewarding(i, data, profile.cost)
-                logger?.reset?.("build")
             }
 
             return redeemer
         })
+    }
+
+    /**
+     * @private
+     * @param {UplcProgramV1 | UplcProgramV2 | UplcProgramV3} script
+     * @param {Object} options
+     * @param {string} options.summary
+     * @param {UplcData[]} options.args
+     * @param {RedeemerBuildContext} options.buildContext
+     * @returns {CekResult}
+     */
+    buildRedeemerProfile(script, { args, summary, buildContext }) {
+        const throwBuildPhaseScriptErrors =
+            buildContext.throwBuildPhaseScriptErrors ?? true
+
+        const { logOptions = this.mkNullLogger() } = buildContext
+        const argsData = args.map((a) => new UplcDataValue(a))
+        const profile = script.eval(argsData, { logOptions })
+        // XXX if the script fails, we signal the logger to emit the diagnostics.
+        // if the script runs correctly, logging will arrive during transaction validation instead.
+        if (isLeft(profile.result)) {
+            if (script.alt) {
+                // only (normally) needed to emit logs in case the optimized script failed
+                const altProfile = script.alt.eval(argsData, { logOptions })
+                if (isLeft(altProfile.result)) {
+                    // all is consistent; we can return the profile of the optimized script
+                    //   ... even though it failed; the built Tx can provide further diagnostics in validate()
+                    if (throwBuildPhaseScriptErrors) {
+                        logOptions.flush?.()
+                        throw new Error(
+                            [
+                                "TxBuilder:build() failed",
+                                altProfile.result.left.error,
+                                ...altProfile.logs
+                            ].join("\n")
+                        )
+                    }
+                    return profile
+                }
+                // this would be an exceptional scenario:
+                logOptions.logError?.(
+                    `build: unoptimized script for ${summary} succeeded where optimized script failed`
+                )
+                const message =
+                    "${summary}: in optimized script: " +
+                    profile.result.left.error
+                logOptions.logError?.(message)
+                logOptions.flush?.()
+                throw new Error(message)
+            } else {
+                console.warn(
+                    `NOTE: ${summary}: no alt script attached; no script logs available.  See \`withAlt\` option in docs to enable logging`
+                )
+            }
+        }
+        logOptions.reset?.("build")
+        return profile
+    }
+
+    /**
+     * @private
+     * @returns {UplcLoggingI}
+     */
+    mkNullLogger() {
+        //@ts-expect-error
+        return { logPrint() {}, lastMsg: "", isMine: true }
     }
 
     /**
