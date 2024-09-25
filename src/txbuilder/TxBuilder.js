@@ -107,6 +107,16 @@ export class TxBuilder {
     collateral
 
     /**
+     * Set when the TxBuilder itself adds collateral.
+     * Used for distinguishing between external and internal collateral
+     * adds, and for recomputing collateral if the effective fee changes
+     * for any reason in case of a second call to build()
+     * @private
+     * @type {boolean}
+     */
+    addedCollatoral
+
+    /**
      * Unique datums
      * @private
      * @type {UplcData[]}
@@ -341,17 +351,12 @@ export class TxBuilder {
         changeOutput.value.lovelace += feeDiff // return part of the fee by adding
 
         if (collateralChangeOutput) {
+            // console.log(" -- recomputing collateral")
             const minCollateral = tx.calcMinCollateral(params)
 
             const collateralInput = Value.sum(tx.body.collateral).lovelace
             const currentCollateralValue =
                 collateralInput - collateralChangeOutput.value.lovelace
-
-            if (minCollateral > currentCollateralValue) {
-                throw new Error(
-                    "internal error: expected final Collateral to be smaller than initial collateral"
-                )
-            }
 
             collateralChangeOutput.value.lovelace =
                 collateralInput - minCollateral
@@ -368,6 +373,7 @@ export class TxBuilder {
      */
     reset() {
         this.collateral = []
+        this.addedCollatoral = false
         this.datums = []
         this.dcerts = []
         this.inputs = []
@@ -1443,7 +1449,11 @@ export class TxBuilder {
      * @returns {Option<TxOutput>} - collateral change output which can be corrected later
      */
     balanceCollateral(params, changeAddress, spareUtxos, baseFee) {
-        // don't do this step if collateral was already added explicitly
+        // if we previously added collateral, use it
+        if (this.addedCollatoral) {
+            return this.collateralReturn
+        }
+        // don't do this step if collateral was already added explicitly outside the TxBuilder
         if (this.collateral.length > 0 || !this.hasUplcScripts()) {
             return
         }
@@ -1515,6 +1525,7 @@ export class TxBuilder {
         collateralInputs.forEach((utxo) => {
             this.addCollateral(utxo)
         })
+        this.addedCollatoral = true
 
         return changeOutput
     }
