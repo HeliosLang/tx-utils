@@ -294,6 +294,9 @@ export class TxBuilder {
             throwBuildPhaseScriptErrors: true,
             ...config
         })
+        if (tx.hasValidationError) {
+            throw new Error(tx.hasValidationError)
+        }
 
         return tx
     }
@@ -303,15 +306,15 @@ export class TxBuilder {
      * @remarks
      * Always returns a built transaction that has been validation-checked.
      *
-     * ***UNSAFE: Does not throw validation errors***
+     * if the `throwBuildPhaseScriptErrors` option is true, then any script errors
+     * found during transaction-building will be thrown, and the full transaction
+     * validation is not run.
      *
      * Caller should check {@link Tx.hasValidationError}, which will be
-     * `false` or a validation error string.
+     * `false` or a validation error string, in case any transaction validations
+     * are found.
      *
      * Use {@link TxBuilder.build} if you want validation errors to be thrown.
-     *
-     * Any validation error will be found in the resulting `tx.hasValidationError`, including script validations.
-     *
      * @param {TxBuilderFinalConfig} config
      * @returns {Promise<Tx>}
      */
