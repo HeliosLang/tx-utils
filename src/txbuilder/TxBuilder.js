@@ -277,7 +277,7 @@ export class TxBuilder {
      *
      * The `config.throwBuildPhaseScriptErrors` default (true) will throw script errors
      * during the build phase, but you can set it to false to defer those errors to the validate
-     * phase (
+     * phase.
      *
      * Use {@link buildUnsafe} to get a transaction with possible
      * {@link Tx.hasValidationError} set, and no thrown exception.
