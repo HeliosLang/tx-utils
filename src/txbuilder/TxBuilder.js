@@ -1906,7 +1906,8 @@ export class TxBuilder {
         const throwBuildPhaseScriptErrors =
             buildContext.throwBuildPhaseScriptErrors ?? true
 
-        const { logOptions = this.mkNullLogger() } = buildContext
+        const { logOptions = { logPrint() {}, lastMsg: "" } } = buildContext
+
         const argsData = args.map((a) => new UplcDataValue(a))
         const profile = script.eval(argsData, { logOptions })
         // XXX if the script fails, we signal the logger to emit the diagnostics.
@@ -1948,14 +1949,6 @@ export class TxBuilder {
         }
         logOptions.reset?.("build")
         return profile
-    }
-
-    /**
-     * @private
-     * @returns {UplcLoggingI}
-     */
-    mkNullLogger() {
-        return { logPrint() {}, lastMsg: "" }
     }
 
     /**
