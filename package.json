@@ -8,6 +8,7 @@
     "scripts": {
         "build": "pnpm run prettify && pnpm run build:types && pnpm run test:suite",
         "build:types": "tsc -p jsconfig.json --noEmit false --emitDeclarationOnly",
+        "lockfile:sync": "pnpm install --ignore-workspace",
         "prepack": "pnpm run build",
         "prettify": "prettier . --write",
         "test": "pnpm run test:pretty && pnpm run test:types && pnpm run test:suite",
@@ -30,10 +31,11 @@
     },
     "dependencies": {
         "@helios-lang/codec-utils": "^0.1.33",
+        "@helios-lang/compiler-utils": "^0.1.56",
         "@helios-lang/crypto": "^0.1.9",
-        "@helios-lang/ledger": "^0.4.8",
+        "@helios-lang/ledger": "^0.5.0",
         "@helios-lang/ledger-shelley": "^0.1.3",
         "@helios-lang/type-utils": "^0.1.21",
-        "@helios-lang/uplc": "^0.3.0"
+        "@helios-lang/uplc": "^0.3.7"
     }
 }
