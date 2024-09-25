@@ -358,15 +358,6 @@ export class TxBuilder {
             const currentCollateralValue =
                 collateralInput - collateralChangeOutput.value.lovelace
 
-            // this was triggering in case of calling build() twice if the collateral was strictly computed
-            // to a smaller number, then increased as a result of adding more inputs.  It seems like an
-            // unneeded check.
-            // if (minCollateral > currentCollateralValue) {
-            //     throw new Error(
-            //         "internal error: expected final Collateral to be smaller than initial collateral"
-            //     )
-            // }
-
             collateralChangeOutput.value.lovelace =
                 collateralInput - minCollateral
         }
