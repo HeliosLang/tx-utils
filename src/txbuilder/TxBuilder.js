@@ -1659,9 +1659,17 @@ export class TxBuilder {
         // use some spareUtxos if the inputValue doesn't cover the outputs and fees
         const totalOutputValue = nonChangeOutputValue.add(changeOutput.value)
         while (!inputValue.isGreaterOrEqual(totalOutputValue)) {
-            let spare = spareUtxos.pop()
+            const spare = spareUtxos.pop()
 
-            if (spare === undefined) {
+            if (spare) {
+                if (this.inputs.some((prevInput) => prevInput.isEqual(spare))) {
+                    // no need to log any warning about a "spare" that's already in the transaction
+                } else {
+                    this.addInput(spare)
+
+                    inputValue = inputValue.add(spare.value)
+                }
+            } else {
                 if (spareAssetUTxOs) {
                     throw new Error(`UTxOs too fragmented`)
                 } else {
@@ -1669,14 +1677,6 @@ export class TxBuilder {
                         `need ${totalOutputValue.lovelace} lovelace, but only have ${inputValue.lovelace}`
                     )
                 }
-            } else if (
-                this.inputs.some((prevInput) => prevInput.isEqual(spare))
-            ) {
-                // no need to log any warning about a "spare" that's already in the transaction
-            } else {
-                this.addInput(spare)
-
-                inputValue = inputValue.add(spare.value)
             }
         }
 
@@ -1925,7 +1925,11 @@ export class TxBuilder {
                             [
                                 "TxBuilder:build() failed",
                                 altProfile.result.left.error,
-                                ...altProfile.logs
+                                ...altProfile.logs,
+                                " stack trace:\n    " +
+                                    altProfile.result.left.callSites
+                                        .map((s) => s.toString())
+                                        .join("\n    ")
                             ].join("\n")
                         )
                     }
@@ -1937,8 +1941,15 @@ export class TxBuilder {
                 )
                 const message =
                     "${summary}: in optimized script: " +
-                    profile.result.left.error
-                logOptions.logError?.(message)
+                    profile.result.left.error +
+                    "\n stack trace: " +
+                    profile.result.left.callSites
+                        .map((s) => s.toString())
+                        .join("\n   ")
+                logOptions.logError?.(
+                    message,
+                    profile.result.left.callSites.slice().pop()
+                )
                 logOptions.flush?.()
                 throw new Error(message)
             } else {
