@@ -1941,14 +1941,10 @@ export class TxBuilder {
                 )
                 const message =
                     "${summary}: in optimized script: " +
-                    profile.result.left.error +
-                    "\n stack trace: " +
-                    profile.result.left.callSites
-                        .map((s) => s.toString())
-                        .join("\n   ")
+                    profile.result.left.error
                 logOptions.logError?.(
                     message,
-                    profile.result.left.callSites.slice().pop()
+                    profile.result.left.callSites.slice()
                 )
                 logOptions.flush?.()
                 throw new Error(message)
