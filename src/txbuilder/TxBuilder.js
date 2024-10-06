@@ -38,7 +38,7 @@ import {
     isNone,
     isRight
 } from "@helios-lang/type-utils"
-import { UplcProgramV3 } from "@helios-lang/uplc"
+import { UplcProgramV3, UplcRuntimeError } from "@helios-lang/uplc"
 import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
 
 /**
@@ -1940,14 +1940,17 @@ export class TxBuilder {
                     `build: unoptimized script for ${summary} succeeded where optimized script failed`
                 )
                 const message =
-                    "${summary}: in optimized script: " +
+                    `${summary}: in optimized script: ` +
                     profile.result.left.error
                 logOptions.logError?.(
                     message,
-                    profile.result.left.callSites.slice()
-                )
+                    profile.result.left.callSites.slice()?.pop()?.site
+                ) // XXX: it might not make sense to log the error message in addition to throwing an error with the same message
                 logOptions.flush?.()
-                throw new Error(message)
+                throw new UplcRuntimeError(
+                    message,
+                    profile.result.left.callSites
+                )
             } else {
                 console.warn(
                     `NOTE: ${summary}: no alt script attached; no script logs available.  See \`withAlt\` option in docs to enable logging`
