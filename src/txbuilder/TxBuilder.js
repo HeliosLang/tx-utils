@@ -32,17 +32,15 @@ import {
 } from "@helios-lang/ledger"
 import {
     None,
-    expectLeft,
     expectSome,
     isLeft,
     isNone,
     isRight
 } from "@helios-lang/type-utils"
-import { UplcProgramV3, UplcRuntimeError } from "@helios-lang/uplc"
-import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
+import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
 
 /**
- * @typedef {import("@helios-lang/codec-utils").ByteArrayLike} ByteArrayLike
+ * @typedef {import("@helios-lang/codec-utils").BytesLike} BytesLike
  * @typedef {import("@helios-lang/codec-utils").IntLike} IntLike
  * @typedef {import("@helios-lang/ledger").AddressLike} AddressLike
  * @typedef {import("@helios-lang/ledger").AssetClassLike} AssetClassLike
@@ -56,6 +54,8 @@ import { UplcProgramV1, UplcProgramV2, UplcDataValue } from "@helios-lang/uplc"
  * @typedef {import("@helios-lang/uplc").CekResult} CekResult
  * @typedef {import("@helios-lang/uplc").UplcLoggingI} UplcLoggingI
  * @typedef {import("@helios-lang/uplc").UplcData} UplcData
+ * @typedef {import("@helios-lang/uplc").UplcProgramV1I} UplcProgramV1I
+ * @typedef {import("@helios-lang/uplc").UplcProgramV2I} UplcProgramV2I
  */
 
 /**
@@ -220,19 +220,19 @@ export class TxBuilder {
 
     /**
      * @private
-     * @type {UplcProgramV1[]}
+     * @type {UplcProgramV1I[]}
      */
     v1Scripts
 
     /**
      * @private
-     * @type {UplcProgramV2[]}
+     * @type {UplcProgramV2I[]}
      */
     v2RefScripts
 
     /**
      * @private
-     * @type {UplcProgramV2[]}
+     * @type {UplcProgramV2I[]}
      */
     v2Scripts
 
@@ -537,7 +537,7 @@ export class TxBuilder {
     }
 
     /**
-     * @param {UplcProgramV1 | UplcProgramV2} program
+     * @param {UplcProgramV1I | UplcProgramV2I} program
      * @return {TxBuilder}
      */
     attachUplcProgram(program) {
@@ -581,7 +581,7 @@ export class TxBuilder {
      * @overload
      * Adds minting instructions to the transaction without a redeemer
      * @param {MintingPolicyHash<null | unknown>} policy
-     * @param {[ByteArrayLike, IntLike][]} tokens
+     * @param {[BytesLike, IntLike][]} tokens
      * @returns {TxBuilder}
      */
     /**
@@ -598,7 +598,7 @@ export class TxBuilder {
      * @overload
      * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
      * @param {MintingPolicyHash<MintingContext<any, TRedeemer>>} policy
-     * @param {[ByteArrayLike, IntLike][]} tokens
+     * @param {[BytesLike, IntLike][]} tokens
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
@@ -608,9 +608,9 @@ export class TxBuilder {
      *  | [ TokenValue<null>]  // 1-arg
      *  | [ TokenValue<MintingContext<any, TRedeemer>>, TRedeemer ] // 2-arg form A
      *  | [ AssetClass<null>, IntLike ]  // 2-arg form B
-     *  | [ MintingPolicyHash<null>, [ByteArrayLike, IntLike][] ] // 2-arg form C
+     *  | [ MintingPolicyHash<null>, [BytesLike, IntLike][] ] // 2-arg form C
      *  | [ AssetClass<MintingContext<any, TRedeemer>>, IntLike, TRedeemer ] // 3-arg form A
-     *  | [ MintingPolicyHash<MintingContext<any, TRedeemer>>, [ByteArrayLike, IntLike][], TRedeemer ]// 3-arg form B
+     *  | [ MintingPolicyHash<MintingContext<any, TRedeemer>>, [BytesLike, IntLike][], TRedeemer ]// 3-arg form B
      * } args
      * @returns {TxBuilder}
      */
@@ -689,7 +689,7 @@ export class TxBuilder {
      *
      * @overload
      * @param {MintingPolicyHashLike} policy
-     * @param {[ByteArrayLike, IntLike][]} tokens - list of pairs of [tokenName, quantity], tokenName can be list of bytes or hex-string
+     * @param {[BytesLike, IntLike][]} tokens - list of pairs of [tokenName, quantity], tokenName can be list of bytes or hex-string
      * @param {Option<UplcData>} redeemer - can be None when minting from a Native script (but not set by default)
      * @returns {TxBuilder}
      *
@@ -697,7 +697,7 @@ export class TxBuilder {
      * @param {[
      *   AssetClassLike, IntLike, Option<UplcData>
      * ] | [
-     *   MintingPolicyHashLike, [ByteArrayLike, IntLike][], Option<UplcData>
+     *   MintingPolicyHashLike, [BytesLike, IntLike][], Option<UplcData>
      * ]} args
      * @returns {TxBuilder}
      */
@@ -1212,7 +1212,7 @@ export class TxBuilder {
     /**
      * Doesn't re-add or throw an error if the script was previously added
      * @private
-     * @param {UplcProgramV1} script
+     * @param {UplcProgramV1I} script
      */
     addV1Script(script) {
         const h = script.hash()
@@ -1224,7 +1224,7 @@ export class TxBuilder {
     /**
      * Doesn't re-add or throw an error if the script was previously added
      * @private
-     * @param {UplcProgramV2} script
+     * @param {UplcProgramV2I} script
      */
     addV2Script(script) {
         const h = script.hash()
@@ -1236,7 +1236,7 @@ export class TxBuilder {
     /**
      * Doesn't re-add or throw an error if the script was previously added
      * @private
-     * @param {UplcProgramV2} script
+     * @param {UplcProgramV2I} script
      */
     addV2RefScript(script) {
         const h = script.hash()
@@ -1248,7 +1248,7 @@ export class TxBuilder {
     /**
      * @private
      * @param {number[] | MintingPolicyHash | ValidatorHash | StakingValidatorHash} hash
-     * @returns {UplcProgramV1 | UplcProgramV2}
+     * @returns {UplcProgramV1I | UplcProgramV2I}
      */
     getUplcScript(hash) {
         const bytes = Array.isArray(hash) ? hash : hash.bytes
@@ -1895,7 +1895,7 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {UplcProgramV1 | UplcProgramV2 | UplcProgramV3} script
+     * @param {UplcProgramV1I | UplcProgramV2I} script
      * @param {Object} options
      * @param {string} options.summary
      * @param {UplcData[]} options.args

@@ -16,6 +16,7 @@ import { SHELLEY_GENESIS_PARAMS } from "@helios-lang/ledger-shelley"
 
 /**
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
+ * @typedef {import("@helios-lang/uplc").UplcProgramV2I} UplcProgramV2I
  * @typedef {import("./Network.js").Network} Network
  * @typedef {import("./Network.js").NetworkName} NetworkName
  */
@@ -583,7 +584,7 @@ export class BlockfrostV0 {
      */
     async restoreTxInput(obj) {
         /**
-         * @type {Option<UplcProgramV2>}
+         * @type {Option<UplcProgramV2I>}
          */
         let refScript = null
 
