@@ -1921,16 +1921,9 @@ export class TxBuilder {
                     //   ... even though it failed; the built Tx can provide further diagnostics in validate()
                     if (throwBuildPhaseScriptErrors) {
                         logOptions.flush?.()
-                        throw new Error(
-                            [
-                                "TxBuilder:build() failed",
-                                altProfile.result.left.error,
-                                ...altProfile.logs,
-                                " stack trace:\n    " +
-                                    altProfile.result.left.callSites
-                                        .map((s) => s.toString())
-                                        .join("\n    ")
-                            ].join("\n")
+                        throw new UplcRuntimeError(
+                            `TxBuilder:build() failed: ${altProfile.result.left.error}`,
+                            altProfile.result.left.callSites
                         )
                     }
                     return profile
