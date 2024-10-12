@@ -138,19 +138,20 @@ export class Emulator {
      * @param {SimpleWallet} wallet
      * @param {bigint} lovelace
      * @param {Assets} assets
+     * @returns {TxOutputId}
      */
     createUtxo(wallet, lovelace, assets = new Assets([])) {
-        if (lovelace != 0n || !assets.isZero()) {
-            const tx = new GenesisTx(
-                this.genesis.length,
-                wallet.address,
-                lovelace,
-                assets
-            )
+        const tx = new GenesisTx(
+            this.genesis.length,
+            wallet.address,
+            lovelace,
+            assets
+        )
 
-            this.genesis.push(tx)
-            this.mempool.push(tx)
-        }
+        this.genesis.push(tx)
+        this.mempool.push(tx)
+
+        return new TxOutputId(tx.id(), 0)
     }
 
     dump() {
