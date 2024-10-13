@@ -1,15 +1,17 @@
 /**
  * @template CSpending
- * @typedef {import("./CoinSelection.js").CoinSelection<CSpending>} CoinSelection
+ * @template CStaking
+ * @typedef {import("./CoinSelection.js").CoinSelection<CSpending, CStaking>} CoinSelection
  */
 
 import { TxInput, Value } from "@helios-lang/ledger"
 
 /**
  * @template CSpending
- * @param {TxInput<CSpending, unknown>[]} utxos
+ * @template CStaking
+ * @param {TxInput<CSpending, CStaking>[]} utxos
  * @param {Value} value
- * @returns {[TxInput<CSpending, unknown>[], TxInput<CSpending, unknown>[]]}
+ * @returns {[TxInput<CSpending, CStaking>[], TxInput<CSpending, CStaking>[]]}
  */
 export function selectSingle(utxos, value) {
     for (let i = 0; i < utxos.length; i++) {

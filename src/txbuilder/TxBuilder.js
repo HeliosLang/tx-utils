@@ -62,6 +62,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @template TDatumPermissive
  * @typedef {import("@helios-lang/ledger").DatumPaymentContext<TDatumPermissive>} DatumPaymentContext
  */
+
 /**
  * @template TRedeemerStrict
  * @template TRedeemerPermissive
@@ -74,6 +75,12 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @template TRedeemerStrict
  * @template TRedeemerPermissive
  * @typedef {import("@helios-lang/ledger").SpendingContext<TDatumStrict, TDatumPermissive, TRedeemerStrict, TRedeemerPermissive>} SpendingContext
+ */
+
+/**
+ * @template TRedeemerStrict
+ * @template TRedeemerPermissive
+ * @typedef {import("@helios-lang/ledger").StakingContext<TRedeemerStrict, TRedeemerPermissive>} StakingContext
  */
 
 /**
@@ -517,11 +524,15 @@ export class TxBuilder {
     }
 
     /**
-     * @param {(b: TxBuilder) => TxBuilder} fn
+     * Apply a function to the TxBuilder instance
+     * Useful for chaining compositions of TxBuilder mutations
+     * @param {(b: TxBuilder) => any} fn - the return value is unused
      * @returns {TxBuilder}
      */
     apply(fn) {
-        return fn(this)
+        fn(this)
+
+        return this
     }
 
     /**
@@ -604,14 +615,14 @@ export class TxBuilder {
      */
     /**
      * @template TRedeemer
-     * @param {
-     *  | [ TokenValue<null>]  // 1-arg
+     * @param {(
+     *  [ TokenValue<null>]  // 1-arg
      *  | [ TokenValue<MintingContext<any, TRedeemer>>, TRedeemer ] // 2-arg form A
      *  | [ AssetClass<null>, IntLike ]  // 2-arg form B
-     *  | [ MintingPolicyHash<null>, [BytesLike, IntLike][] ] // 2-arg form C
+     *  | [ MintingPolicyHash<null | unknown>, [BytesLike, IntLike][] ] // 2-arg form C
      *  | [ AssetClass<MintingContext<any, TRedeemer>>, IntLike, TRedeemer ] // 3-arg form A
      *  | [ MintingPolicyHash<MintingContext<any, TRedeemer>>, [BytesLike, IntLike][], TRedeemer ]// 3-arg form B
-     * } args
+     * )} args
      * @returns {TxBuilder}
      */
     mint(...args) {
@@ -694,11 +705,11 @@ export class TxBuilder {
      * @returns {TxBuilder}
      *
      * @template TRedeemer
-     * @param {[
+     * @param {([
      *   AssetClassLike, IntLike, Option<UplcData>
      * ] | [
      *   MintingPolicyHashLike, [BytesLike, IntLike][], Option<UplcData>
-     * ]} args
+     * ])} args
      * @returns {TxBuilder}
      */
     mintUnsafe(...args) {
@@ -773,11 +784,11 @@ export class TxBuilder {
      * @returns {TxBuilder}
      *
      * @template TDatum
-     * @param {[
+     * @param {([
      *   Address<null, any>, ValueLike
      * ] | [
      *   Address<DatumPaymentContext<TDatum>, any>, ValueLike, TxOutputDatumCastable<TDatum>
-     * ]} args
+     * ])} args
      * @returns {TxBuilder}
      */
     pay(...args) {
@@ -812,13 +823,13 @@ export class TxBuilder {
      * @param {TxOutput | TxOutput[]} output
      * @returns {TxBuilder}
      *
-     * @param {[
+     * @param {([
      *   AddressLike, ValueLike
      * ] | [
      *   AddressLike, ValueLike, TxOutputDatum
      * ] | [
      *   TxOutput | TxOutput[]
-     * ]} args
+     * ])} args
      * @returns {TxBuilder}
      */
     payUnsafe(...args) {
@@ -883,7 +894,7 @@ export class TxBuilder {
      * @param {{[key: number]: TxMetadataAttr}} attributes
      * @returns {TxBuilder}
      *
-     * @param {[number, TxMetadataAttr] | [{[key: number]: TxMetadataAttr}]} args
+     * @param {([number, TxMetadataAttr] | [{[key: number]: TxMetadataAttr}])} args
      * @returns {TxBuilder}
      */
     setMetadata(...args) {
@@ -912,12 +923,12 @@ export class TxBuilder {
      */
     /**
      * @template TRedeemer
-     * @param {[
+     * @param {([
      *   TxInput<null, any> | TxInput<null, any>[]
      * ] | [
      *   TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[],
      *   TRedeemer
-     * ]} args
+     * ])} args
      * @returns {TxBuilder}
      */
     spend(...args) {
@@ -1068,12 +1079,53 @@ export class TxBuilder {
     }
 
     /**
-     * @param {StakingAddressLike} addr
+     * @overload
+     * @param {StakingAddress<null>} addr
      * @param {IntLike} lovelace
-     * @param {Option<UplcData>} redeemer - TOO: typeSafe redeemer n
      * @returns {TxBuilder}
      */
-    withdraw(addr, lovelace, redeemer = None) {
+    /**
+     * @template TRedeemer
+     * @overload
+     * @param {StakingAddress<StakingContext<any, TRedeemer>>} addr
+     * @param {IntLike} lovelace
+     * @param {TRedeemer} redeemer
+     * @returns {TxBuilder}
+     */
+    /**
+     * @template TRedeemer
+     * @param {([
+     *   StakingAddress<null>, IntLike
+     * ] | [
+     *   StakingAddress<StakingContext<any, TRedeemer>>, IntLike, TRedeemer
+     * ])} args
+     * @returns {TxBuilder}
+     */
+    withdraw(...args) {
+        if (args.length == 2) {
+            return this.withdrawUnsafe(args[0], args[1])
+        } else if (args.length == 3) {
+            const [a, qty, redeemer] = args
+
+            this.attachUplcProgram(a.context.program)
+
+            return this.withdrawUnsafe(
+                a,
+                qty,
+                a.context.redeemer.toUplcData(redeemer)
+            )
+        } else {
+            throw new Error("invalid number of arguments")
+        }
+    }
+
+    /**
+     * @param {StakingAddressLike} addr
+     * @param {IntLike} lovelace
+     * @param {Option<UplcData>} redeemer
+     * @returns {TxBuilder}
+     */
+    withdrawUnsafe(addr, lovelace, redeemer = None) {
         const stakingAddress = StakingAddress.new(this.config.isMainnet, addr)
 
         /**

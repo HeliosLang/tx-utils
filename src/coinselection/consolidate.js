@@ -4,7 +4,8 @@ import { InsufficientFundsError } from "./InsufficientFundsError.js"
 
 /**
  * @template CSpending
- * @typedef {import("./CoinSelection.js").CoinSelection<CSpending>} CoinSelection
+ * @template CStaking
+ * @typedef {import("./CoinSelection.js").CoinSelection<CSpending, CStaking>} CoinSelection
  */
 
 /**

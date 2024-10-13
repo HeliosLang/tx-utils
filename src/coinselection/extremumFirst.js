@@ -3,7 +3,8 @@ import { InsufficientFundsError } from "./InsufficientFundsError.js"
 
 /**
  * @template CSpending
- * @typedef {import("./CoinSelection.js").CoinSelection<CSpending>} CoinSelection
+ * @template CStaking
+ * @typedef {import("./CoinSelection.js").CoinSelection<CSpending, CStaking>} CoinSelection
  */
 
 /**
@@ -50,9 +51,10 @@ export function selectSmallestFirst(props = {}) {
 function selectExtremumFirst({ largestFirst, allowSelectingUninvolvedAssets }) {
     /**
      * @template CSpending
-     * @param {TxInput<CSpending, unknown>[]} utxos
+     * @template CStaking
+     * @param {TxInput<CSpending, CStaking>[]} utxos
      * @param {Value} amount
-     * @returns {[TxInput<CSpending, unknown>[], TxInput<CSpending, unknown>[]]}
+     * @returns {[TxInput<CSpending, CStaking>[], TxInput<CSpending, CStaking>[]]}
      */
     return (utxos, amount) => {
         let sum = new Value()

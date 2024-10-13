@@ -13,7 +13,8 @@ import { OfflineWallet } from "./OfflineWallet.js"
 
 /**
  * @template CSpending
- * @typedef {import("../coinselection/index.js").CoinSelection<CSpending>} CoinSelection
+ * @template CStaking
+ * @typedef {import("../coinselection/index.js").CoinSelection<CSpending, CStaking>} CoinSelection
  */
 
 /**
@@ -236,7 +237,7 @@ export class WalletHelper {
     /**
      * Pick a number of UTxOs needed to cover a given Value. The default coin selection strategy is to pick the smallest first.
      * @param {Value} amount
-     * @param {CoinSelection<null>} coinSelection
+     * @param {CoinSelection<null, unknown>} coinSelection
      * @returns {Promise<TxInput<null, unknown>[]>}
      */
     async selectUtxos(amount, coinSelection = selectSmallestFirst()) {
