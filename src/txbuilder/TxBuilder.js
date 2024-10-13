@@ -861,7 +861,7 @@ export class TxBuilder {
 
     /**
      * Include a reference input
-     * @param {TxInput[]} utxos
+     * @param {TxInput<any, any>[]} utxos
      * @returns {TxBuilder}
      */
     refer(...utxos) {
