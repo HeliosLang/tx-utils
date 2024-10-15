@@ -969,7 +969,7 @@ export class TxBuilder {
     /**
      * Add a UTxO instance as an input to the transaction being built.
      * Throws an error if the UTxO is locked at a script address but a redeemer isn't specified (unless the script is a known `NativeScript`).
-     * @param {TxInput | TxInput[]} utxos
+     * @param {TxInput<any, any> | TxInput<any, any>[]} utxos
      * @param {Option<UplcData>} redeemer
      * @returns {TxBuilder}
      */
