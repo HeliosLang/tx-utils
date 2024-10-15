@@ -56,6 +56,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @typedef {import("@helios-lang/uplc").UplcData} UplcData
  * @typedef {import("@helios-lang/uplc").UplcProgramV1I} UplcProgramV1I
  * @typedef {import("@helios-lang/uplc").UplcProgramV2I} UplcProgramV2I
+ * @typedef {import("./RefScriptRegistry.js").RefScriptRegistry} RefScriptRegistry
  */
 
 /**
@@ -91,6 +92,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
 /**
  * @typedef {{
  *   isMainnet: boolean
+ *   refScriptRegistry?: Option<RefScriptRegistry>
  * }} TxBuilderConfig
  */
 
@@ -372,6 +374,8 @@ export class TxBuilder {
             spareUtxos.slice(),
             fee
         )
+
+        await this.grabRefScriptsFromRegistry()
 
         // the final fee will never be higher than the current `fee`, so the inputs and outputs won't change, and we will get redeemers with the right indices
         // the scripts executed at this point will not see the correct txHash nor the correct fee
@@ -1287,6 +1291,7 @@ export class TxBuilder {
 
     /**
      * Doesn't re-add or throw an error if the script was previously added
+     * Removes the same regular script if it was added before
      * @private
      * @param {UplcProgramV2I} script
      */
@@ -1295,6 +1300,9 @@ export class TxBuilder {
         if (!this.v2RefScripts.some((prev) => equalsBytes(prev.hash(), h))) {
             this.v2RefScripts.push(script)
         }
+
+        // also remove from v2Scrips
+        this.v2Scripts = this.v2Scripts.filter((s) => !equalsBytes(s.hash(), h))
     }
 
     /**
@@ -1303,18 +1311,18 @@ export class TxBuilder {
      * @returns {UplcProgramV1I | UplcProgramV2I}
      */
     getUplcScript(hash) {
-        const bytes = Array.isArray(hash) ? hash : hash.bytes
+        const hashBytes = Array.isArray(hash) ? hash : hash.bytes
 
         const v2Script = this.v2Scripts
             .concat(this.v2RefScripts)
-            .find((s) => equalsBytes(s.hash(), bytes))
+            .find((s) => equalsBytes(s.hash(), hashBytes))
 
         if (v2Script) {
             return v2Script
         }
 
         const v1Script = this.v1Scripts.find((s) =>
-            equalsBytes(s.hash(), bytes)
+            equalsBytes(s.hash(), hashBytes)
         )
 
         if (v1Script) {
@@ -1829,6 +1837,60 @@ export class TxBuilder {
     }
 
     /**
+     * @private
+     * @returns {number[][]}
+     */
+    collectUnknownHashes() {
+        /**
+         * @type {number[][]}
+         */
+        const allHashes = []
+
+        this.mintingRedeemers.forEach(([mph]) => {
+            allHashes.push(mph.bytes)
+        })
+
+        this.spendingRedeemers.map(([utxo]) => {
+            const vh = utxo.address.validatorHash
+
+            if (vh) {
+                allHashes.push(vh.bytes)
+            }
+        })
+
+        this.rewardingRedeemers.forEach(([stakingAddress]) => {
+            const svh = stakingAddress
+                .toCredential()
+                .expectStakingHash().stakingValidatorHash
+
+            if (svh) {
+                allHashes.push(svh.bytes)
+            }
+        })
+
+        // filter out the ones that are known
+        return allHashes.filter((h) => {
+            const v2Script = this.v2Scripts
+                .concat(this.v2RefScripts)
+                .find((s) => equalsBytes(s.hash(), h))
+
+            if (v2Script) {
+                return false
+            }
+
+            const v1Script = this.v1Scripts.find((s) =>
+                equalsBytes(s.hash(), h)
+            )
+
+            if (v1Script) {
+                return false
+            }
+
+            return true
+        })
+    }
+
+    /**
      * The execution itself might depend on the redeemers, so we must also be able to return the redeemers without any execution first
      * @private
      * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
@@ -2058,5 +2120,33 @@ export class TxBuilder {
      */
     correctOutputs(params) {
         this.outputs.forEach((output) => output.correctLovelace(params))
+    }
+
+    /**
+     * @private
+     * @returns {Promise<void>}
+     */
+    async grabRefScriptsFromRegistry() {
+        if (!this.config.refScriptRegistry) {
+            return
+        }
+
+        const allUnknownHashes = this.collectUnknownHashes()
+
+        for (let h of allUnknownHashes) {
+            const found = await this.config.refScriptRegistry.find(h)
+
+            if (found) {
+                this.refer(found.input)
+            }
+        }
+
+        for (let s of this.v2Scripts) {
+            const found = await this.config.refScriptRegistry.find(s.hash())
+
+            if (found) {
+                this.refer(found.input)
+            }
+        }
     }
 }
