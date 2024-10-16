@@ -258,6 +258,13 @@ export class TxBuilder {
     rewardingRedeemers
 
     /**
+     * this.apply() can take functions that return promises, these must be awaited before doing anything else in .build()
+     * @private
+     * @type {Promise[]}
+     */
+    pending
+
+    /**
      * @param {TxBuilderConfig} config
      */
     constructor(config) {
@@ -341,6 +348,12 @@ export class TxBuilder {
             config.spareUtxos instanceof Promise
                 ? await config.spareUtxos
                 : (config.spareUtxos ?? [])
+
+        // await the remaining pending applications
+        for (let p of this.pending) {
+            // must be executed in order, hence the for loop instead of Promise.all()
+            await p
+        }
 
         const { metadata, metadataHash } = this.buildMetadata()
         const { firstValidSlot, lastValidSlot } =
@@ -477,6 +490,7 @@ export class TxBuilder {
         this.v2Scripts = []
         this.withdrawals = []
         this.rewardingRedeemers = []
+        this.pending = []
 
         return this
     }
@@ -530,11 +544,15 @@ export class TxBuilder {
     /**
      * Apply a function to the TxBuilder instance
      * Useful for chaining compositions of TxBuilder mutations
-     * @param {(b: TxBuilder) => any} fn - the return value is unused
+     * @param {(b: TxBuilder) => any | Promise<any>} fn - the return value is unused
      * @returns {TxBuilder}
      */
     apply(fn) {
-        fn(this)
+        const maybePromise = fn(this)
+
+        if (maybePromise instanceof Promise) {
+            this.pending.push(maybePromise)
+        }
 
         return this
     }
