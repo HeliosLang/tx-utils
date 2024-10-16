@@ -90,6 +90,11 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  */
 
 /**
+ * @template [T=UplcData]
+ * @typedef {(tx?: TxInfo) => T} LazyRedeemerData
+ */
+
+/**
  * @typedef {{
  *   isMainnet: boolean
  *   refScriptRegistry?: Option<RefScriptRegistry>
@@ -179,7 +184,7 @@ export class TxBuilder {
 
     /**
      * @private
-     * @type {[MintingPolicyHash, UplcData][]}
+     * @type {[MintingPolicyHash, UplcData | LazyRedeemerData][]}
      */
     mintingRedeemers
 
@@ -209,7 +214,7 @@ export class TxBuilder {
 
     /**
      * @private
-     * @type {[TxInput, UplcData][]}
+     * @type {[TxInput, UplcData | LazyRedeemerData][]}
      */
     spendingRedeemers
 
@@ -253,7 +258,7 @@ export class TxBuilder {
 
     /**
      * @private
-     * @type {[StakingAddress, UplcData][]}
+     * @type {[StakingAddress, UplcData | LazyRedeemerData][]}
      */
     rewardingRedeemers
 
@@ -701,9 +706,7 @@ export class TxBuilder {
                 // 2-arg form A
                 this.attachUplcProgram(a.context.program)
 
-                return this.mintUnsafe(
-                    a.assetClass,
-                    a.quantity,
+                return this.mintUnsafe(a.assetClass, a.quantity, (_tx) =>
                     a.context.redeemer.toUplcData(/** @type {TRedeemer} */ (b))
                 )
             } else {
@@ -719,18 +722,14 @@ export class TxBuilder {
                 // 3-arg form A
                 this.attachUplcProgram(a.context.program)
 
-                return this.mintUnsafe(
-                    a,
-                    b,
+                return this.mintUnsafe(a, b, (_tx) =>
                     a.context.redeemer.toUplcData(redeemer)
                 )
             } else if (a instanceof MintingPolicyHash && Array.isArray(b)) {
                 // 3-arg form B
                 this.attachUplcProgram(a.context.program)
 
-                return this.mintUnsafe(
-                    a,
-                    b,
+                return this.mintUnsafe(a, b, (_tx) =>
                     a.context.redeemer.toUplcData(redeemer)
                 )
             } else {
@@ -739,6 +738,22 @@ export class TxBuilder {
         } else {
             throw new Error("invalid number of arguments")
         }
+    }
+
+    /**
+     * @template TRedeemer
+     * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
+     * @param {AssetClass<MintingContext<any, TRedeemer>>} assetClass
+     * @param {IntLike} quantity
+     * @param {LazyRedeemerData<TRedeemer>} redeemer
+     * @returns {TxBuilder}
+     */
+    mintLazy(assetClass, quantity, redeemer) {
+        this.attachUplcProgram(assetClass.context.program)
+
+        return this.mintUnsafe(assetClass, quantity, (tx) =>
+            assetClass.context.redeemer.toUplcData(redeemer(tx))
+        )
     }
 
     /**
@@ -752,20 +767,20 @@ export class TxBuilder {
      * @overload
      * @param {AssetClassLike} assetClass
      * @param {IntLike} quantity
-     * @param {Option<UplcData>} redeemer - can be None when minting from a Native script (but not set by default)
+     * @param {Option<UplcData | LazyRedeemerData>} redeemer - can be None when minting from a Native script (but not set by default)
      * @returns {TxBuilder}
      *
      * @overload
      * @param {MintingPolicyHashLike} policy
      * @param {[BytesLike, IntLike][]} tokens - list of pairs of [tokenName, quantity], tokenName can be list of bytes or hex-string
-     * @param {Option<UplcData>} redeemer - can be None when minting from a Native script (but not set by default)
+     * @param {Option<UplcData | LazyRedeemerData>} redeemer - can be None when minting from a Native script (but not set by default)
      * @returns {TxBuilder}
      *
      * @template TRedeemer
      * @param {([
-     *   AssetClassLike, IntLike, Option<UplcData>
+     *   AssetClassLike, IntLike, Option<UplcData | LazyRedeemerData>
      * ] | [
-     *   MintingPolicyHashLike, [BytesLike, IntLike][], Option<UplcData>
+     *   MintingPolicyHashLike, [BytesLike, IntLike][], Option<UplcData | LazyRedeemerData>
      * ])} args
      * @returns {TxBuilder}
      */
@@ -1002,15 +1017,13 @@ export class TxBuilder {
                 utxos.forEach((utxo) =>
                     this.attachUplcProgram(utxo.spendingContext.program)
                 )
-                return this.spendUnsafe(
-                    utxos,
+                return this.spendUnsafe(utxos, (_tx) =>
                     utxos[0].spendingContext.redeemer.toUplcData(redeemer)
                 )
             } else {
                 this.attachUplcProgram(utxos.spendingContext.program)
 
-                return this.spendUnsafe(
-                    utxos,
+                return this.spendUnsafe(utxos, (_tx) =>
                     utxos.spendingContext.redeemer.toUplcData(redeemer)
                 )
             }
@@ -1020,10 +1033,37 @@ export class TxBuilder {
     }
 
     /**
+     * @template TRedeemer
+     * @param {TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[]} utxos
+     * @param {LazyRedeemerData<TRedeemer>} redeemer
+     * @returns {TxBuilder}
+     */
+    spendLazy(utxos, redeemer) {
+        if (Array.isArray(utxos)) {
+            if (utxos.length == 0) {
+                throw new Error("expected at least one UTxO")
+            }
+
+            utxos.forEach((utxo) =>
+                this.attachUplcProgram(utxo.spendingContext.program)
+            )
+            return this.spendUnsafe(utxos, (tx) =>
+                utxos[0].spendingContext.redeemer.toUplcData(redeemer(tx))
+            )
+        } else {
+            this.attachUplcProgram(utxos.spendingContext.program)
+
+            return this.spendUnsafe(utxos, (tx) =>
+                utxos.spendingContext.redeemer.toUplcData(redeemer(tx))
+            )
+        }
+    }
+
+    /**
      * Add a UTxO instance as an input to the transaction being built.
      * Throws an error if the UTxO is locked at a script address but a redeemer isn't specified (unless the script is a known `NativeScript`).
      * @param {TxInput<any, any> | TxInput<any, any>[]} utxos
-     * @param {Option<UplcData>} redeemer
+     * @param {Option<UplcData | LazyRedeemerData>} redeemer
      * @returns {TxBuilder}
      */
     spendUnsafe(utxos, redeemer = None) {
@@ -1166,9 +1206,7 @@ export class TxBuilder {
 
             this.attachUplcProgram(a.context.program)
 
-            return this.withdrawUnsafe(
-                a,
-                qty,
+            return this.withdrawUnsafe(a, qty, (_tx) =>
                 a.context.redeemer.toUplcData(redeemer)
             )
         } else {
@@ -1177,9 +1215,22 @@ export class TxBuilder {
     }
 
     /**
+     * @template TRedeemer
+     * @param {StakingAddress<StakingContext<any, TRedeemer>>} addr
+     * @param {IntLike} lovelace
+     * @param {LazyRedeemerData<TRedeemer>} redeemer
+     * @returns {TxBuilder}
+     */
+    withdrawLazy(addr, lovelace, redeemer) {
+        return this.withdrawUnsafe(addr, lovelace, (tx) =>
+            addr.context.redeemer.toUplcData(redeemer(tx))
+        )
+    }
+
+    /**
      * @param {StakingAddressLike} addr
      * @param {IntLike} lovelace
-     * @param {Option<UplcData>} redeemer
+     * @param {Option<UplcData | LazyRedeemerData>} redeemer
      * @returns {TxBuilder}
      */
     withdrawUnsafe(addr, lovelace, redeemer = None) {
@@ -1239,7 +1290,7 @@ export class TxBuilder {
      * Index is calculated later
      * @private
      * @param {MintingPolicyHashLike} policy
-     * @param {UplcData} data
+     * @param {UplcData | LazyRedeemerData} data
      */
     addMintingRedeemer(policy, data) {
         const mph = MintingPolicyHash.new(policy)
@@ -1294,7 +1345,7 @@ export class TxBuilder {
      * Index is calculated later
      * @private
      * @param {TxInput} utxo
-     * @param {UplcData} data
+     * @param {UplcData | LazyRedeemerData} data
      */
     addSpendingRedeemer(utxo, data) {
         if (this.hasSpendingRedeemer(utxo)) {
@@ -1308,7 +1359,7 @@ export class TxBuilder {
      * Index is calculated later
      * @private
      * @param {StakingAddress} sa
-     * @param {UplcData} data
+     * @param {UplcData | LazyRedeemerData} data
      */
     addRewardingRedeemer(sa, data) {
         if (this.hasRewardingRedeemer(sa)) {
@@ -1953,18 +2004,30 @@ export class TxBuilder {
      */
     buildMintingRedeemers(buildContext = None) {
         // const logOpts = logOptions || { accumulate: true, logPrint: null }
-        return this.mintingRedeemers.map(([mph, data]) => {
+        return this.mintingRedeemers.map(([mph, redeemerDataOrFn]) => {
             const i = this._mintedTokens
                 .getPolicies()
                 .findIndex((mph_) => mph_.isEqual(mph))
-            let redeemer = TxRedeemer.Minting(i, data)
+            const dummyRedeemerData =
+                "kind" in redeemerDataOrFn
+                    ? redeemerDataOrFn
+                    : buildContext
+                      ? redeemerDataOrFn(buildContext.txInfo)
+                      : redeemerDataOrFn()
+
+            let redeemer = TxRedeemer.Minting(i, dummyRedeemerData)
             const script = this.getUplcScript(mph)
 
             if (buildContext) {
+                const redeemerData =
+                    "kind" in redeemerDataOrFn
+                        ? redeemerDataOrFn
+                        : redeemerDataOrFn(buildContext.txInfo)
+
                 const profile = this.buildRedeemerProfile(script, {
                     summary: `mint @${i}`,
                     args: [
-                        redeemer.data,
+                        redeemerData,
                         new ScriptContextV2(
                             buildContext.txInfo,
                             ScriptPurpose.Minting(redeemer, mph)
@@ -1972,7 +2035,7 @@ export class TxBuilder {
                     ],
                     buildContext
                 })
-                redeemer = TxRedeemer.Minting(i, data, profile.cost)
+                redeemer = TxRedeemer.Minting(i, redeemerData, profile.cost)
             }
             return redeemer
         })
@@ -1984,9 +2047,16 @@ export class TxBuilder {
      * @returns {TxRedeemer[]}
      */
     buildSpendingRedeemers(buildContext = None) {
-        return this.spendingRedeemers.map(([utxo, data]) => {
+        return this.spendingRedeemers.map(([utxo, redeemerDataOrFn]) => {
             const i = this._inputs.findIndex((inp) => inp.isEqual(utxo))
-            let redeemer = TxRedeemer.Spending(i, data)
+            const dummyRedeemerData =
+                "kind" in redeemerDataOrFn
+                    ? redeemerDataOrFn
+                    : buildContext
+                      ? redeemerDataOrFn(buildContext.txInfo)
+                      : redeemerDataOrFn()
+
+            let redeemer = TxRedeemer.Spending(i, dummyRedeemerData)
 
             // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
             // this finds the index based on staking address, but ^ uses the index we found here.
@@ -1996,12 +2066,16 @@ export class TxBuilder {
 
             if (buildContext) {
                 const datum = expectSome(utxo.datum?.data)
+                const redeemerData =
+                    "kind" in redeemerDataOrFn
+                        ? redeemerDataOrFn
+                        : redeemerDataOrFn(buildContext.txInfo)
 
                 const profile = this.buildRedeemerProfile(script, {
                     summary: `input @${i}`,
                     args: [
                         datum,
-                        data,
+                        redeemerData,
                         new ScriptContextV2(
                             buildContext.txInfo,
                             ScriptPurpose.Spending(redeemer, utxo.id)
@@ -2010,7 +2084,7 @@ export class TxBuilder {
                     buildContext
                 })
 
-                redeemer = TxRedeemer.Spending(i, data, profile.cost)
+                redeemer = TxRedeemer.Spending(i, redeemerData, profile.cost)
             }
 
             return redeemer
@@ -2023,43 +2097,60 @@ export class TxBuilder {
      * @returns {TxRedeemer[]}
      */
     buildRewardingRedeemers(buildContext = None) {
-        return this.rewardingRedeemers.map(([stakingAddress, data]) => {
-            // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
-            // this finds the index based on staking address, but ^ uses the index we found here.
-            // Possibly the other thing should do the same as this.
+        return this.rewardingRedeemers.map(
+            ([stakingAddress, redeemerDataOrFn]) => {
+                // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
+                // this finds the index based on staking address, but ^ uses the index we found here.
+                // Possibly the other thing should do the same as this.
 
-            const i = this.withdrawals.findIndex(([sa]) =>
-                sa.isEqual(stakingAddress)
-            )
-            let redeemer = TxRedeemer.Rewarding(i, data)
+                const i = this.withdrawals.findIndex(([sa]) =>
+                    sa.isEqual(stakingAddress)
+                )
+                // pass dummy data if the lazy can't be evaluated yet
+                const dummyRedeemerData =
+                    "kind" in redeemerDataOrFn
+                        ? redeemerDataOrFn
+                        : buildContext
+                          ? redeemerDataOrFn(buildContext.txInfo)
+                          : redeemerDataOrFn()
+                let redeemer = TxRedeemer.Rewarding(i, dummyRedeemerData)
 
-            const svh = expectSome(
-                stakingAddress.toCredential().expectStakingHash()
-                    .stakingValidatorHash
-            )
-            const script = this.getUplcScript(svh)
+                const svh = expectSome(
+                    stakingAddress.toCredential().expectStakingHash()
+                        .stakingValidatorHash
+                )
+                const script = this.getUplcScript(svh)
 
-            if (buildContext) {
-                const profile = this.buildRedeemerProfile(script, {
-                    summary: `rewards @${i}`,
-                    args: [
-                        data,
-                        new ScriptContextV2(
-                            buildContext.txInfo,
-                            ScriptPurpose.Rewarding(
-                                redeemer,
-                                stakingAddress.toCredential()
-                            )
-                        ).toUplcData()
-                    ],
-                    buildContext
-                })
+                if (buildContext) {
+                    const redeemerData =
+                        "kind" in redeemerDataOrFn
+                            ? redeemerDataOrFn
+                            : redeemerDataOrFn(buildContext.txInfo)
+                    const profile = this.buildRedeemerProfile(script, {
+                        summary: `rewards @${i}`,
+                        args: [
+                            redeemerData,
+                            new ScriptContextV2(
+                                buildContext.txInfo,
+                                ScriptPurpose.Rewarding(
+                                    redeemer,
+                                    stakingAddress.toCredential()
+                                )
+                            ).toUplcData()
+                        ],
+                        buildContext
+                    })
 
-                redeemer = TxRedeemer.Rewarding(i, data, profile.cost)
+                    redeemer = TxRedeemer.Rewarding(
+                        i,
+                        redeemerData,
+                        profile.cost
+                    )
+                }
+
+                return redeemer
             }
-
-            return redeemer
-        })
+        )
     }
 
     /**
