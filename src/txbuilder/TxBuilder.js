@@ -892,7 +892,7 @@ export class TxBuilder {
      * @returns {TxBuilder}
      *
      * @overload
-     * @param {TxOutput | TxOutput[]} output
+     * @param {TxOutput<any, any> | TxOutput<any, any>[]} output
      * @returns {TxBuilder}
      *
      * @param {([
@@ -900,7 +900,7 @@ export class TxBuilder {
      * ] | [
      *   AddressLike, ValueLike, TxOutputDatum
      * ] | [
-     *   TxOutput | TxOutput[]
+     *   TxOutput<any, any> | TxOutput<any, any>[]
      * ])} args
      * @returns {TxBuilder}
      */
