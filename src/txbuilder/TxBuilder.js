@@ -163,7 +163,7 @@ export class TxBuilder {
      * @private
      * @type {TxInput[]}
      */
-    inputs
+    _inputs
 
     /**
      * @private
@@ -175,7 +175,7 @@ export class TxBuilder {
      * @private
      * @type {Assets}
      */
-    mintedTokens
+    _mintedTokens
 
     /**
      * @private
@@ -193,19 +193,19 @@ export class TxBuilder {
      * @private
      * @type {TxOutput[]}
      */
-    outputs
+    _outputs
 
     /**
      * @private
      * @type {TxInput[]}
      */
-    refInputs
+    _refInputs
 
     /**
      * @private
      * @type {PubKeyHash[]}
      */
-    signers
+    _signers
 
     /**
      * @private
@@ -278,6 +278,41 @@ export class TxBuilder {
      */
     static new(config) {
         return new TxBuilder(config)
+    }
+
+    /**
+     * @type {TxInput[]}
+     */
+    get inputs() {
+        return this._inputs
+    }
+
+    /**
+     * @type {Assets}
+     */
+    get mintedTokens() {
+        return this._mintedTokens
+    }
+
+    /**
+     * @type {TxOutput[]}
+     */
+    get outputs() {
+        return this._outputs
+    }
+
+    /**
+     * @type {TxInput[]}
+     */
+    get refInputs() {
+        return this._refInputs
+    }
+
+    /**
+     * @type {PubKeyHash[]}
+     */
+    get signers() {
+        return this._signers
     }
 
     /**
@@ -366,7 +401,7 @@ export class TxBuilder {
 
         // start with the max possible fee, minimize later
         const fee = helper.calcMaxConwayTxFee(
-            calcRefScriptsSize(this.inputs, this.refInputs)
+            calcRefScriptsSize(this._inputs, this._refInputs)
         )
 
         // balance collateral (if collateral wasn't already set manually)
@@ -407,17 +442,17 @@ export class TxBuilder {
 
         const tx = new Tx(
             new TxBody({
-                inputs: this.inputs,
-                outputs: this.outputs,
-                refInputs: this.refInputs,
+                inputs: this._inputs,
+                outputs: this._outputs,
+                refInputs: this._refInputs,
                 collateral: this.collateral,
                 collateralReturn: this.collateralReturn,
-                minted: this.mintedTokens,
+                minted: this._mintedTokens,
                 withdrawals: this.withdrawals,
                 fee,
                 firstValidSlot,
                 lastValidSlot,
-                signers: this.signers,
+                signers: this._signers,
                 dcerts: this.dcerts,
                 metadataHash,
                 scriptDataHash
@@ -474,14 +509,14 @@ export class TxBuilder {
         this.addedCollatoral = false
         this.datums = []
         this.dcerts = []
-        this.inputs = []
+        this._inputs = []
         this.metadata = {}
-        this.mintedTokens = new Assets()
+        this._mintedTokens = new Assets()
         this.mintingRedeemers = []
         this.nativeScripts = []
-        this.outputs = []
-        this.refInputs = []
-        this.signers = []
+        this._outputs = []
+        this._refInputs = []
+        this._signers = []
         this.spendingRedeemers = []
         this.validTo = None
         this.validFrom = None
@@ -533,8 +568,8 @@ export class TxBuilder {
      */
     addSigners(...hash) {
         hash.forEach((hash) => {
-            if (!this.signers.some((prev) => prev.isEqual(hash))) {
-                this.signers.push(hash)
+            if (!this._signers.some((prev) => prev.isEqual(hash))) {
+                this._signers.push(hash)
             }
         })
 
@@ -765,7 +800,7 @@ export class TxBuilder {
             }
         })()
 
-        this.mintedTokens.addTokens(mph, tokens)
+        this._mintedTokens.addTokens(mph, tokens)
 
         if (redeemer) {
             if (this.hasNativeScript(mph.bytes)) {
@@ -1197,7 +1232,7 @@ export class TxBuilder {
      * @param {TxInput} input
      */
     addInput(input) {
-        TxInput.append(this.inputs, input, true)
+        TxInput.append(this._inputs, input, true)
     }
 
     /**
@@ -1245,14 +1280,14 @@ export class TxBuilder {
         // sort the tokens in the outputs, needed by the flint wallet
         output.value.assets.sort()
 
-        this.outputs.push(output)
+        this._outputs.push(output)
     }
 
     /**
      * @param {TxInput} utxo
      */
     addRefInput(utxo) {
-        TxInput.append(this.refInputs, utxo, true)
+        TxInput.append(this._refInputs, utxo, true)
     }
 
     /**
@@ -1483,7 +1518,7 @@ export class TxBuilder {
      * @returns {Value}
      */
     sumInputValue() {
-        return this.inputs.reduce(
+        return this._inputs.reduce(
             (prev, input) => prev.add(input.value),
             new Value()
         )
@@ -1496,7 +1531,7 @@ export class TxBuilder {
      */
     sumInputAndMintedValue() {
         return this.sumInputValue()
-            .add(new Value(0n, this.mintedTokens))
+            .add(new Value(0n, this._mintedTokens))
             .assertAllPositive()
     }
 
@@ -1512,7 +1547,7 @@ export class TxBuilder {
      * @returns {Value}
      */
     sumOutputValue() {
-        return this.outputs.reduce(
+        return this._outputs.reduce(
             (prev, output) => prev.add(output.value),
             new Value()
         )
@@ -1648,7 +1683,7 @@ export class TxBuilder {
             }
         }
 
-        addCollateralInputs(this.inputs.slice())
+        addCollateralInputs(this._inputs.slice())
         addCollateralInputs(spareUtxos.map((utxo) => utxo))
 
         // create the collateral return output if there is enough lovelace
@@ -1740,7 +1775,9 @@ export class TxBuilder {
             const spare = spareUtxos.pop()
 
             if (spare) {
-                if (this.inputs.some((prevInput) => prevInput.isEqual(spare))) {
+                if (
+                    this._inputs.some((prevInput) => prevInput.isEqual(spare))
+                ) {
                     // no need to log any warning about a "spare" that's already in the transaction
                 } else {
                     this.addInput(spare)
@@ -1841,16 +1878,16 @@ export class TxBuilder {
      */
     buildDummyTxBody(fee, firstValidSlot, lastValidSlot) {
         return new TxBody({
-            inputs: this.inputs,
-            outputs: this.outputs,
-            refInputs: this.refInputs,
+            inputs: this._inputs,
+            outputs: this._outputs,
+            refInputs: this._refInputs,
             fee,
             firstValidSlot,
             lastValidSlot,
-            signers: this.signers,
+            signers: this._signers,
             dcerts: this.dcerts,
             withdrawals: this.withdrawals,
-            minted: this.mintedTokens
+            minted: this._mintedTokens
         })
     }
 
@@ -1917,7 +1954,7 @@ export class TxBuilder {
     buildMintingRedeemers(buildContext = None) {
         // const logOpts = logOptions || { accumulate: true, logPrint: null }
         return this.mintingRedeemers.map(([mph, data]) => {
-            const i = this.mintedTokens
+            const i = this._mintedTokens
                 .getPolicies()
                 .findIndex((mph_) => mph_.isEqual(mph))
             let redeemer = TxRedeemer.Minting(i, data)
@@ -1948,7 +1985,7 @@ export class TxBuilder {
      */
     buildSpendingRedeemers(buildContext = None) {
         return this.spendingRedeemers.map(([utxo, data]) => {
-            const i = this.inputs.findIndex((inp) => inp.isEqual(utxo))
+            const i = this._inputs.findIndex((inp) => inp.isEqual(utxo))
             let redeemer = TxRedeemer.Spending(i, data)
 
             // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
@@ -2137,7 +2174,7 @@ export class TxBuilder {
      * @param {NetworkParams} params
      */
     correctOutputs(params) {
-        this.outputs.forEach((output) => output.correctLovelace(params))
+        this._outputs.forEach((output) => output.correctLovelace(params))
     }
 
     /**
