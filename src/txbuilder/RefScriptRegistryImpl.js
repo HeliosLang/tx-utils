@@ -1,4 +1,4 @@
-import { bytesToHex } from "@helios-lang/codec-utils"
+import { bytesToHex, equalsBytes } from "@helios-lang/codec-utils"
 import {
     Address,
     TxInput,
@@ -11,6 +11,7 @@ import { None } from "@helios-lang/type-utils"
 import { IntData } from "@helios-lang/uplc"
 import { WalletHelper } from "../wallets/index.js"
 import { TxBuilder } from "./TxBuilder.js"
+import { expectSome } from "@helios-lang/type-utils"
 
 /**
  * @typedef {import("@helios-lang/uplc").UplcProgramV2I} UplcProgramV2I
@@ -122,7 +123,28 @@ class RefScriptRegistryImpl {
                 input
             }
         } else {
-            return None
+            const utxos = await this._network.getUtxos(this.address)
+
+            const input = utxos.find((utxo) =>
+                equalsBytes(utxo.output.refScript?.hash() ?? [], hash)
+            )
+
+            if (input) {
+                const program = expectSome(input.output.refScript)
+
+                if (program.plutusVersion != "PlutusScriptV2") {
+                    throw new Error("unexpected plutus version")
+                }
+
+                this._cache[h] = {
+                    program,
+                    utxoId: input.id
+                }
+
+                return { input, program }
+            } else {
+                return None
+            }
         }
     }
 }
