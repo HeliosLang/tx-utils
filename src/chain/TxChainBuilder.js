@@ -1,14 +1,15 @@
-import { Address, Tx, TxInput, TxOutputId } from "@helios-lang/ledger"
+import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
 import { expectSome } from "@helios-lang/type-utils"
 import { TxChain } from "./TxChain.js"
 
 /**
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
+ * @typedef {import("../network/index.js").Network} Network
  * @typedef {import("../network/index.js").ReadonlyNetwork} ReadonlyNetwork
  */
 
 /**
- * @implements {ReadonlyNetwork}
+ * @implements {Network}
  */
 export class TxChainBuilder {
     /**
@@ -93,6 +94,15 @@ export class TxChainBuilder {
         )
 
         return utxos
+    }
+
+    /**
+     * @param {Tx} tx
+     * @returns {Promise<TxId>}
+     */
+    async submitTx(tx) {
+        this.txs.push(tx)
+        return tx.id()
     }
 
     /**
