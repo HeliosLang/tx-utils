@@ -98,6 +98,28 @@ export class GenesisTx {
         )
     }
 
+    /**
+     * @returns {TxInput[]}
+     */
+    newUtxos() {
+        return [
+            new TxInput(
+                new TxOutputId(this.id(), 0),
+                new TxOutput(
+                    this.#address,
+                    new Value(this.#lovelace, this.#assets)
+                )
+            )
+        ]
+    }
+
+    /**
+     * @returns {TxInput[]}
+     */
+    consumedUtxos() {
+        return []
+    }
+
     dump() {
         console.log("GENESIS TX")
         console.log(

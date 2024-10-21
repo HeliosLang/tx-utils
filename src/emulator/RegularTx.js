@@ -84,6 +84,24 @@ export class RegularTx {
         return utxo
     }
 
+    /**
+     * @returns {TxInput[]}
+     */
+    newUtxos() {
+        const id = this.id()
+
+        return this.#tx.body.outputs.map((output, i) => {
+            return new TxInput(new TxOutputId(id, i), output.copy())
+        })
+    }
+
+    /**
+     * @returns {TxInput[]}
+     */
+    consumedUtxos() {
+        return this.#tx.body.inputs
+    }
+
     dump() {
         console.log("REGULAR TX")
         console.log(JSON.stringify(this.#tx.dump(), undefined, "  "))

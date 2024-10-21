@@ -6,6 +6,8 @@ import { Address, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
  *     consumes(utxo: TxInput): boolean
  *     collectUtxos(address: Address, utxos: TxInput[]): TxInput[]
  *     getUtxo(id: TxOutputId): Option<TxInput>
+ *     newUtxos(): TxInput[]
+ *     consumedUtxos(): TxInput[]
  *     dump(): void
  * }} EmulatorTx
  */

@@ -36,9 +36,10 @@ export class Emulator {
     currentSlot
 
     /**
+     * @private
      * @type {NumberGenerator}
      */
-    #random
+    _random
 
     /**
      * @type {GenesisTx[]}
@@ -56,6 +57,27 @@ export class Emulator {
     blocks
 
     /**
+     * Cached map of all UTxOs ever created
+     * @private
+     * @type {Record<string, TxInput>}
+     */
+    _allUtxos
+
+    /**
+     * Cached set of all UTxOs ever consumed
+     * @private
+     * @type {Set<string>}
+     */
+    _consumedUtxos
+
+    /**
+     * Cached map of UTxOs at addresses
+     * @private
+     * @type {Record<string, TxInput[]>}
+     */
+    _addressUtxos
+
+    /**
      * Instantiates a Emulator at slot 0.
      * An optional seed number can be specified, from which all emulated randomness is derived.
      * @param {number} seed
@@ -63,11 +85,15 @@ export class Emulator {
     constructor(seed = 0) {
         this.currentSlot = 0
 
-        this.#random = mulberry32(seed)
+        this._random = mulberry32(seed)
 
         this.genesis = []
         this.mempool = []
         this.blocks = []
+
+        this._allUtxos = {}
+        this._consumedUtxos = new Set()
+        this._addressUtxos = {}
     }
 
     /**
@@ -106,6 +132,7 @@ export class Emulator {
          */
         const res = []
 
+        // TODO: the current approach is very slow, use a snapshot
         for (let block of this.blocks) {
             for (let tx of block) {
                 if (tx instanceof RegularTx) {
@@ -125,7 +152,7 @@ export class Emulator {
      * @returns {SimpleWallet}
      */
     createWallet(lovelace = 0n, assets = new Assets([])) {
-        const rootKey = new RootPrivateKey(generateBytes(this.#random, 32))
+        const rootKey = new RootPrivateKey(generateBytes(this._random, 32))
         const wallet = SimpleWallet.fromRootPrivateKey(rootKey, this)
 
         this.createUtxo(wallet, lovelace, assets)
@@ -172,16 +199,13 @@ export class Emulator {
     async getUtxo(id) {
         this.warnMempool()
 
-        for (let block of this.blocks) {
-            for (let tx of block) {
-                const utxo = tx.getUtxo(id)
-                if (utxo) {
-                    return utxo
-                }
-            }
-        }
+        const utxo = this._allUtxos[id.toString()]
 
-        throw new Error(`utxo with id ${id.toString()} doesn't exist`)
+        if (!utxo) {
+            throw new Error(`utxo with id ${id.toString()} doesn't exist`)
+        } else {
+            return utxo
+        }
     }
 
     /**
@@ -191,18 +215,7 @@ export class Emulator {
     async getUtxos(address) {
         this.warnMempool()
 
-        /**
-         * @type {TxInput[]}
-         */
-        let utxos = []
-
-        for (let block of this.blocks) {
-            for (let tx of block) {
-                utxos = tx.collectUtxos(address, utxos)
-            }
-        }
-
-        return utxos
+        return this._addressUtxos[address.toBech32()] ?? []
     }
 
     /**
@@ -211,11 +224,7 @@ export class Emulator {
      */
     isConsumed(utxo) {
         return (
-            this.blocks.some((b) => {
-                return b.some((tx) => {
-                    return tx.consumes(utxo)
-                })
-            }) ||
+            this._consumedUtxos.has(utxo.id.toString()) ||
             this.mempool.some((tx) => {
                 return tx.consumes(utxo)
             })
@@ -262,7 +271,7 @@ export class Emulator {
         }
 
         if (this.mempool.length > 0) {
-            this.blocks.push(this.mempool)
+            this.pushBlock(this.mempool)
 
             this.mempool = []
         }
@@ -276,5 +285,41 @@ export class Emulator {
                 "Warning: mempool not empty (hint: use 'network.tick()')"
             )
         }
+    }
+
+    /**
+     * @private
+     * @param {EmulatorTx[]} txs
+     */
+    pushBlock(txs) {
+        this.blocks.push(txs)
+
+        // add all new utxos
+        txs.forEach((tx) => {
+            tx.newUtxos().forEach((utxo) => {
+                const key = utxo.id.toString()
+                this._allUtxos[key] = utxo
+
+                const addr = utxo.address.toBech32()
+
+                if (addr in this._addressUtxos) {
+                    this._addressUtxos[addr].push(utxo)
+                } else {
+                    this._addressUtxos[addr] = [utxo]
+                }
+            })
+
+            tx.consumedUtxos().forEach((utxo) => {
+                this._consumedUtxos.add(utxo.id.toString())
+
+                const addr = utxo.address.toBech32()
+
+                if (addr in this._addressUtxos) {
+                    this._addressUtxos[addr] = this._addressUtxos[addr].filter(
+                        (inner) => !inner.isEqual(utxo)
+                    )
+                }
+            })
+        })
     }
 }
