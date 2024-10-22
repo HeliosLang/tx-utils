@@ -90,11 +90,6 @@ export function consolidate(props) {
                     }
                 })
 
-                console.log(
-                    "second filtered UTxOs",
-                    filteredUtxos.map((u) => u.value.dump())
-                )
-
                 const selectionResult = selectSmallestFirst({
                     allowSelectingUninvolvedAssets: true
                 })(filteredUtxos, amount)
