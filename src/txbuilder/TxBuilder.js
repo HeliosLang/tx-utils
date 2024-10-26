@@ -342,14 +342,11 @@ export class TxBuilder {
      * @returns {Promise<Tx>}
      */
     async build(config) {
-        const params =
-            config?.networkParams instanceof Promise
-                ? await config.networkParams
-                : (config?.networkParams ?? DEFAULT_NETWORK_PARAMS())
         const tx = await this.buildUnsafe({
             throwBuildPhaseScriptErrors: true,
             ...config
         })
+
         if (tx.hasValidationError) {
             throw new Error(tx.hasValidationError)
         }
@@ -384,10 +381,11 @@ export class TxBuilder {
                 ? await config.networkParams
                 : (config?.networkParams ?? DEFAULT_NETWORK_PARAMS())
         const helper = new NetworkParamsHelper(params)
-        const spareUtxos =
+        const spareUtxos = (
             config.spareUtxos instanceof Promise
                 ? await config.spareUtxos
                 : (config.spareUtxos ?? [])
+        ).filter((utxo) => !this._inputs.some((input) => input.isEqual(utxo)))
 
         // await the remaining pending applications
         for (let p of this.pending) {

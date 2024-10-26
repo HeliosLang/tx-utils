@@ -251,6 +251,24 @@ export class Emulator {
             )
         }
 
+        // make sure that each input exists
+        if (
+            !tx.body.inputs.every(
+                (input) => input.id.toString() in this._allUtxos
+            )
+        ) {
+            throw new Error("some inputs don't exist")
+        }
+
+        // make sure that each ref input exists
+        if (
+            !tx.body.refInputs.every(
+                (input) => input.id.toString() in this._allUtxos
+            )
+        ) {
+            throw new Error("some ref inputs don't exist")
+        }
+
         // make sure that none of the inputs have been consumed before
         if (tx.body.inputs.some((input) => this.isConsumed(input))) {
             throw new Error("input already consumed before")
