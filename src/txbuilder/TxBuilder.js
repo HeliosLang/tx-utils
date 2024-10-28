@@ -91,7 +91,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
 
 /**
  * @template [T=UplcData]
- * @typedef {(tx?: TxInfo) => T} LazyRedeemerData
+ * @typedef {(tx?: TxInfo) => (T | Promise<T>)} LazyRedeemerData
  */
 
 /**
@@ -430,7 +430,7 @@ export class TxBuilder {
 
         // the final fee will never be higher than the current `fee`, so the inputs and outputs won't change, and we will get redeemers with the right indices
         // the scripts executed at this point will not see the correct txHash nor the correct fee
-        const redeemers = this.buildRedeemers({
+        const redeemers = await this.buildRedeemers({
             networkParams: params,
             fee,
             firstValidSlot,
@@ -749,9 +749,12 @@ export class TxBuilder {
     mintLazy(assetClass, quantity, redeemer) {
         this.attachUplcProgram(assetClass.context.program)
 
-        return this.mintUnsafe(assetClass, quantity, (tx) =>
-            assetClass.context.redeemer.toUplcData(redeemer(tx))
-        )
+        return this.mintUnsafe(assetClass, quantity, async (tx) => {
+            const r = redeemer(tx)
+            const redeemerData = r instanceof Promise ? await r : r
+
+            return assetClass.context.redeemer.toUplcData(redeemerData)
+        })
     }
 
     /**
@@ -1045,15 +1048,21 @@ export class TxBuilder {
             utxos.forEach((utxo) =>
                 this.attachUplcProgram(utxo.spendingContext.program)
             )
-            return this.spendUnsafe(utxos, (tx) =>
-                utxos[0].spendingContext.redeemer.toUplcData(redeemer(tx))
-            )
+            return this.spendUnsafe(utxos, async (tx) => {
+                const r = redeemer(tx)
+                const redeemerData = r instanceof Promise ? await r : r
+                return utxos[0].spendingContext.redeemer.toUplcData(
+                    redeemerData
+                )
+            })
         } else {
             this.attachUplcProgram(utxos.spendingContext.program)
 
-            return this.spendUnsafe(utxos, (tx) =>
-                utxos.spendingContext.redeemer.toUplcData(redeemer(tx))
-            )
+            return this.spendUnsafe(utxos, async (tx) => {
+                const r = redeemer(tx)
+                const redeemerData = r instanceof Promise ? await r : r
+                return utxos.spendingContext.redeemer.toUplcData(redeemerData)
+            })
         }
     }
 
@@ -1220,9 +1229,12 @@ export class TxBuilder {
      * @returns {TxBuilder}
      */
     withdrawLazy(addr, lovelace, redeemer) {
-        return this.withdrawUnsafe(addr, lovelace, (tx) =>
-            addr.context.redeemer.toUplcData(redeemer(tx))
-        )
+        return this.withdrawUnsafe(addr, lovelace, async (tx) => {
+            const r = redeemer(tx)
+            const redeemerData = r instanceof Promise ? await r : r
+
+            return addr.context.redeemer.toUplcData(redeemerData)
+        })
     }
 
     /**
@@ -1885,12 +1897,12 @@ export class TxBuilder {
      * TODO: return profiling information?
      * @private
      * @param {RedeemerExecContext} execContext
-     * @returns {TxRedeemer[]}
+     * @returns {Promise<TxRedeemer[]>}
      */
-    buildRedeemers(execContext) {
-        const dummyRedeemers = this.buildMintingRedeemers()
-            .concat(this.buildSpendingRedeemers())
-            .concat(this.buildRewardingRedeemers())
+    async buildRedeemers(execContext) {
+        const dummyRedeemers = (await this.buildMintingRedeemers())
+            .concat(await this.buildSpendingRedeemers())
+            .concat(await this.buildRewardingRedeemers())
 
         // we have all the information to create a dummy tx
         const dummyTx = this.buildDummyTxBody(
@@ -1911,9 +1923,9 @@ export class TxBuilder {
             txInfo
         }
         // rebuild the redeemers now that we can generate the correct ScriptContext
-        const redeemers = this.buildMintingRedeemers(buildContext)
-            .concat(this.buildSpendingRedeemers(buildContext))
-            .concat(this.buildRewardingRedeemers(buildContext))
+        const redeemers = (await this.buildMintingRedeemers(buildContext))
+            .concat(await this.buildSpendingRedeemers(buildContext))
+            .concat(await this.buildRewardingRedeemers(buildContext))
 
         return redeemers
     }
@@ -1998,148 +2010,105 @@ export class TxBuilder {
      * The execution itself might depend on the redeemers, so we must also be able to return the redeemers without any execution first
      * @private
      * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
-     * @returns {TxRedeemer[]}
+     * @returns {Promise<TxRedeemer[]>}
      */
-    buildMintingRedeemers(buildContext = None) {
-        // const logOpts = logOptions || { accumulate: true, logPrint: null }
-        return this.mintingRedeemers.map(([mph, redeemerDataOrFn]) => {
-            const i = this._mintedTokens
-                .getPolicies()
-                .findIndex((mph_) => mph_.isEqual(mph))
-            const dummyRedeemerData =
-                "kind" in redeemerDataOrFn
-                    ? redeemerDataOrFn
-                    : buildContext
-                      ? redeemerDataOrFn(buildContext.txInfo)
-                      : redeemerDataOrFn()
-
-            let redeemer = TxRedeemer.Minting(i, dummyRedeemerData)
-            const script = this.getUplcScript(mph)
-
-            if (buildContext) {
-                const redeemerData =
-                    "kind" in redeemerDataOrFn
-                        ? redeemerDataOrFn
-                        : redeemerDataOrFn(buildContext.txInfo)
-
-                const profile = this.buildRedeemerProfile(script, {
-                    summary: `mint @${i}`,
-                    args: [
-                        redeemerData,
-                        new ScriptContextV2(
-                            buildContext.txInfo,
-                            ScriptPurpose.Minting(redeemer, mph)
-                        ).toUplcData()
-                    ],
-                    buildContext
-                })
-                redeemer = TxRedeemer.Minting(i, redeemerData, profile.cost)
-            }
-            return redeemer
-        })
-    }
-
-    /**
-     * @private
-     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
-     * @returns {TxRedeemer[]}
-     */
-    buildSpendingRedeemers(buildContext = None) {
-        return this.spendingRedeemers.map(([utxo, redeemerDataOrFn]) => {
-            const i = this._inputs.findIndex((inp) => inp.isEqual(utxo))
-            const dummyRedeemerData =
-                "kind" in redeemerDataOrFn
-                    ? redeemerDataOrFn
-                    : buildContext
-                      ? redeemerDataOrFn(buildContext.txInfo)
-                      : redeemerDataOrFn()
-
-            let redeemer = TxRedeemer.Spending(i, dummyRedeemerData)
-
-            // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
-            // this finds the index based on staking address, but ^ uses the index we found here.
-            // Possibly the other thing should do the same as this.
-            const vh = expectSome(utxo.address.validatorHash)
-            const script = this.getUplcScript(vh)
-
-            if (buildContext) {
-                const datum = expectSome(utxo.datum?.data)
-                const redeemerData =
-                    "kind" in redeemerDataOrFn
-                        ? redeemerDataOrFn
-                        : redeemerDataOrFn(buildContext.txInfo)
-
-                const profile = this.buildRedeemerProfile(script, {
-                    summary: `input @${i}`,
-                    args: [
-                        datum,
-                        redeemerData,
-                        new ScriptContextV2(
-                            buildContext.txInfo,
-                            ScriptPurpose.Spending(redeemer, utxo.id)
-                        ).toUplcData()
-                    ],
-                    buildContext
-                })
-
-                redeemer = TxRedeemer.Spending(i, redeemerData, profile.cost)
-            }
-
-            return redeemer
-        })
-    }
-
-    /**
-     * @private
-     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
-     * @returns {TxRedeemer[]}
-     */
-    buildRewardingRedeemers(buildContext = None) {
-        return this.rewardingRedeemers.map(
-            ([stakingAddress, redeemerDataOrFn]) => {
-                // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
-                // this finds the index based on staking address, but ^ uses the index we found here.
-                // Possibly the other thing should do the same as this.
-
-                const i = this.withdrawals.findIndex(([sa]) =>
-                    sa.isEqual(stakingAddress)
-                )
-                // pass dummy data if the lazy can't be evaluated yet
+    async buildMintingRedeemers(buildContext = None) {
+        return Promise.all(
+            this.mintingRedeemers.map(async ([mph, redeemerDataOrFn]) => {
+                const i = this._mintedTokens
+                    .getPolicies()
+                    .findIndex((mph_) => mph_.isEqual(mph))
                 const dummyRedeemerData =
                     "kind" in redeemerDataOrFn
                         ? redeemerDataOrFn
                         : buildContext
                           ? redeemerDataOrFn(buildContext.txInfo)
                           : redeemerDataOrFn()
-                let redeemer = TxRedeemer.Rewarding(i, dummyRedeemerData)
 
-                const svh = expectSome(
-                    stakingAddress.toCredential().expectStakingHash()
-                        .stakingValidatorHash
+                let redeemer = TxRedeemer.Minting(
+                    i,
+                    dummyRedeemerData instanceof Promise
+                        ? await dummyRedeemerData
+                        : dummyRedeemerData
                 )
-                const script = this.getUplcScript(svh)
+                const script = this.getUplcScript(mph)
 
                 if (buildContext) {
-                    const redeemerData =
+                    const r =
                         "kind" in redeemerDataOrFn
                             ? redeemerDataOrFn
                             : redeemerDataOrFn(buildContext.txInfo)
+                    const redeemerData = r instanceof Promise ? await r : r
+
                     const profile = this.buildRedeemerProfile(script, {
-                        summary: `rewards @${i}`,
+                        summary: `mint @${i}`,
                         args: [
                             redeemerData,
                             new ScriptContextV2(
                                 buildContext.txInfo,
-                                ScriptPurpose.Rewarding(
-                                    redeemer,
-                                    stakingAddress.toCredential()
-                                )
+                                ScriptPurpose.Minting(redeemer, mph)
+                            ).toUplcData()
+                        ],
+                        buildContext
+                    })
+                    redeemer = TxRedeemer.Minting(i, redeemerData, profile.cost)
+                }
+                return redeemer
+            })
+        )
+    }
+
+    /**
+     * @private
+     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
+     * @returns {Promise<TxRedeemer[]>}
+     */
+    async buildSpendingRedeemers(buildContext = None) {
+        return Promise.all(
+            this.spendingRedeemers.map(async ([utxo, redeemerDataOrFn]) => {
+                const i = this._inputs.findIndex((inp) => inp.isEqual(utxo))
+                const dummyRedeemerData =
+                    "kind" in redeemerDataOrFn
+                        ? redeemerDataOrFn
+                        : buildContext
+                          ? redeemerDataOrFn(buildContext.txInfo)
+                          : redeemerDataOrFn()
+
+                let redeemer = TxRedeemer.Spending(
+                    i,
+                    dummyRedeemerData instanceof Promise
+                        ? await dummyRedeemerData
+                        : dummyRedeemerData
+                )
+
+                // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
+                // this finds the index based on staking address, but ^ uses the index we found here.
+                // Possibly the other thing should do the same as this.
+                const vh = expectSome(utxo.address.validatorHash)
+                const script = this.getUplcScript(vh)
+
+                if (buildContext) {
+                    const datum = expectSome(utxo.datum?.data)
+                    const r =
+                        "kind" in redeemerDataOrFn
+                            ? redeemerDataOrFn
+                            : redeemerDataOrFn(buildContext.txInfo)
+                    const redeemerData = r instanceof Promise ? await r : r
+
+                    const profile = this.buildRedeemerProfile(script, {
+                        summary: `input @${i}`,
+                        args: [
+                            datum,
+                            redeemerData,
+                            new ScriptContextV2(
+                                buildContext.txInfo,
+                                ScriptPurpose.Spending(redeemer, utxo.id)
                             ).toUplcData()
                         ],
                         buildContext
                     })
 
-                    redeemer = TxRedeemer.Rewarding(
+                    redeemer = TxRedeemer.Spending(
                         i,
                         redeemerData,
                         profile.cost
@@ -2147,7 +2116,77 @@ export class TxBuilder {
                 }
 
                 return redeemer
-            }
+            })
+        )
+    }
+
+    /**
+     * @private
+     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
+     * @returns {Promise<TxRedeemer[]>}
+     */
+    async buildRewardingRedeemers(buildContext = None) {
+        return Promise.all(
+            this.rewardingRedeemers.map(
+                async ([stakingAddress, redeemerDataOrFn]) => {
+                    // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
+                    // this finds the index based on staking address, but ^ uses the index we found here.
+                    // Possibly the other thing should do the same as this.
+
+                    const i = this.withdrawals.findIndex(([sa]) =>
+                        sa.isEqual(stakingAddress)
+                    )
+                    // pass dummy data if the lazy can't be evaluated yet
+                    const dummyRedeemerData =
+                        "kind" in redeemerDataOrFn
+                            ? redeemerDataOrFn
+                            : buildContext
+                              ? redeemerDataOrFn(buildContext.txInfo)
+                              : redeemerDataOrFn()
+                    let redeemer = TxRedeemer.Rewarding(
+                        i,
+                        dummyRedeemerData instanceof Promise
+                            ? await dummyRedeemerData
+                            : dummyRedeemerData
+                    )
+
+                    const svh = expectSome(
+                        stakingAddress.toCredential().expectStakingHash()
+                            .stakingValidatorHash
+                    )
+                    const script = this.getUplcScript(svh)
+
+                    if (buildContext) {
+                        const r =
+                            "kind" in redeemerDataOrFn
+                                ? redeemerDataOrFn
+                                : redeemerDataOrFn(buildContext.txInfo)
+                        const redeemerData = r instanceof Promise ? await r : r
+                        const profile = this.buildRedeemerProfile(script, {
+                            summary: `rewards @${i}`,
+                            args: [
+                                redeemerData,
+                                new ScriptContextV2(
+                                    buildContext.txInfo,
+                                    ScriptPurpose.Rewarding(
+                                        redeemer,
+                                        stakingAddress.toCredential()
+                                    )
+                                ).toUplcData()
+                            ],
+                            buildContext
+                        })
+
+                        redeemer = TxRedeemer.Rewarding(
+                            i,
+                            redeemerData,
+                            profile.cost
+                        )
+                    }
+
+                    return redeemer
+                }
+            )
         )
     }
 
