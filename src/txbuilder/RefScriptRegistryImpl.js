@@ -21,11 +21,11 @@ import { expectSome } from "@helios-lang/type-utils"
  */
 
 /**
- * @param {{network: Network, agent: Wallet}} args
+ * @param {{network: Network, agent: Wallet, address?: Address<any, any>}} args
  * @returns {RefScriptRegistry}
  */
 export function makeRefScriptRegistry(args) {
-    return new RefScriptRegistryImpl(args.network, args.agent)
+    return new RefScriptRegistryImpl(args.network, args.agent, args.address)
 }
 
 /**
@@ -46,6 +46,12 @@ class RefScriptRegistryImpl {
 
     /**
      * @private
+     * @type {Address<any, any>}
+     */
+    _address
+
+    /**
+     * @private
      * @type {Record<string, {program: UplcProgramV2I, utxoId: TxOutputId}>}
      */
     _cache
@@ -54,30 +60,34 @@ class RefScriptRegistryImpl {
      * @param {Network} network
      * @param {Wallet} agent
      */
-    constructor(network, agent) {
+    constructor(
+        network,
+        agent,
+        address = Address.dummy(network.isMainnet(), 0)
+    ) {
         this._network = network
         this._agent = agent
+        this._address = address
         this._cache = {}
     }
 
     /**
-     * TODO: configurable lock address that is based in always_fails native script
      * @private
      * @type {Address<any, any>}
      */
     get address() {
-        return Address.dummy(this._network.isMainnet(), 0)
+        return this._address
     }
 
     /**
      * @param {UplcProgramV2I} program
-     * @returns {Promise<void>}
+     * @returns {Promise<TxOutputId>}
      */
     async register(program) {
         const h = bytesToHex(program.hash())
 
         if (h in this._cache) {
-            return
+            return this._cache[h].utxoId
         }
 
         const b = new TxBuilder({ isMainnet: this._network.isMainnet() })
@@ -106,6 +116,8 @@ class RefScriptRegistryImpl {
             program,
             utxoId
         }
+
+        return utxoId
     }
 
     /**
