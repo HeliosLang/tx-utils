@@ -56,7 +56,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @typedef {import("@helios-lang/uplc").UplcData} UplcData
  * @typedef {import("@helios-lang/uplc").UplcProgramV1I} UplcProgramV1I
  * @typedef {import("@helios-lang/uplc").UplcProgramV2I} UplcProgramV2I
- * @typedef {import("./RefScriptRegistry.js").RefScriptRegistry} RefScriptRegistry
+ * @typedef {import("./RefScriptRegistry.js").ReadonlyRefScriptRegistry} ReadonlyRefScriptRegistry
  */
 
 /**
@@ -97,7 +97,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
 /**
  * @typedef {{
  *   isMainnet: boolean
- *   refScriptRegistry?: Option<RefScriptRegistry>
+ *   refScriptRegistry?: Option<ReadonlyRefScriptRegistry>
  * }} TxBuilderConfig
  */
 
