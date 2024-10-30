@@ -598,9 +598,18 @@ export class BlockfrostV0 {
                 }
             })
 
-            const cbor = /** @type {any} */ (await response.json()).cbor
+            /**
+             * @type {any}
+             */
+            const responseJson = await response.json()
 
-            refScript = UplcProgramV2.fromCbor(cbor)
+            if (!responseJson) {
+                console.error("blockfrost response is null or undefined")
+            } else if (!("cbor" in responseJson)) {
+                console.error(`reponse.cbor not found in ${responseJson}`)
+            } else {
+                refScript = UplcProgramV2.fromCbor(responseJson.cbor)
+            }
         }
 
         return new TxInput(
