@@ -21,7 +21,7 @@ export function makeCachedRefScriptRegistry(network, scripts) {
             Object.fromEntries(
                 scripts.map(([p, id]) => {
                     return [
-                        p.hash(),
+                        bytesToHex(p.hash()),
                         { program: p, inputId: TxOutputId.new(id) }
                     ]
                 })
