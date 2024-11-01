@@ -44,6 +44,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @typedef {import("@helios-lang/codec-utils").IntLike} IntLike
  * @typedef {import("@helios-lang/ledger").AddressLike} AddressLike
  * @typedef {import("@helios-lang/ledger").AssetClassLike} AssetClassLike
+ * @typedef {import("@helios-lang/ledger").PubKeyHashLike} PubKeyHashLike
  * @typedef {import("@helios-lang/ledger").MintingPolicyHashLike} MintingPolicyHashLike
  * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
  * @typedef {import("@helios-lang/ledger").StakingAddressLike} StakingAddressLike
@@ -261,6 +262,12 @@ export class TxBuilder {
      * @type {[StakingAddress, UplcData | LazyRedeemerData][]}
      */
     rewardingRedeemers
+
+    /**
+     * @private
+     * @type {[DCert, UplcData | LazyRedeemerData][]}
+     */
+    certifyingRedeemers
 
     /**
      * this.apply() can take functions that return promises, these must be awaited before doing anything else in .build()
@@ -528,6 +535,7 @@ export class TxBuilder {
         this.v2Scripts = []
         this.withdrawals = []
         this.rewardingRedeemers = []
+        this.certifyingRedeemers = []
         this.pending = []
 
         return this
@@ -621,6 +629,188 @@ export class TxBuilder {
                 break
             default:
                 throw new Error(`unhandled UplcProgram type`)
+        }
+
+        return this
+    }
+
+    /**
+     * @overload
+     * @param {PubKeyHash} hash
+     * @param {PubKeyHashLike} poolId
+     * @returns {TxBuilder}
+     */
+    /**
+     * @template TRedeemer
+     * @overload
+     * @param {StakingValidatorHash<StakingContext<any, TRedeemer>>} hash
+     * @param {PubKeyHashLike} poolId
+     * @param {TRedeemer} redeemer
+     * @returns {TxBuilder}
+     */
+    /**
+     * @template TRedeemer
+     * @param {(
+     *   [PubKeyHash, PubKeyHashLike]
+     *   | [StakingValidatorHash<StakingContext<any, TRedeemer>>, PubKeyHashLike, TRedeemer]
+     * )} args
+     * @returns {TxBuilder}
+     */
+    delegate(...args) {
+        this.addDCert(DCert.Delegate(args[0], args[1]))
+
+        if (args.length == 2) {
+            this.delegateUnsafe(args[0], args[1])
+        } else if (args.length == 3) {
+            const redeemerData = args[0].context.redeemer.toUplcData(
+                /** @type {TRedeemer} */ (args[2])
+            )
+            this.delegateUnsafe(args[0], args[1], redeemerData)
+        } else {
+            throw new Error("invalid number of arguments")
+        }
+
+        return this
+    }
+
+    /**
+     * @overload
+     * @param {PubKeyHash} hash
+     * @param {PubKeyHashLike} poolId
+     * @returns {TxBuilder}
+     */
+    /**
+     * @overload
+     * @param {StakingValidatorHash<any, any>} hash
+     * @param {PubKeyHashLike} poolId
+     * @param {Option<UplcData | LazyRedeemerData>} redeemer
+     * @returns {TxBuilder}
+     */
+    /**
+     * @param {(
+     *   [PubKeyHash, PubKeyHashLike]
+     *   | [StakingValidatorHash<any, any>, PubKeyHashLike, Option<UplcData | LazyRedeemerData>]
+     * )} args
+     * @returns {TxBuilder}
+     */
+    delegateUnsafe(...args) {
+        const dcert = DCert.Delegate(args[0], args[1])
+        this.addDCert(dcert)
+
+        if (args.length == 3) {
+            const hash = args[0]
+            const redeemer = args[2]
+
+            if (redeemer) {
+                if (this.hasNativeScript(hash.bytes)) {
+                    throw new Error(
+                        "redeemer not required when certifying using a native script (hint: omit the redeemer)"
+                    )
+                }
+
+                if (!this.hasUplcScript(hash.bytes)) {
+                    throw new Error(
+                        "certification is witnessed by unknown script (hint: attach the script before calling TxBuilder.delegate())"
+                    )
+                }
+
+                this.addCertifyingRedeemer(dcert, redeemer)
+            } else {
+                if (!this.hasNativeScript(hash.bytes)) {
+                    throw new Error(
+                        "no redeemer specified for DCert (hint: if this policy is a NativeScript, attach that script before calling TxBuilder.delegate())"
+                    )
+                }
+            }
+        }
+
+        return this
+    }
+
+    /**
+     * @overload
+     * @param {PubKeyHash} hash
+     * @returns {TxBuilder}
+     */
+    /**
+     * @template TRedeemer
+     * @overload
+     * @param {StakingValidatorHash<StakingContext<any, TRedeemer>>} hash
+     * @param {TRedeemer} redeemer
+     * @returns {TxBuilder}
+     */
+    /**
+     * @template TRedeemer
+     * @param {(
+     *   [PubKeyHash]
+     *   | [StakingValidatorHash<StakingContext<any, TRedeemer>>, TRedeemer]
+     * )} args
+     * @returns {TxBuilder}
+     */
+    deregister(...args) {
+        this.addDCert(DCert.Deregister(args[0]))
+
+        if (args.length == 1) {
+            this.deregisterUnsafe(args[0])
+        } else if (args.length == 2) {
+            const redeemerData = args[0].context.redeemer.toUplcData(
+                /** @type {TRedeemer} */ (args[1])
+            )
+            this.deregisterUnsafe(args[0], redeemerData)
+        } else {
+            throw new Error("invalid number of arguments")
+        }
+
+        return this
+    }
+
+    /**
+     * @overload
+     * @param {PubKeyHash} hash
+     * @returns {TxBuilder}
+     */
+    /**
+     * @overload
+     * @param {StakingValidatorHash<any, any>} hash
+     * @param {Option<UplcData | LazyRedeemerData>} redeemer
+     * @returns {TxBuilder}
+     */
+    /**
+     * @param {(
+     *   [PubKeyHash]
+     *   | [StakingValidatorHash<any, any>, Option<UplcData | LazyRedeemerData>]
+     * )} args
+     * @returns {TxBuilder}
+     */
+    deregisterUnsafe(...args) {
+        const dcert = DCert.Deregister(args[0])
+        this.addDCert(dcert)
+
+        if (args.length == 2) {
+            const hash = args[0]
+            const redeemer = args[1]
+
+            if (redeemer) {
+                if (this.hasNativeScript(hash.bytes)) {
+                    throw new Error(
+                        "redeemer not required when certifying using a native script (hint: omit the redeemer)"
+                    )
+                }
+
+                if (!this.hasUplcScript(hash.bytes)) {
+                    throw new Error(
+                        "certification is witnessed by unknown script (hint: attach the script before calling TxBuilder.delegate())"
+                    )
+                }
+
+                this.addCertifyingRedeemer(dcert, redeemer)
+            } else {
+                if (!this.hasNativeScript(hash.bytes)) {
+                    throw new Error(
+                        "no redeemer specified for DCert (hint: if this policy is a NativeScript, attach that script before calling TxBuilder.delegate())"
+                    )
+                }
+            }
         }
 
         return this
@@ -1380,6 +1570,16 @@ export class TxBuilder {
     }
 
     /**
+     * @privte
+     * @param {DCert} dcert
+     * @param {UplcData | LazyRedeemerData} data
+     */
+    addCertifyingRedeemer(dcert, data) {
+        // TODO: duplicate check
+        this.certifyingRedeemers.push([dcert, data])
+    }
+
+    /**
      * Doesn't re-add or throw an error if the script was previously added
      * @private
      * @param {UplcProgramV1I} script
@@ -1903,6 +2103,7 @@ export class TxBuilder {
         const dummyRedeemers = (await this.buildMintingRedeemers())
             .concat(await this.buildSpendingRedeemers())
             .concat(await this.buildRewardingRedeemers())
+            .concat(await this.buildCertifyingRedeemers())
 
         // we have all the information to create a dummy tx
         const dummyTx = this.buildDummyTxBody(
@@ -1978,6 +2179,14 @@ export class TxBuilder {
             const svh = stakingAddress
                 .toCredential()
                 .expectStakingHash().stakingValidatorHash
+
+            if (svh) {
+                allHashes.push(svh.bytes)
+            }
+        })
+
+        this.certifyingRedeemers.forEach(([dcert]) => {
+            const svh = dcert.credential.hash.stakingValidatorHash
 
             if (svh) {
                 allHashes.push(svh.bytes)
@@ -2187,6 +2396,70 @@ export class TxBuilder {
                     return redeemer
                 }
             )
+        )
+    }
+
+    /**
+     * @private
+     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
+     * @returns {Promise<TxRedeemer[]>}
+     */
+    async buildCertifyingRedeemers(buildContext = None) {
+        return Promise.all(
+            this.certifyingRedeemers.map(async ([dcert, redeemerDataOrFn]) => {
+                const svh = expectSome(
+                    dcert.credential.hash.stakingValidatorHash
+                )
+
+                const i = this.dcerts.findIndex(
+                    (dc) =>
+                        dc.credential.hash.stakingValidatorHash?.isEqual(svh) &&
+                        dc.kind == dcert.kind
+                )
+
+                // pass dummy data if the lazy can't be evaluated yet
+                const dummyRedeemerData =
+                    "kind" in redeemerDataOrFn
+                        ? redeemerDataOrFn
+                        : buildContext
+                          ? redeemerDataOrFn(buildContext.txInfo)
+                          : redeemerDataOrFn()
+                let redeemer = TxRedeemer.Certifying(
+                    i,
+                    dummyRedeemerData instanceof Promise
+                        ? await dummyRedeemerData
+                        : dummyRedeemerData
+                )
+
+                const script = this.getUplcScript(svh)
+
+                if (buildContext) {
+                    const r =
+                        "kind" in redeemerDataOrFn
+                            ? redeemerDataOrFn
+                            : redeemerDataOrFn(buildContext.txInfo)
+                    const redeemerData = r instanceof Promise ? await r : r
+                    const profile = this.buildRedeemerProfile(script, {
+                        summary: `dcert ${dcert.kind} @${i}`,
+                        args: [
+                            redeemerData,
+                            new ScriptContextV2(
+                                buildContext.txInfo,
+                                ScriptPurpose.Certifying(redeemer, dcert)
+                            ).toUplcData()
+                        ],
+                        buildContext
+                    })
+
+                    redeemer = TxRedeemer.Certifying(
+                        i,
+                        redeemerData,
+                        profile.cost
+                    )
+                }
+
+                return redeemer
+            })
         )
     }
 
