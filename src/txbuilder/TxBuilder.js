@@ -657,8 +657,6 @@ export class TxBuilder {
      * @returns {TxBuilder}
      */
     delegate(...args) {
-        this.addDCert(DCert.Delegate(args[0], args[1]))
-
         if (args.length == 2) {
             this.delegateUnsafe(args[0], args[1])
         } else if (args.length == 3) {
@@ -748,8 +746,6 @@ export class TxBuilder {
      * @returns {TxBuilder}
      */
     deregister(...args) {
-        this.addDCert(DCert.Deregister(args[0]))
-
         if (args.length == 1) {
             this.deregisterUnsafe(args[0])
         } else if (args.length == 2) {
