@@ -660,6 +660,8 @@ export class TxBuilder {
         if (args.length == 2) {
             this.delegateUnsafe(args[0], args[1])
         } else if (args.length == 3) {
+            this.attachUplcProgram(args[0].context.program)
+
             const redeemerData = args[0].context.redeemer.toUplcData(
                 /** @type {TRedeemer} */ (args[2])
             )
@@ -749,9 +751,12 @@ export class TxBuilder {
         if (args.length == 1) {
             this.deregisterUnsafe(args[0])
         } else if (args.length == 2) {
+            this.attachUplcProgram(args[0].context.program)
+
             const redeemerData = args[0].context.redeemer.toUplcData(
                 /** @type {TRedeemer} */ (args[1])
             )
+
             this.deregisterUnsafe(args[0], redeemerData)
         } else {
             throw new Error("invalid number of arguments")
@@ -2123,6 +2128,7 @@ export class TxBuilder {
         const redeemers = (await this.buildMintingRedeemers(buildContext))
             .concat(await this.buildSpendingRedeemers(buildContext))
             .concat(await this.buildRewardingRedeemers(buildContext))
+            .concat(await this.buildCertifyingRedeemers(buildContext))
 
         return redeemers
     }
