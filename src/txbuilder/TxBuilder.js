@@ -53,6 +53,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @typedef {import("@helios-lang/ledger").TxMetadataAttr} TxMetadataAttr
  * @typedef {import("@helios-lang/ledger").ValueLike} ValueLike
  * @typedef {import("@helios-lang/uplc").CekResult} CekResult
+ * @typedef {import("@helios-lang/uplc").Cost} Cost
  * @typedef {import("@helios-lang/uplc").UplcLoggingI} UplcLoggingI
  * @typedef {import("@helios-lang/uplc").UplcData} UplcData
  * @typedef {import("@helios-lang/uplc").UplcProgramV1I} UplcProgramV1I
@@ -103,6 +104,9 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  */
 
 /**
+ * @typedef {(txInfo: TxInfo, purpose: string, index: number, fee: Cost) => Cost} ExBudgetModifier
+ */
+/**
  * @typedef {{
  *   changeAddress: AddressLike | Promise<AddressLike>
  *   spareUtxos?: TxInput[] | Promise<TxInput[]>
@@ -111,6 +115,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  *   logOptions?: UplcLoggingI
  *   throwBuildPhaseScriptErrors?: boolean
  *   beforeValidate?: (tx: Tx) => any | Promise<any>
+ *   modifyExBudget?: ExBudgetModifier
  * }} TxBuilderFinalConfig
  */
 
@@ -123,6 +128,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @property {boolean} [throwBuildPhaseScriptErrors] - if false, script errors will be thrown only during validate phase of the build.  Default is true for build(), false for buildUnsafe()
  * @property {UplcLoggingI} [logOptions] - an externally-provided logger
  * @property {NetworkParams} networkParams
+ * @property {ExBudgetModifier} [modifyExBudget]
  */
 /**
  * @private
@@ -443,7 +449,8 @@ export class TxBuilder {
             firstValidSlot,
             lastValidSlot,
             throwBuildPhaseScriptErrors,
-            logOptions: config.logOptions // NOTE: has an internal default null-logger
+            logOptions: config.logOptions, // NOTE: has an internal default null-logger
+            modifyExBudget: config.modifyExBudget
         })
 
         const scriptDataHash = this.buildScriptDataHash(params, redeemers)
@@ -2262,7 +2269,17 @@ export class TxBuilder {
                         ],
                         buildContext
                     })
-                    redeemer = TxRedeemer.Minting(i, redeemerData, profile.cost)
+
+                    const cost = buildContext.modifyExBudget
+                        ? buildContext.modifyExBudget(
+                              buildContext.txInfo,
+                              "minting",
+                              i,
+                              profile.cost
+                          )
+                        : profile.cost
+
+                    redeemer = TxRedeemer.Minting(i, redeemerData, cost)
                 }
                 return redeemer
             })
@@ -2319,11 +2336,16 @@ export class TxBuilder {
                         buildContext
                     })
 
-                    redeemer = TxRedeemer.Spending(
-                        i,
-                        redeemerData,
-                        profile.cost
-                    )
+                    const cost = buildContext.modifyExBudget
+                        ? buildContext.modifyExBudget(
+                              buildContext.txInfo,
+                              "spending",
+                              i,
+                              profile.cost
+                          )
+                        : profile.cost
+
+                    redeemer = TxRedeemer.Spending(i, redeemerData, cost)
                 }
 
                 return redeemer
@@ -2388,11 +2410,16 @@ export class TxBuilder {
                             buildContext
                         })
 
-                        redeemer = TxRedeemer.Rewarding(
-                            i,
-                            redeemerData,
-                            profile.cost
-                        )
+                        const cost = buildContext.modifyExBudget
+                            ? buildContext.modifyExBudget(
+                                  buildContext.txInfo,
+                                  "rewarding",
+                                  i,
+                                  profile.cost
+                              )
+                            : profile.cost
+
+                        redeemer = TxRedeemer.Rewarding(i, redeemerData, cost)
                     }
 
                     return redeemer
@@ -2453,11 +2480,16 @@ export class TxBuilder {
                         buildContext
                     })
 
-                    redeemer = TxRedeemer.Certifying(
-                        i,
-                        redeemerData,
-                        profile.cost
-                    )
+                    const cost = buildContext.modifyExBudget
+                        ? buildContext.modifyExBudget(
+                              buildContext.txInfo,
+                              "certifying",
+                              i,
+                              profile.cost
+                          )
+                        : profile.cost
+
+                    redeemer = TxRedeemer.Certifying(i, redeemerData, cost)
                 }
 
                 return redeemer
