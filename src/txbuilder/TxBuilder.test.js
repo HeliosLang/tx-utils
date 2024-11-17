@@ -1,9 +1,9 @@
 import { describe, it } from "node:test"
 import { strictEqual } from "node:assert"
 import { Tx, TxInput, TxOutput } from "@helios-lang/ledger"
-import { TxBuilder } from "./TxBuilder.js"
+import { makeTxBuilder } from "./TxBuilder.js"
 
-describe(`basic ${TxBuilder.name}`, () => {
+describe("basic TxBuilder", () => {
     /**
      * send 10 tAda on preview net from wallet1 to wallet 2
      * (input is 10000 tAda, change is 9990 tAda minus fees)
@@ -26,7 +26,7 @@ describe(`basic ${TxBuilder.name}`, () => {
             "d4b22d33611fb2b3764080cb349b3f12d353aef1d4319ee33e44594bbebe5e83#0",
             new TxOutput(wallet1, 10_000_000_000n)
         )
-        const tx = await TxBuilder.new({ isMainnet: false })
+        const tx = await makeTxBuilder({ isMainnet: false })
             .spendUnsafe(input1)
             .payUnsafe(wallet2, 10_000_000n)
             .build({ changeAddress: wallet1 })

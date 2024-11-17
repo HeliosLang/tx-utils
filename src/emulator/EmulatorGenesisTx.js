@@ -10,13 +10,24 @@ import {
 } from "@helios-lang/ledger"
 
 /**
- * @typedef {import("./EmulatorTx.js").EmulatorTx} EmulatorTx
+ * @import { EmulatorGenesisTx } from "src/index.js"
  */
 
 /**
- * @implements {EmulatorTx}
+ * @param {number} id
+ * @param {Address} address
+ * @param {bigint} lovelace
+ * @param {Assets} assets
+ * @returns {EmulatorGenesisTx}
  */
-export class GenesisTx {
+export function makeEmulatorGenesisTx(id, address, lovelace, assets) {
+    return new EmulatorGenesisTxImpl(id, address, lovelace, assets)
+}
+
+/**
+ * @implements {EmulatorGenesisTx}
+ */
+class EmulatorGenesisTxImpl {
     #id
     #address
     #lovelace
@@ -33,6 +44,13 @@ export class GenesisTx {
         this.#address = address
         this.#lovelace = lovelace
         this.#assets = assets
+    }
+
+    /**
+     * @type {"Genesis"}
+     */
+    get kind() {
+        return "Genesis"
     }
 
     /**
@@ -85,11 +103,11 @@ export class GenesisTx {
 
     /**
      * @param {TxOutputId} id
-     * @returns {null | TxInput}
+     * @returns {TxInput | undefined}
      */
     getUtxo(id) {
         if (!(this.id().isEqual(id.txId) && id.utxoIdx == 0)) {
-            return null
+            return undefined
         }
 
         return new TxInput(
@@ -120,6 +138,9 @@ export class GenesisTx {
         return []
     }
 
+    /**
+     * @returns {void}
+     */
     dump() {
         console.log("GENESIS TX")
         console.log(

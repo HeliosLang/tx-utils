@@ -1,52 +1,51 @@
 import {
     Address,
+    Tx,
+    TxId,
     TxInput,
     TxOutput,
     TxOutputId,
     Value
 } from "@helios-lang/ledger"
 import { selectSmallestFirst } from "../coinselection/index.js"
-import { None } from "@helios-lang/type-utils"
 
 /**
- * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
- * @typedef {import("./Network.js").ReadonlyNetwork} ReadonlyNetwork
+ * @import { NetworkParams } from "@helios-lang/ledger"
+ * @import { CardanoClient, CardanoClientHelper, CardanoClientHelperOptions, CoinSelection, ReadonlyCardanoClient } from "src/index.js"
  */
 
 /**
- * @template CSpending
- * @template CStaking
- * @typedef {import("../coinselection/index.js").CoinSelection<CSpending, CStaking>} CoinSelection
+ * @template {ReadonlyCardanoClient} C
+ * @param {C} client
+ * @returns {CardanoClientHelper<C>}
  */
+export function makeCardanoClientHelper(client) {
+    return new CardanoClientHelperImpl(client)
+}
 
 /**
- * @typedef {{
- *   onSelectUtxoFail?: (address: Address, value: Value) => Promise<void>
- * }} NetworkHelperOptions
+ * @template {ReadonlyCardanoClient} C
+ * @implements {CardanoClientHelper<C>}
  */
-
-/**
- * @implements {ReadonlyNetwork}
- */
-export class NetworkHelper {
+class CardanoClientHelperImpl {
     /**
      * @readonly
-     * @type {ReadonlyNetwork}
+     * @type {C}
      */
-    network
+    client
 
     /**
      * @readonly
-     * @type {NetworkHelperOptions}
+     * @type {CardanoClientHelperOptions}
      */
     options
 
     /**
-     * @param {ReadonlyNetwork} network
-     * @param {NetworkHelperOptions} options
+     * @param {C} client
+     * @param {CardanoClientHelperOptions} options
      */
-    constructor(network, options = {}) {
-        this.network = network
+    constructor(client, options = {}) {
+        this.client = client
         this.options = options
     }
 
@@ -54,21 +53,21 @@ export class NetworkHelper {
      * @type {number}
      */
     get now() {
-        return this.network.now
+        return this.client.now
     }
 
     /**
      * @type {Promise<NetworkParams>}
      */
     get parameters() {
-        return this.network.parameters
+        return this.client.parameters
     }
 
     /**
      * @returns {boolean}
      */
     isMainnet() {
-        return this.network.isMainnet()
+        return this.client.isMainnet()
     }
 
     /**
@@ -83,11 +82,11 @@ export class NetworkHelper {
      * @template [CSpending=unknown]
      * @template [CStaking=unknown]
      * @param {TxOutputId} id
-     * @param {Option<Address<CSpending, CStaking>>} address
+     * @param {Address<CSpending, CStaking> | undefined} address
      * @returns {Promise<TxInput<CSpending, CStaking>>}
      */
-    async getUtxo(id, address = None) {
-        const utxo = await this.network.getUtxo(id)
+    async getUtxo(id, address = undefined) {
+        const utxo = await this.client.getUtxo(id)
 
         if (address) {
             if (!utxo.address.isEqual(address)) {
@@ -117,7 +116,7 @@ export class NetworkHelper {
      * @returns {Promise<TxInput<CSpending, CStaking>[]>}
      */
     async getUtxos(address) {
-        const utxos = await this.network.getUtxos(address)
+        const utxos = await this.client.getUtxos(address)
 
         return utxos.map((utxo) => {
             return new TxInput(
@@ -193,4 +192,33 @@ export class NetworkHelper {
             coinSelection(utxos, value)[0]
         )
     }
+
+    /**
+     * @type {C extends CardanoClient ? (tx: Tx) => Promise<TxId> : never}
+     */
+    get submitTx() {
+        const c = this.client
+
+        if (isCardanoClient(c)) {
+            /**
+             * @param {Tx} tx
+             * @returns {Promise<TxId>}
+             */
+            const fn = async (tx) => {
+                return c.submitTx(tx)
+            }
+
+            return /** @type {any} */ (fn)
+        } else {
+            throw new Error("submitTx not available on ReadonlyCardanoClient")
+        }
+    }
+}
+
+/**
+ * @param {ReadonlyCardanoClient} c
+ * @returns {c is CardanoClient}
+ */
+function isCardanoClient(c) {
+    return "submitTx" in c
 }

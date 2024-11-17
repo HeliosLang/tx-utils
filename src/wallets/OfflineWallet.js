@@ -1,12 +1,10 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
 import { Address, StakingAddress, TxInput } from "@helios-lang/ledger"
+import { JSON, assert } from "@helios-lang/type-utils"
 import { isOfflineWalletJsonSafe } from "./OfflineWalletJsonSafe.js"
-import { assert } from "@helios-lang/type-utils"
 
 /**
- * @typedef {import("../network/Network.js").NetworkName} NetworkName
- * @typedef {import("./OfflineWalletJsonSafe.js").OfflineWalletJsonSafe} OfflineWalletJsonSafe
- * @typedef {import("./Wallet.js").ReadonlyWallet} ReadonlyWallet
+ * @import { OfflineWallet, OfflineWalletJsonSafe } from "src/index.js"
  */
 
 /**
@@ -21,9 +19,55 @@ import { assert } from "@helios-lang/type-utils"
  */
 
 /**
- * @implements {ReadonlyWallet}
+ * @param {object} props
+ * @param {boolean} props.isMainnet
+ * @param {(Address | string)[]} props.usedAddresses
+ * @param {(Address | string)[]} props.unusedAddresses
+ * @param {(TxInput | string)[]} props.utxos
+ * @param {(TxInput | string)[]} [props.collateral]
+ * @param {(StakingAddress | string)[]} [props.stakingAddresses]
+ * @returns {OfflineWallet}
  */
-export class OfflineWallet {
+export function makeOfflineWallet(props) {
+    return new OfflineWalletImpl({
+        isMainnet: props.isMainnet,
+        usedAddresses: props.usedAddresses.map((addr) =>
+            typeof addr == "string" ? Address.fromBech32(addr) : addr
+        ),
+        unusedAddresses: props.unusedAddresses.map((addr) =>
+            typeof addr == "string" ? Address.fromBech32(addr) : addr
+        ),
+        utxos: props.utxos.map((utxo) =>
+            typeof utxo == "string" ? TxInput.fromCbor(utxo) : utxo
+        ),
+        collateral: props.collateral?.map((utxo) =>
+            typeof utxo == "string" ? TxInput.fromCbor(utxo) : utxo
+        ),
+        stakingAddresses: props.stakingAddresses?.map((addr) =>
+            typeof addr == "string" ? StakingAddress.fromBech32(addr) : addr
+        )
+    })
+}
+
+/**
+ * Throws an error if the input doesn't have the correct format.
+ * @param {string | JsonSafe} json
+ * @returns {OfflineWallet}
+ */
+export function parseOfflineWallet(json) {
+    if (typeof json == "string") {
+        return parseOfflineWallet(JSON.parse(json))
+    } else if (isOfflineWalletJsonSafe(json)) {
+        return makeOfflineWallet(json)
+    } else {
+        throw new Error("invalid format")
+    }
+}
+
+/**
+ * @implements {OfflineWallet}
+ */
+class OfflineWalletImpl {
     /**
      * @readonly
      * @type {boolean}
@@ -77,30 +121,6 @@ export class OfflineWallet {
         this.utxosSync = utxos
         this.collateralSync = collateral
         this.stakingAddressesSync = stakingAddresses
-    }
-
-    /**
-     * Throws an error if the input is invalid
-     * @param {string | JsonSafe} input
-     * @returns {OfflineWallet}
-     */
-    static fromJson(input) {
-        if (typeof input == "string") {
-            return OfflineWallet.fromJson(JSON.parse(input))
-        } else {
-            assert(input, isOfflineWalletJsonSafe)
-
-            return new OfflineWallet({
-                isMainnet: input.isMainnet,
-                usedAddresses: input.usedAddresses.map(Address.fromBech32),
-                unusedAddresses: input.unusedAddresses.map(Address.fromBech32),
-                utxos: input.utxos.map(TxInput.fromCbor),
-                collateral: input.collateral?.map(TxInput.fromCbor),
-                stakingAddresses: input.stakingAddresses?.map(
-                    StakingAddress.fromBech32
-                )
-            })
-        }
     }
 
     /**

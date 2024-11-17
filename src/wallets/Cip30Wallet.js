@@ -10,15 +10,21 @@ import {
 } from "@helios-lang/ledger"
 
 /**
- * @typedef {import("./Cip30Handle.js").Cip30FullHandle} Cip30FullHandle
- * @typedef {import("./Wallet.js").Wallet} Wallet
+ * @import { Cip30FullHandle, Cip30Wallet } from "src/index.js"
  */
 
 /**
- * Implementation of `Wallet` that lets you connect to a browser plugin wallet.
- * @implements {Wallet}
+ * @param {Cip30FullHandle} handle
+ * @returns {Cip30Wallet}
  */
-export class Cip30Wallet {
+export function makeCip30Wallet(handle) {
+    return new Cip30WalletImpl(handle)
+}
+
+/**
+ * @implements {Cip30Wallet}
+ */
+class Cip30WalletImpl {
     /**
      * @readonly
      * @type {Cip30FullHandle}

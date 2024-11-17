@@ -1,3 +1,4 @@
+import { mulberry32 } from "@helios-lang/crypto"
 import {
     Address,
     PubKey,
@@ -9,31 +10,89 @@ import {
     TxInput
 } from "@helios-lang/ledger"
 import {
-    Bip32PrivateKey,
     BIP39_DICT_EN,
-    RootPrivateKey
+    restoreRootPrivateKey,
+    makeRandomRootPrivateKey
 } from "../keys/index.js"
-import { None } from "@helios-lang/type-utils"
-import { mulberry32 } from "@helios-lang/crypto"
 
 /**
- * @typedef {import("@helios-lang/crypto").NumberGenerator} NumberGenerator
- * @typedef {import("../network/Network.js").Network} Network
- * @typedef {import("../network/Network.js").NetworkName} NetworkName
- * @typedef {import("./Wallet.js").Wallet} Wallet
+ * @import { NumberGenerator } from "@helios-lang/crypto"
+ * @import { Bip32PrivateKey, CardanoClient, RootPrivateKey, SimpleWallet } from "src/index.js"
  */
+
+/**
+ * @overload
+ * @param {RootPrivateKey} key
+ * @param {CardanoClient} cardanoClient
+ * @returns {SimpleWallet}
+ *
+ * @overload
+ * @param {Bip32PrivateKey} spendingPrivateKey
+ * @param {Bip32PrivateKey | undefined} stakingPrivateKey
+ * @param {CardanoClient} cardanoClient
+ * @returns {SimpleWallet}
+ *
+ * @param {(
+ *   [RootPrivateKey, CardanoClient]
+ *   | [Bip32PrivateKey, Bip32PrivateKey | undefined, CardanoClient]
+ * )} args
+ * @returns {SimpleWallet}
+ */
+export function makeSimpleWallet(...args) {
+    if (args.length == 2) {
+        const [key, client] = args
+
+        return new SimpleWalletImpl(
+            key.deriveSpendingKey(),
+            key.deriveStakingKey(),
+            client
+        )
+    } else if (args.length == 3) {
+        return new SimpleWalletImpl(...args)
+    } else {
+        throw new Error("invalid number of arguments to makeSimpleWallet")
+    }
+}
+
+/**
+ * @param {CardanoClient} cardanoClient
+ * @param {NumberGenerator} rand
+ * @returns {SimpleWallet}
+ */
+export function makeRandomSimpleWallet(
+    cardanoClient,
+    rand = mulberry32(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
+) {
+    const key = makeRandomRootPrivateKey(rand)
+
+    return makeSimpleWallet(key, cardanoClient)
+}
+
+/**
+ * @param {string[]} phrase
+ * @param {CardanoClient} cardanoClient
+ * @param {string[]} dict
+ * @returns {SimpleWallet}
+ */
+export function restoreSimpleWallet(
+    phrase,
+    cardanoClient,
+    dict = BIP39_DICT_EN
+) {
+    return makeSimpleWallet(restoreRootPrivateKey(phrase, dict), cardanoClient)
+}
 
 /**
  * This wallet only has a single private/public key, which isn't rotated. Staking is not yet supported.
  * Requires a network interface
- * @implements {Wallet}
+ * @implements {SimpleWallet}
  */
-export class SimpleWallet {
+class SimpleWalletImpl {
     /**
      * @readonly
-     * @type {Network}
+     * @type {CardanoClient}
      */
-    network
+    cardanoClient
 
     /**
      * @readonly
@@ -49,17 +108,17 @@ export class SimpleWallet {
 
     /**
      * @readonly
-     * @type {Option<PubKey>}
+     * @type {PubKey | undefined}
      */
     stakingPubKey
 
     /**
      * @param {Bip32PrivateKey} spendingPrivateKey
-     * @param {Option<Bip32PrivateKey>} stakingPrivateKey
-     * @param {Network} network
+     * @param {Bip32PrivateKey | undefined} stakingPrivateKey
+     * @param {CardanoClient} network
      */
     constructor(spendingPrivateKey, stakingPrivateKey, network) {
-        this.network = network
+        this.cardanoClient = network
         this.spendingPrivateKey = spendingPrivateKey
         this.stakingPrivateKey = stakingPrivateKey
         this.spendingPubKey = this.spendingPrivateKey.derivePubKey()
@@ -67,51 +126,11 @@ export class SimpleWallet {
     }
 
     /**
-     * @param {string[]} phrase
-     * @param {Network} network
-     * @param {string[]} dict
-     * @returns {SimpleWallet}
-     */
-    static fromPhrase(phrase, network, dict = BIP39_DICT_EN) {
-        return SimpleWallet.fromRootPrivateKey(
-            RootPrivateKey.fromPhrase(phrase, dict),
-            network
-        )
-    }
-
-    /**
-     * @param {RootPrivateKey} key
-     * @param {Network} network
-     * @returns {SimpleWallet}
-     */
-    static fromRootPrivateKey(key, network) {
-        return new SimpleWallet(
-            key.deriveSpendingKey(),
-            key.deriveStakingKey(),
-            network
-        )
-    }
-
-    /**
-     * @param {Network} network
-     * @param {NumberGenerator} rand - the default random number generator IS NOT cryptographically secure
-     * @returns {SimpleWallet}
-     */
-    static random(
-        network,
-        rand = mulberry32(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
-    ) {
-        const key = RootPrivateKey.random(rand)
-
-        return SimpleWallet.fromRootPrivateKey(key, network)
-    }
-
-    /**
      * @type {Address}
      */
     get address() {
         return Address.fromHashes(
-            this.network.isMainnet(),
+            this.cardanoClient.isMainnet(),
             this.spendingPubKeyHash,
             this.stakingPubKeyHash
         )
@@ -135,16 +154,16 @@ export class SimpleWallet {
     }
 
     /**
-     * @type {Option<StakingAddress>}
+     * @type {StakingAddress | undefined}
      */
     get stakingAddress() {
         if (this.stakingPubKey) {
             return StakingAddress.fromHash(
-                this.network.isMainnet(),
+                this.cardanoClient.isMainnet(),
                 this.stakingPubKey.toHash()
             )
         } else {
-            return None
+            return undefined
         }
     }
 
@@ -160,7 +179,7 @@ export class SimpleWallet {
     }
 
     /**
-     * @type {Option<PubKeyHash>}
+     * @type {PubKeyHash | undefined}
      */
     get stakingPubKeyHash() {
         return this.stakingPubKey?.toHash()
@@ -190,7 +209,7 @@ export class SimpleWallet {
      */
     get utxos() {
         return new Promise((resolve, _) => {
-            resolve(this.network.getUtxos(this.address))
+            resolve(this.cardanoClient.getUtxos(this.address))
         })
     }
 
@@ -198,7 +217,7 @@ export class SimpleWallet {
      * @returns {Promise<boolean>}
      */
     async isMainnet() {
-        return this.network.isMainnet()
+        return this.cardanoClient.isMainnet()
     }
 
     /**
@@ -225,6 +244,6 @@ export class SimpleWallet {
      * @returns {Promise<TxId>}
      */
     async submitTx(tx) {
-        return await this.network.submitTx(tx)
+        return await this.cardanoClient.submitTx(tx)
     }
 }

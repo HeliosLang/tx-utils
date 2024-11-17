@@ -1,5 +1,5 @@
 import { describe, it } from "node:test"
-import { TxSummary, isTxSummaryJsonSafe } from "./TxSummary.js"
+import { makeTxSummary, isTxSummaryJsonSafe } from "./TxSummary.js"
 import {
     Address,
     TxId,
@@ -63,7 +63,7 @@ describe(isTxSummaryJsonSafe.name, () => {
     })
 })
 
-describe(TxSummary.name, () => {
+describe("TxSummary", () => {
     it("superimpose ignores utxos that have already been included", () => {
         const utxos = [
             new TxInput(
@@ -72,7 +72,7 @@ describe(TxSummary.name, () => {
             )
         ]
 
-        const summary = new TxSummary({
+        const summary = makeTxSummary({
             id: TxId.dummy(),
             inputs: [],
             outputs: [

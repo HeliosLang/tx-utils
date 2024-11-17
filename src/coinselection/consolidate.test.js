@@ -1,5 +1,5 @@
+import { strictEqual } from "node:assert"
 import { describe, it } from "node:test"
-import { consolidate } from "./consolidate.js"
 import {
     Address,
     AssetClass,
@@ -8,7 +8,7 @@ import {
     TxOutputId,
     Value
 } from "@helios-lang/ledger"
-import { strictEqual, throws } from "node:assert"
+import { consolidate } from "./consolidate.js"
 
 const MARKER = AssetClass.new(
     "f643c8c300085984c09d5a2d7f5b45fd2d5921cbd1512c972981402b.38"

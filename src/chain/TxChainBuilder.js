@@ -1,21 +1,29 @@
 import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
-import { expectSome } from "@helios-lang/type-utils"
-import { TxChain } from "./TxChain.js"
+import { expectDefined } from "@helios-lang/type-utils"
+import { makeTxChain } from "./TxChain.js"
 
 /**
- * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
- * @typedef {import("../network/index.js").Network} Network
- * @typedef {import("../network/index.js").ReadonlyNetwork} ReadonlyNetwork
+ * @import { NetworkParams } from "@helios-lang/ledger"
+ * @import { ReadonlyCardanoClient, TxChain, TxChainBuilder } from "src/index.js"
  */
 
 /**
- * @implements {Network}
+ *
+ * @param {ReadonlyCardanoClient} source
+ * @returns {TxChainBuilder}
  */
-export class TxChainBuilder {
+export function makeTxChainBuilder(source) {
+    return new TxChainBuilderImpl(source)
+}
+
+/**
+ * @implements {TxChainBuilder}
+ */
+class TxChainBuilderImpl {
     /**
      * @private
      * @readonly
-     * @type {ReadonlyNetwork}
+     * @type {ReadonlyCardanoClient}
      */
     source
 
@@ -27,7 +35,7 @@ export class TxChainBuilder {
     txs
 
     /**
-     * @param {ReadonlyNetwork} source
+     * @param {ReadonlyCardanoClient} source
      */
     constructor(source) {
         this.source = source
@@ -51,7 +59,7 @@ export class TxChainBuilder {
      * @returns {TxChain}
      */
     build() {
-        return new TxChain(this.txs)
+        return makeTxChain(this.txs)
     }
 
     /**
@@ -63,7 +71,7 @@ export class TxChainBuilder {
             const tx = this.txs[i]
 
             if (tx.id().isEqual(id.txId)) {
-                const output = expectSome(tx.body.outputs[id.utxoIdx])
+                const output = expectDefined(tx.body.outputs[id.utxoIdx])
 
                 return new TxInput(id, output)
             }
@@ -79,7 +87,7 @@ export class TxChainBuilder {
     async getUtxos(addr) {
         let utxos = await this.source.getUtxos(addr)
 
-        const chain = new TxChain(this.txs)
+        const chain = makeTxChain(this.txs)
 
         const chainInputs = chain.collectInputs(false, false)
         const chainOutputs = chain.collectOutputs()

@@ -1,9 +1,9 @@
 import { describe, it } from "node:test"
-import { Bip32PrivateKey } from "./Bip32PrivateKey.js"
+import { makeBip32PrivateKey } from "./Bip32PrivateKey.js"
 import { deepEqual } from "node:assert"
 import { encodeUtf8 } from "@helios-lang/codec-utils"
 
-describe(Bip32PrivateKey.name, () => {
+describe("Bip32PrivateKey", () => {
     it('correctly signs "Hello World"', () => {
         const bytes = [
             0x60, 0xd3, 0x99, 0xda, 0x83, 0xef, 0x80, 0xd8, 0xd4, 0xf8, 0xd2,
@@ -25,7 +25,7 @@ describe(Bip32PrivateKey.name, () => {
             0xfa, 0x7a, 0x34, 0xea, 0x20, 0x46, 0xd4, 0xbe, 0x04
         ]
 
-        const key = new Bip32PrivateKey(bytes)
+        const key = makeBip32PrivateKey(bytes)
 
         deepEqual(key.sign(encodeUtf8("Hello World")).bytes, expectedSignature)
     })

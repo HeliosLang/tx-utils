@@ -1,25 +1,54 @@
-import { BitWriter, padBits } from "@helios-lang/codec-utils"
-import { generateBytes, mulberry32, sha2_256 } from "@helios-lang/crypto"
+import { generateBytes, mulberry32 } from "@helios-lang/crypto"
 import { PubKey, Signature } from "@helios-lang/ledger"
-import { isNone } from "@helios-lang/type-utils"
-import { Bip32PrivateKey, BIP32_HARDEN } from "./Bip32PrivateKey.js"
+import {
+    BIP32_HARDEN,
+    makeBip32PrivateKeyWithBip39Entropy
+} from "./Bip32PrivateKey.js"
 import {
     BIP39_DICT_EN,
     convertBip39PhraseToEntropy,
-    convertEntropyToBip39Phrase,
-    isValidBip39Phrase
+    convertEntropyToBip39Phrase
 } from "./bip39.js"
 
 /**
- * @typedef {import("@helios-lang/crypto").NumberGenerator} NumberGenerator
- * @typedef {import("./PrivateKey.js").PrivateKey} PrivateKey
+ * @import { NumberGenerator } from "@helios-lang/crypto"
+ * @import { Bip32PrivateKey, RootPrivateKey } from "src/index.js"
  */
 
 /**
- * With a RootPrivateKey any large number of Bip32PrivateKeys can be generated
- * @implements {PrivateKey}
+ * @param {number[]} entropy
+ * @returns {RootPrivateKey}
  */
-export class RootPrivateKey {
+export function makeRootPrivateKey(entropy) {
+    return new RootPrivateKeyImpl(entropy)
+}
+
+/**
+ * @param {string[]} phrase
+ * @param {string[]} dict
+ * @returns {RootPrivateKey}
+ */
+export function restoreRootPrivateKey(phrase, dict = BIP39_DICT_EN) {
+    const entropy = convertBip39PhraseToEntropy(phrase, dict)
+    return new RootPrivateKeyImpl(entropy)
+}
+
+/**
+ * @param {NumberGenerator} rand
+ * @returns {RootPrivateKey}
+ */
+export function makeRandomRootPrivateKey(
+    rand = mulberry32(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
+) {
+    const entropy = generateBytes(rand, 32)
+    return new RootPrivateKeyImpl(entropy)
+}
+
+/**
+ * With a RootPrivateKey any large number of Bip32PrivateKeys can be generated
+ * @implements {RootPrivateKey}
+ */
+class RootPrivateKeyImpl {
     /**
      * @readonly
      * @type {number[]}
@@ -51,7 +80,7 @@ export class RootPrivateKey {
         }
 
         this.entropy = entropy
-        this.bip32Key = Bip32PrivateKey.fromBip39Entropy(entropy)
+        this.bip32Key = makeBip32PrivateKeyWithBip39Entropy(entropy)
     }
 
     /**
@@ -62,18 +91,7 @@ export class RootPrivateKey {
     static fromPhrase(phrase, dict = BIP39_DICT_EN) {
         const entropy = convertBip39PhraseToEntropy(phrase, dict)
 
-        return new RootPrivateKey(entropy)
-    }
-
-    /**
-     * @param {NumberGenerator} rand - the default random number generator is not cryptographically secure
-     * @returns {RootPrivateKey}
-     */
-    static random(
-        rand = mulberry32(Math.floor(Math.random() * Number.MAX_SAFE_INTEGER))
-    ) {
-        const entropy = generateBytes(rand, 32)
-        return new RootPrivateKey(entropy)
+        return new RootPrivateKeyImpl(entropy)
     }
 
     /**
@@ -116,7 +134,7 @@ export class RootPrivateKey {
      * @param {number} accountIndex
      * @returns {Bip32PrivateKey}
      */
-    deriveStakingRootKey(accountIndex) {
+    deriveStakingRootKey(accountIndex = 0) {
         return this.derivePath([
             1852 + BIP32_HARDEN,
             1815 + BIP32_HARDEN,

@@ -3,33 +3,39 @@ import {
     Address,
     Assets,
     DEFAULT_NETWORK_PARAMS,
-    NetworkParamsHelper,
     Tx,
     TxId,
     TxInput,
     TxOutputId
 } from "@helios-lang/ledger"
-import { RootPrivateKey } from "../keys/index.js"
-import { SimpleWallet } from "../wallets/index.js"
-import { GenesisTx } from "./GenesisTx.js"
-import { RegularTx } from "./RegularTx.js"
 import { SECOND } from "../duration/index.js"
+import { makeRootPrivateKey } from "../keys/index.js"
+import { makeSimpleWallet } from "../wallets/index.js"
+import { makeEmulatorGenesisTx } from "./EmulatorGenesisTx.js"
+import { makeEmulatorRegularTx } from "./EmulatorRegularTx.js"
 
 /**
- * @typedef {import("@helios-lang/codec-utils").IntLike} IntLike
- * @typedef {import("@helios-lang/crypto").NumberGenerator} NumberGenerator
- * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
- * @typedef {import("../network/Network.js").Network} Network
- * @typedef {import("./EmulatorTx.js").EmulatorTx} EmulatorTx
+ * @import { IntLike } from "@helios-lang/codec-utils"
+ * @import { NumberGenerator } from "@helios-lang/crypto"
+ * @import { NetworkParams } from "@helios-lang/ledger"
+ * @import { Emulator, EmulatorTx, EmulatorGenesisTx, SimpleWallet } from "src/index.js"
  */
+
+/**
+ * @param {number} seed
+ * @returns {Emulator}
+ */
+export function makeEmulator(seed = 0) {
+    return new EmulatorImpl(seed)
+}
 
 /**
  * A simple emulated Network.
  * This can be used to do integration tests of whole dApps.
  * Staking is not yet supported.
- * @implements {Network}
+ * @implements {Emulator}
  */
-export class Emulator {
+class EmulatorImpl {
     /**
      * @type {number}
      */
@@ -42,7 +48,7 @@ export class Emulator {
     _random
 
     /**
-     * @type {GenesisTx[]}
+     * @type {EmulatorGenesisTx[]}
      */
     genesis
 
@@ -135,7 +141,7 @@ export class Emulator {
         // TODO: the current approach is very slow, use a snapshot
         for (let block of this.blocks) {
             for (let tx of block) {
-                if (tx instanceof RegularTx) {
+                if (tx.kind == "Regular") {
                     res.push(tx.id())
                 }
             }
@@ -152,8 +158,8 @@ export class Emulator {
      * @returns {SimpleWallet}
      */
     createWallet(lovelace = 0n, assets = new Assets([])) {
-        const rootKey = new RootPrivateKey(generateBytes(this._random, 32))
-        const wallet = SimpleWallet.fromRootPrivateKey(rootKey, this)
+        const rootKey = makeRootPrivateKey(generateBytes(this._random, 32))
+        const wallet = makeSimpleWallet(rootKey, this)
 
         this.createUtxo(wallet, lovelace, assets)
 
@@ -168,7 +174,7 @@ export class Emulator {
      * @returns {TxOutputId}
      */
     createUtxo(wallet, lovelace, assets = new Assets([])) {
-        const tx = new GenesisTx(
+        const tx = makeEmulatorGenesisTx(
             this.genesis.length,
             wallet.address,
             lovelace,
@@ -181,6 +187,9 @@ export class Emulator {
         return new TxOutputId(tx.id(), 0)
     }
 
+    /**
+     * @returns {void}
+     */
     dump() {
         console.log(`${this.blocks.length} BLOCKS`)
         this.blocks.forEach((block, i) => {
@@ -274,7 +283,7 @@ export class Emulator {
             throw new Error("input already consumed before")
         }
 
-        this.mempool.push(new RegularTx(tx))
+        this.mempool.push(makeEmulatorRegularTx(tx))
 
         return tx.id()
     }
@@ -297,6 +306,9 @@ export class Emulator {
         this.currentSlot += Number(nSlots)
     }
 
+    /**
+     * @private
+     */
     warnMempool() {
         if (this.mempool.length > 0) {
             console.error(

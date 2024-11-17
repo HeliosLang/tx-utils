@@ -21,8 +21,8 @@ importers:
         specifier: ^0.1.5
         version: 0.1.5
       '@helios-lang/type-utils':
-        specifier: ^0.1.25
-        version: 0.1.25
+        specifier: ^0.2.8
+        version: 0.2.8
       '@helios-lang/uplc':
         specifier: ^0.6.1
         version: 0.6.1
@@ -74,6 +74,9 @@ packages:
 
   '@helios-lang/type-utils@0.1.25':
     resolution: {integrity: sha512-tOqyBWtaI6n/xhfaZr8cnL+Syv0X5whbxpzPLayfDwllI9el54fQ4P4e8CUUm2ls8WNSAgC9razCd2Q3qnMwlA==}
+
+  '@helios-lang/type-utils@0.2.8':
+    resolution: {integrity: sha512-ldtxPIZbE2TbbiFvvTqgiHng1uWmZj0w8z4yMMxPH79R+qt+romAOOmUXVdAN6YM2cA3yiE4lRlRpyGlVEQNMw==}
 
   '@helios-lang/uplc@0.6.1':
     resolution: {integrity: sha512-6edSDD3zQ1suOudu9bs5hhCn/tu3bYt+/NpNT0rsuduYcnRrXABX5fGIXBPA34m+g5FJ/1XeO8MStreJTGpZDA==}
@@ -159,6 +162,8 @@ snapshots:
       '@helios-lang/ledger-conway': 0.2.14
 
   '@helios-lang/type-utils@0.1.25': {}
+
+  '@helios-lang/type-utils@0.2.8': {}
 
   '@helios-lang/uplc@0.6.1':
     dependencies:

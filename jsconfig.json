@@ -1,5 +1,9 @@
 {
     "compilerOptions": {
+        "baseUrl": "./",
+        "paths": {
+            "src": ["./src"]
+        },
         "checkJs": true,
         "declaration": true,
         "declarationMap": true,

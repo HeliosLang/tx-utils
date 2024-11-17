@@ -1,6 +1,21 @@
 import { Tx, TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
 
-export class TxChain {
+/**
+ * @import { TxChain } from "src/index.js"
+ */
+
+/**
+ * @param {Tx[]} txs
+ * @returns {TxChain}
+ */
+export function makeTxChain(txs) {
+    return new TxChainImpl(txs)
+}
+
+/**
+ * @implements {TxChain}
+ */
+class TxChainImpl {
     /**
      * @readonly
      * @type {Tx[]}

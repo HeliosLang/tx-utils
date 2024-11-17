@@ -1,10 +1,8 @@
-/**
- * @template CSpending
- * @template CStaking
- * @typedef {import("./CoinSelection.js").CoinSelection<CSpending, CStaking>} CoinSelection
- */
-
 import { TxInput, Value } from "@helios-lang/ledger"
+
+/**
+ * @import { CoinSelection } from "src/index.js"
+ */
 
 /**
  * @template CSpending

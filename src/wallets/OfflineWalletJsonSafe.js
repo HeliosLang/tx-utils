@@ -1,28 +1,5 @@
-/**
- * @typedef {import("@helios-lang/type-utils").NotifyOnFalse} NotifyOnFalse
- */
-
-/**
- * OfflineWalletJsonSafe is useful when building transactions remotely as it can be (de)serialized using JSON.parse/JSON.stringify:
- *   - isMainnet
- *   - usedAddresses: array of bech32 encoded `Address`es
- *   - unusedAddresses: array of bech32 encoded `Address`es
- *   - utxos: array of cborhex encoded `TxInput`s (full cbor encoding)
- *   - collateral: optional array of cborhex encoded `TxInput`s (full cbor encoding)
- *   - stakingAddresses: array of bech32 encoded `StakingAddress`es
- * @typedef {{
- *   isMainnet: boolean
- *   usedAddresses: string[]
- *   unusedAddresses: string[]
- *   utxos: string[]
- *   collateral?: string[]
- *   stakingAddresses?: string[]
- * }} OfflineWalletJsonSafe
- */
-
 import { Address, StakingAddress, TxInput } from "@helios-lang/ledger"
 import {
-    None,
     assert,
     expect,
     isArray,
@@ -32,19 +9,9 @@ import {
 } from "@helios-lang/type-utils"
 
 /**
- * @param {unknown} input
- * @param {string} msg
- * @returns {asserts input is string[]}
+ * @import { NotifyOnFalse } from "@helios-lang/type-utils"
+ * @import { OfflineWalletJsonSafe } from "src/index.js"
  */
-function expectStringArray(input, msg) {
-    if (!Array.isArray(input)) {
-        throw new TypeError(msg)
-    }
-
-    if (!input.every((item) => typeof item == "string")) {
-        throw new TypeError(msg)
-    }
-}
 
 /**
  * Asserts the content of input
@@ -96,18 +63,18 @@ export function isOfflineWalletJsonSafe(input, onFalse = undefined) {
 
 /**
  * @param {unknown} input
- * @param {Option<string>} msg
+ * @param {string | undefined} msg
  * @returns {asserts input is OfflineWalletJsonSafe}
  */
-export function assertOfflineWalletJsonSafe(input, msg = None) {
+export function assertOfflineWalletJsonSafe(input, msg = undefined) {
     return assert(input, isOfflineWalletJsonSafe, msg ?? undefined)
 }
 
 /**
  * @param {unknown} input
- * @param {Option<string>} msg
+ * @param {string | undefined} msg
  * @returns {OfflineWalletJsonSafe}
  */
-export function expectOfflineWalletJsonSafe(input, msg = None) {
+export function expectOfflineWalletJsonSafe(input, msg = undefined) {
     return expect(input, isOfflineWalletJsonSafe, msg ?? undefined)
 }

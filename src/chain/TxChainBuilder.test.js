@@ -1,3 +1,4 @@
+import { strictEqual } from "node:assert"
 import { describe, it } from "node:test"
 import { encodeUtf8 } from "@helios-lang/codec-utils"
 import {
@@ -7,25 +8,24 @@ import {
     MintingPolicyHash,
     TokenValue
 } from "@helios-lang/ledger"
-import { Emulator } from "../emulator/index.js"
-import { TxBuilder } from "../txbuilder/index.js"
-import { WalletHelper } from "../wallets/index.js"
-import { TxChainBuilder } from "./TxChainBuilder.js"
-import { strictEqual } from "node:assert"
-import { NetworkHelper } from "../network/index.js"
+import { makeCardanoClientHelper } from "../clients/index.js"
+import { makeEmulator } from "../emulator/index.js"
+import { makeTxBuilder } from "../txbuilder/index.js"
+import { makeWalletHelper } from "../wallets/index.js"
+import { makeTxChainBuilder } from "./TxChainBuilder.js"
 
-describe(TxChainBuilder.name, async () => {
+describe("TxChainBuilder", async () => {
     it("second transaction uses utxo from first transaction", async () => {
         const mph = new MintingPolicyHash(new Array(28).fill(0))
         const tokenName = encodeUtf8("hello world")
         const assetClass = new AssetClass(mph, tokenName)
         const token = new TokenValue(assetClass, 1n)
 
-        const emulator = new Emulator()
-        const chain = new TxChainBuilder(emulator)
-        const helper = new NetworkHelper(chain)
+        const emulator = makeEmulator()
+        const chain = makeTxChainBuilder(emulator)
+        const helper = makeCardanoClientHelper(chain)
 
-        const wallet1 = new WalletHelper(
+        const wallet1 = makeWalletHelper(
             emulator.createWallet(
                 100_000_000n,
                 new Assets([[mph, [[tokenName, 1]]]])
@@ -34,7 +34,7 @@ describe(TxChainBuilder.name, async () => {
         )
         const wallet1Addr = await wallet1.changeAddress
 
-        const wallet2 = new WalletHelper(
+        const wallet2 = makeWalletHelper(
             emulator.createWallet(200_000_000n),
             chain
         )
@@ -49,9 +49,9 @@ describe(TxChainBuilder.name, async () => {
         )
 
         // tx1: send token from wallet1 to wallet2
-        const tx1 = await new TxBuilder({ isMainnet: false })
-            .spend(await wallet1.selectUtxo(token))
-            .pay(wallet2Addr, token)
+        const tx1 = await makeTxBuilder({ isMainnet: false })
+            .spendWithoutRedeemer(await wallet1.selectUtxo(token))
+            .payWithoutDatum(wallet2Addr, token)
             .build({
                 changeAddress: wallet1Addr,
                 networkParams: DEFAULT_NETWORK_PARAMS()
@@ -60,9 +60,9 @@ describe(TxChainBuilder.name, async () => {
         chain.with(tx1)
 
         // tx2: send token back to wallet1
-        const tx2 = await new TxBuilder({ isMainnet: false })
-            .spend(await helper.selectUtxo(wallet2Addr, token))
-            .pay(wallet1Addr, token)
+        const tx2 = await makeTxBuilder({ isMainnet: false })
+            .spendWithoutRedeemer(await helper.selectUtxo(wallet2Addr, token))
+            .payWithoutDatum(wallet1Addr, token)
             .build({
                 changeAddress: wallet2Addr,
                 networkParams: DEFAULT_NETWORK_PARAMS(),

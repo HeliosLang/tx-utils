@@ -30,112 +30,43 @@ import {
     calcRefScriptsSize,
     StakingValidatorHash
 } from "@helios-lang/ledger"
-import {
-    None,
-    expectSome,
-    isLeft,
-    isNone,
-    isRight
-} from "@helios-lang/type-utils"
+import { expectDefined, isLeft, isRight, isUndefined } from "@helios-lang/type-utils"
 import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
 
 /**
- * @typedef {import("@helios-lang/codec-utils").BytesLike} BytesLike
- * @typedef {import("@helios-lang/codec-utils").IntLike} IntLike
- * @typedef {import("@helios-lang/ledger").AddressLike} AddressLike
- * @typedef {import("@helios-lang/ledger").AssetClassLike} AssetClassLike
- * @typedef {import("@helios-lang/ledger").PubKeyHashLike} PubKeyHashLike
- * @typedef {import("@helios-lang/ledger").MintingPolicyHashLike} MintingPolicyHashLike
- * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
- * @typedef {import("@helios-lang/ledger").StakingAddressLike} StakingAddressLike
- * @typedef {import("@helios-lang/ledger").TimeLike} TimeLike
- * @typedef {import("@helios-lang/ledger").TxInfo} TxInfo
- * @typedef {import("@helios-lang/ledger").TxMetadataAttr} TxMetadataAttr
- * @typedef {import("@helios-lang/ledger").ValueLike} ValueLike
- * @typedef {import("@helios-lang/uplc").CekResult} CekResult
- * @typedef {import("@helios-lang/uplc").Cost} Cost
- * @typedef {import("@helios-lang/uplc").UplcLoggingI} UplcLoggingI
- * @typedef {import("@helios-lang/uplc").UplcData} UplcData
- * @typedef {import("@helios-lang/uplc").UplcProgramV1I} UplcProgramV1I
- * @typedef {import("@helios-lang/uplc").UplcProgramV2I} UplcProgramV2I
- * @typedef {import("./RefScriptRegistry.js").ReadonlyRefScriptRegistry} ReadonlyRefScriptRegistry
+ * @import { BytesLike, IntLike } from "@helios-lang/codec-utils"
+ * @import { AddressLike, AssetClassLike, DatumPaymentContext, MintingContext, MintingPolicyHashLike, NetworkParams, PubKeyHashLike, SpendingContext, StakingAddressLike, StakingContext, TimeLike, TxInfo, TxMetadataAttr, TxOutputDatumCastable, ValueLike } from "@helios-lang/ledger"
+ * @import { CekResult, Cost, UplcLoggingI, UplcData, UplcProgramV1I, UplcProgramV2I } from "@helios-lang/uplc"
+ * @import { ExBudgetModifier, LazyRedeemerData, TxBuilder, TxBuilderConfig, TxBuilderFinalConfig } from "src/index.js"
  */
 
 /**
- * @template TDatumPermissive
- * @typedef {import("@helios-lang/ledger").DatumPaymentContext<TDatumPermissive>} DatumPaymentContext
- */
-
-/**
- * @template TRedeemerStrict
- * @template TRedeemerPermissive
- * @typedef {import("@helios-lang/ledger").MintingContext<TRedeemerStrict, TRedeemerPermissive>} MintingContext
- */
-
-/**
- * @template TDatumStrict
- * @template TDatumPermissive
- * @template TRedeemerStrict
- * @template TRedeemerPermissive
- * @typedef {import("@helios-lang/ledger").SpendingContext<TDatumStrict, TDatumPermissive, TRedeemerStrict, TRedeemerPermissive>} SpendingContext
- */
-
-/**
- * @template TRedeemerStrict
- * @template TRedeemerPermissive
- * @typedef {import("@helios-lang/ledger").StakingContext<TRedeemerStrict, TRedeemerPermissive>} StakingContext
- */
-
-/**
- * @template T
- * @typedef {import("@helios-lang/ledger").TxOutputDatumCastable<T>} TxOutputDatumCastable
- */
-
-/**
- * @template [T=UplcData]
- * @typedef {(tx?: TxInfo) => (T | Promise<T>)} LazyRedeemerData
- */
-
-/**
- * @typedef {{
- *   isMainnet: boolean
- *   refScriptRegistry?: Option<ReadonlyRefScriptRegistry>
- * }} TxBuilderConfig
- */
-
-/**
- * @typedef {(txInfo: TxInfo, purpose: string, index: number, fee: Cost) => Cost} ExBudgetModifier
- */
-/**
- * @typedef {{
- *   changeAddress: AddressLike | Promise<AddressLike>
- *   spareUtxos?: TxInput[] | Promise<TxInput[]>
- *   networkParams?: NetworkParams | Promise<NetworkParams>
- *   maxAssetsPerChangeOutput?: number
- *   logOptions?: UplcLoggingI
- *   throwBuildPhaseScriptErrors?: boolean
- *   beforeValidate?: (tx: Tx) => any | Promise<any>
- *   modifyExBudget?: ExBudgetModifier
- * }} TxBuilderFinalConfig
- */
-
-/**
- * @private
  * @typedef {Object} RedeemerExecContext
- * @property {bigint} fee
- * @property {Option<number>} firstValidSlot
- * @property {Option<number>} lastValidSlot
- * @property {boolean} [throwBuildPhaseScriptErrors] - if false, script errors will be thrown only during validate phase of the build.  Default is true for build(), false for buildUnsafe()
- * @property {UplcLoggingI} [logOptions] - an externally-provided logger
- * @property {NetworkParams} networkParams
- * @property {ExBudgetModifier} [modifyExBudget]
+ * @prop {bigint} fee
+ * @prop {number | undefined} firstValidSlot
+ * @prop {number | undefined} lastValidSlot
+ * @prop {boolean} [throwBuildPhaseScriptErrors] - if false, script errors will be thrown only during validate phase of the build.  Default is true for build(), false for buildUnsafe()
+ * @prop {UplcLoggingI} [logOptions] - an externally-provided logger
+ * @prop {NetworkParams} networkParams
+ * @prop {ExBudgetModifier} [modifyExBudget]
  */
+
 /**
- * @private
  * @typedef {RedeemerExecContext & {txInfo: TxInfo;}} RedeemerBuildContext
  */
 
-export class TxBuilder {
+/**
+ * @param {TxBuilderConfig} config
+ * @returns {TxBuilder}
+ */
+export function makeTxBuilder(config) {
+    return new TxBuilderImpl(config)
+}
+
+/**
+ * @implements {TxBuilder}
+ */
+class TxBuilderImpl {
     /**
      * @readonly
      * @type {TxBuilderConfig}
@@ -228,14 +159,14 @@ export class TxBuilder {
     /**
      * Upon finalization the slot is calculated and stored in the body
      * @private
-     * @type {Option<Either<{slot: number}, {timestamp: number}>>}
+     * @type {Either<{slot: number}, {timestamp: number}> | undefined}
      */
     validTo
 
     /**
      * Upon finalization the slot is calculated and stored in the body
      * @private
-     * @type {Option<Either<{slot: number}, {timestamp: number}>>}
+     * @type {Either<{slot: number}, {timestamp: number}> | undefined}
      */
     validFrom
 
@@ -288,14 +219,6 @@ export class TxBuilder {
     constructor(config) {
         this.config = config
         this.reset()
-    }
-
-    /**
-     * @param {TxBuilderConfig} config
-     * @returns {TxBuilder}
-     */
-    static new(config) {
-        return new TxBuilder(config)
     }
 
     /**
@@ -535,8 +458,8 @@ export class TxBuilder {
         this._refInputs = []
         this._signers = []
         this.spendingRedeemers = []
-        this.validTo = None
-        this.validFrom = None
+        this.validTo = undefined
+        this.validFrom = undefined
         this.v1Scripts = []
         this.v2RefScripts = []
         this.v2Scripts = []
@@ -575,6 +498,42 @@ export class TxBuilder {
             if (stakingHash.isPubKey()) {
                 this.addSigners(stakingHash.hash)
             }
+        }
+
+        return this
+    }
+
+    /**
+     * Sorts that assets in the output if not already sorted (mutates `output`s) (needed by the Flint wallet)
+     * Throws an error if any the value entries are non-positive
+     * Throws an error if the output doesn't include a datum but is sent to a non-nativescript validator
+     * @param {TxOutput<any, any>[]} outputs
+     * @returns {TxBuilder}
+     */
+    addOutput(...outputs) {
+        for (let output of outputs) {
+            output.value.assertAllPositive()
+
+            const spendingCredential = output.address.spendingCredential
+
+            if (
+                isUndefined(output.datum) &&
+                spendingCredential.isValidator() &&
+                !this.hasNativeScript(
+                    /** @type {SpendingCredential<"Validator">} */ (
+                        spendingCredential
+                    ).validatorHash.bytes
+                )
+            ) {
+                throw new Error(
+                    "TxOutput must include datum when sending to validator which isn't a known NativeScript (hint: add the NativeScript to this transaction first)"
+                )
+            }
+
+            // sort the tokens in the outputs, needed by the flint wallet
+            output.value.assets.sort()
+
+            this._outputs.push(output)
         }
 
         return this
@@ -642,72 +601,40 @@ export class TxBuilder {
     }
 
     /**
-     * @overload
      * @param {PubKeyHash} hash
      * @param {PubKeyHashLike} poolId
      * @returns {TxBuilder}
      */
+    delegateWithoutRedeemer(hash, poolId) {
+        return this.delegateUnsafe(hash, poolId)
+    }
+
     /**
      * @template TRedeemer
-     * @overload
      * @param {StakingValidatorHash<StakingContext<any, TRedeemer>>} hash
      * @param {PubKeyHashLike} poolId
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
-    /**
-     * @template TRedeemer
-     * @param {(
-     *   [PubKeyHash, PubKeyHashLike]
-     *   | [StakingValidatorHash<StakingContext<any, TRedeemer>>, PubKeyHashLike, TRedeemer]
-     * )} args
-     * @returns {TxBuilder}
-     */
-    delegate(...args) {
-        if (args.length == 2) {
-            this.delegateUnsafe(args[0], args[1])
-        } else if (args.length == 3) {
-            this.attachUplcProgram(args[0].context.program)
+    delegateWithRedeemer(hash, poolId, redeemer) {
+        this.attachUplcProgram(hash.context.program)
 
-            const redeemerData = args[0].context.redeemer.toUplcData(
-                /** @type {TRedeemer} */ (args[2])
-            )
-            this.delegateUnsafe(args[0], args[1], redeemerData)
-        } else {
-            throw new Error("invalid number of arguments")
-        }
+        const redeemerData = hash.context.redeemer.toUplcData(redeemer)
 
-        return this
+        return this.delegateUnsafe(hash, poolId, redeemerData)
     }
 
     /**
-     * @overload
-     * @param {PubKeyHash} hash
+     * @param {PubKeyHash | StakingValidatorHash<any, any>} hash
      * @param {PubKeyHashLike} poolId
+     * @param {UplcData | LazyRedeemerData | undefined} redeemer
      * @returns {TxBuilder}
      */
-    /**
-     * @overload
-     * @param {StakingValidatorHash<any, any>} hash
-     * @param {PubKeyHashLike} poolId
-     * @param {Option<UplcData | LazyRedeemerData>} redeemer
-     * @returns {TxBuilder}
-     */
-    /**
-     * @param {(
-     *   [PubKeyHash, PubKeyHashLike]
-     *   | [StakingValidatorHash<any, any>, PubKeyHashLike, Option<UplcData | LazyRedeemerData>]
-     * )} args
-     * @returns {TxBuilder}
-     */
-    delegateUnsafe(...args) {
-        const dcert = DCert.Delegate(args[0], args[1])
+    delegateUnsafe(hash, poolId, redeemer = undefined) {
+        const dcert = DCert.Delegate(hash, poolId)
         this.addDCert(dcert)
 
-        if (args.length == 3) {
-            const hash = args[0]
-            const redeemer = args[2]
-
+        if (hash instanceof StakingValidatorHash) {
             if (redeemer) {
                 if (this.hasNativeScript(hash.bytes)) {
                     throw new Error(
@@ -735,69 +662,37 @@ export class TxBuilder {
     }
 
     /**
-     * @overload
      * @param {PubKeyHash} hash
      * @returns {TxBuilder}
      */
+    deregisterWithoutRedeemer(hash) {
+        return this.deregisterUnsafe(hash)
+    }
+
     /**
      * @template TRedeemer
-     * @overload
      * @param {StakingValidatorHash<StakingContext<any, TRedeemer>>} hash
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
-    /**
-     * @template TRedeemer
-     * @param {(
-     *   [PubKeyHash]
-     *   | [StakingValidatorHash<StakingContext<any, TRedeemer>>, TRedeemer]
-     * )} args
-     * @returns {TxBuilder}
-     */
-    deregister(...args) {
-        if (args.length == 1) {
-            this.deregisterUnsafe(args[0])
-        } else if (args.length == 2) {
-            this.attachUplcProgram(args[0].context.program)
+    deregisterWithRedeemer(hash, redeemer) {
+        this.attachUplcProgram(hash.context.program)
 
-            const redeemerData = args[0].context.redeemer.toUplcData(
-                /** @type {TRedeemer} */ (args[1])
-            )
+        const redeemerData = hash.context.redeemer.toUplcData(redeemer)
 
-            this.deregisterUnsafe(args[0], redeemerData)
-        } else {
-            throw new Error("invalid number of arguments")
-        }
-
-        return this
+        return this.deregisterUnsafe(hash, redeemerData)
     }
 
     /**
-     * @overload
-     * @param {PubKeyHash} hash
+     * @param {PubKeyHash | StakingValidatorHash<any, any>} hash
+     * @param {UplcData | LazyRedeemerData | undefined} redeemer
      * @returns {TxBuilder}
      */
-    /**
-     * @overload
-     * @param {StakingValidatorHash<any, any>} hash
-     * @param {Option<UplcData | LazyRedeemerData>} redeemer
-     * @returns {TxBuilder}
-     */
-    /**
-     * @param {(
-     *   [PubKeyHash]
-     *   | [StakingValidatorHash<any, any>, Option<UplcData | LazyRedeemerData>]
-     * )} args
-     * @returns {TxBuilder}
-     */
-    deregisterUnsafe(...args) {
-        const dcert = DCert.Deregister(args[0])
+    deregisterUnsafe(hash, redeemer = undefined) {
+        const dcert = DCert.Deregister(hash)
         this.addDCert(dcert)
 
-        if (args.length == 2) {
-            const hash = args[0]
-            const redeemer = args[1]
-
+        if (hash instanceof StakingValidatorHash) {
             if (redeemer) {
                 if (this.hasNativeScript(hash.bytes)) {
                     throw new Error(
@@ -822,118 +717,64 @@ export class TxBuilder {
         }
 
         return this
+    }
+
+    /**
+     * Adds minting instructions to the transaction without a redeemer
+     * @param {TokenValue<null>} token
+     * @returns {TxBuilder}
+     */
+    mintTokenValueWithoutRedeemer(token) {
+        return this.mintAssetClassUnsafe(
+            token.assetClass,
+            token.quantity,
+            undefined
+        )
     }
 
     /**
      * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
      * @remarks Use {@link mintUnsafe} if you don't have such a transaction context.
      * @template TRedeemer
-     * @overload
      * @param {TokenValue<MintingContext<any, TRedeemer>>} token
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
+    mintTokenValueWithRedeemer(token, redeemer) {
+        // 2-arg form A
+        this.attachUplcProgram(token.context.program)
+
+        return this.mintAssetClassUnsafe(
+            token.assetClass,
+            token.quantity,
+            (_tx) => token.context.redeemer.toUplcData(redeemer)
+        )
+    }
+
     /**
-     * @overload
-     * Adds minting instructions to the transaction without a redeemer
-     * @param {TokenValue<null>} token
-     * @returns {TxBuilder}
-     */
-    /**
-     * @overload
      * Adds minting instructions to the transaction without a redeemer
      * @param {AssetClass<null>} assetClass
      * @param {IntLike} quantity
      * @returns {TxBuilder}
      */
-    /**
-     * @overload
-     * Adds minting instructions to the transaction without a redeemer
-     * @param {MintingPolicyHash<null | unknown>} policy
-     * @param {[BytesLike, IntLike][]} tokens
-     * @returns {TxBuilder}
-     */
+    mintAssetClassWithoutRedeemer(assetClass, quantity) {
+        return this.mintAssetClassUnsafe(assetClass, quantity, undefined)
+    }
+
     /**
      * @template TRedeemer
-     * @overload
      * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
      * @param {AssetClass<MintingContext<any, TRedeemer>>} assetClass
      * @param {IntLike} quantity
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
-    /**
-     * @template TRedeemer
-     * @overload
-     * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
-     * @param {MintingPolicyHash<MintingContext<any, TRedeemer>>} policy
-     * @param {[BytesLike, IntLike][]} tokens
-     * @param {TRedeemer} redeemer
-     * @returns {TxBuilder}
-     */
-    /**
-     * @template TRedeemer
-     * @param {(
-     *  [ TokenValue<null>]  // 1-arg
-     *  | [ TokenValue<MintingContext<any, TRedeemer>>, TRedeemer ] // 2-arg form A
-     *  | [ AssetClass<null>, IntLike ]  // 2-arg form B
-     *  | [ MintingPolicyHash<null | unknown>, [BytesLike, IntLike][] ] // 2-arg form C
-     *  | [ AssetClass<MintingContext<any, TRedeemer>>, IntLike, TRedeemer ] // 3-arg form A
-     *  | [ MintingPolicyHash<MintingContext<any, TRedeemer>>, [BytesLike, IntLike][], TRedeemer ]// 3-arg form B
-     * )} args
-     * @returns {TxBuilder}
-     */
-    mint(...args) {
-        if (args.length == 1) {
-            return this.mintUnsafe(args[0].assetClass, args[0].quantity, None)
-        } else if (args.length == 2) {
-            const [a, b] = args
+    mintAssetClassWithRedeemer(assetClass, quantity, redeemer) {
+        this.attachUplcProgram(assetClass.context.program)
 
-            if (
-                a instanceof AssetClass &&
-                (typeof b == "bigint" || typeof b == "number")
-            ) {
-                // 2-arg form B
-                return this.mintUnsafe(a, b, None)
-            } else if (a instanceof MintingPolicyHash && Array.isArray(b)) {
-                // 2-arg form C
-                return this.mintUnsafe(a, b, None)
-            } else if (a instanceof TokenValue) {
-                // 2-arg form A
-                this.attachUplcProgram(a.context.program)
-
-                return this.mintUnsafe(a.assetClass, a.quantity, (_tx) =>
-                    a.context.redeemer.toUplcData(/** @type {TRedeemer} */ (b))
-                )
-            } else {
-                throw new Error("invalid arguments")
-            }
-        } else if (args.length == 3) {
-            const [a, b, redeemer] = args
-
-            if (
-                a instanceof AssetClass &&
-                (typeof b == "bigint" || typeof b == "number")
-            ) {
-                // 3-arg form A
-                this.attachUplcProgram(a.context.program)
-
-                return this.mintUnsafe(a, b, (_tx) =>
-                    a.context.redeemer.toUplcData(redeemer)
-                )
-            } else if (a instanceof MintingPolicyHash && Array.isArray(b)) {
-                // 3-arg form B
-                this.attachUplcProgram(a.context.program)
-
-                return this.mintUnsafe(a, b, (_tx) =>
-                    a.context.redeemer.toUplcData(redeemer)
-                )
-            } else {
-                throw new Error("invalid arguments")
-            }
-        } else {
-            throw new Error("invalid number of arguments")
-        }
+        return this.mintAssetClassUnsafe(assetClass, quantity, (_tx) =>
+            assetClass.context.redeemer.toUplcData(redeemer)
+        )
     }
 
     /**
@@ -944,10 +785,10 @@ export class TxBuilder {
      * @param {LazyRedeemerData<TRedeemer>} redeemer
      * @returns {TxBuilder}
      */
-    mintLazy(assetClass, quantity, redeemer) {
+    mintAssetClassWithLazyRedeemer(assetClass, quantity, redeemer) {
         this.attachUplcProgram(assetClass.context.program)
 
-        return this.mintUnsafe(assetClass, quantity, async (tx) => {
+        return this.mintAssetClassUnsafe(assetClass, quantity, async (tx) => {
             const r = redeemer(tx)
             const redeemerData = r instanceof Promise ? await r : r
 
@@ -956,63 +797,62 @@ export class TxBuilder {
     }
 
     /**
+     * Adds minting instructions to the transaction without a redeemer
+     * @param {MintingPolicyHash<null | unknown>} policy
+     * @param {[BytesLike, IntLike][]} tokens
+     * @returns {TxBuilder}
+     */
+    mintPolicyTokensWithoutRedeemer(policy, tokens) {
+        return this.mintPolicyTokensUnsafe(policy, tokens, undefined)
+    }
+
+    /**
+     * @template TRedeemer
+     * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
+     * @param {MintingPolicyHash<MintingContext<any, TRedeemer>>} policy
+     * @param {[BytesLike, IntLike][]} tokens
+     * @param {TRedeemer} redeemer
+     * @returns {TxBuilder}
+     */
+    mintPolicyTokensWithRedeemer(policy, tokens, redeemer) {
+        this.attachUplcProgram(policy.context.program)
+
+        return this.mintPolicyTokensUnsafe(policy, tokens, (_tx) =>
+            policy.context.redeemer.toUplcData(redeemer)
+        )
+    }
+
+    /**
+     * @param {AssetClassLike} assetClass
+     * @param {IntLike} quantity
+     * @param {UplcData | LazyRedeemerData | undefined} redeemer - can be None when minting from a Native script (but not set by default)
+     * @returns {TxBuilder}
+     */
+    mintAssetClassUnsafe(assetClass, quantity, redeemer = undefined) {
+        const ac = AssetClass.new(assetClass)
+
+        const mph = ac.mph
+        const tokens = [
+            /** @type {[number[], IntLike]} */ ([ac.tokenName, quantity])
+        ]
+
+        return this.mintPolicyTokensUnsafe(mph, tokens, redeemer)
+    }
+
+    /**
      * Mint a list of tokens associated with a given `MintingPolicyHash`.
      * @remarks
      * Throws an error if the given `MintingPolicyHash` was already used in a previous call to `mint()`.
      * The token names can either by a list of bytes or a hexadecimal string.
      *
-     * Also throws an error if the redeemer is `null`, and the minting policy isn't a known `NativeScript`.
-     *
-     * @overload
-     * @param {AssetClassLike} assetClass
-     * @param {IntLike} quantity
-     * @param {Option<UplcData | LazyRedeemerData>} redeemer - can be None when minting from a Native script (but not set by default)
-     * @returns {TxBuilder}
-     *
-     * @overload
+     * Also throws an error if the redeemer is `undefined`, and the minting policy isn't a known `NativeScript`.
      * @param {MintingPolicyHashLike} policy
      * @param {[BytesLike, IntLike][]} tokens - list of pairs of [tokenName, quantity], tokenName can be list of bytes or hex-string
-     * @param {Option<UplcData | LazyRedeemerData>} redeemer - can be None when minting from a Native script (but not set by default)
-     * @returns {TxBuilder}
-     *
-     * @template TRedeemer
-     * @param {([
-     *   AssetClassLike, IntLike, Option<UplcData | LazyRedeemerData>
-     * ] | [
-     *   MintingPolicyHashLike, [BytesLike, IntLike][], Option<UplcData | LazyRedeemerData>
-     * ])} args
+     * @param {UplcData | LazyRedeemerData | undefined} redeemer - can be None when minting from a Native script (but not set by default)
      * @returns {TxBuilder}
      */
-    mintUnsafe(...args) {
-        const [a, b, redeemer] = args
-
-        // handle the overloads
-        const [mph, tokens] = (() => {
-            if (typeof b == "bigint" || typeof b == "number") {
-                const assetClass = AssetClass.new(
-                    /** @type {AssetClassLike} */ (a)
-                )
-
-                return [
-                    assetClass.mph,
-                    [
-                        /** @type {[number[], IntLike]} */ ([
-                            assetClass.tokenName,
-                            b
-                        ])
-                    ]
-                ]
-            } else if (Array.isArray(b)) {
-                return [
-                    MintingPolicyHash.new(
-                        /** @type {MintingPolicyHashLike} */ (a)
-                    ),
-                    b
-                ]
-            } else {
-                throw new Error("invalid arguments")
-            }
-        })()
+    mintPolicyTokensUnsafe(policy, tokens, redeemer = undefined) {
+        const mph = MintingPolicyHash.new(policy)
 
         this._mintedTokens.addTokens(mph, tokens)
 
@@ -1042,92 +882,39 @@ export class TxBuilder {
     }
 
     /**
-     * @overload
      * @param {Address<null, any>} address
      * @param {ValueLike} value
      * @returns {TxBuilder}
-     *
+     */
+    payWithoutDatum(address, value) {
+        return this.payUnsafe(address, value)
+    }
+
+    /**
      * @template TDatum
-     * @overload
      * @param {Address<DatumPaymentContext<TDatum>, any>} address
      * @param {ValueLike} value
      * @param {TxOutputDatumCastable<TDatum>} datum
      * @returns {TxBuilder}
-     *
-     * @template TDatum
-     * @param {([
-     *   Address<null, any>, ValueLike
-     * ] | [
-     *   Address<DatumPaymentContext<TDatum>, any>, ValueLike, TxOutputDatumCastable<TDatum>
-     * ])} args
-     * @returns {TxBuilder}
      */
-    pay(...args) {
-        if (args.length == 2) {
-            return this.payUnsafe(...args)
-        } else if (args.length == 3) {
-            const [address, value, datum] = args
-
-            return this.payUnsafe(
-                address,
-                value,
-                TxOutputDatum.fromCast(datum, address.spendingContext.datum)
-            )
-        } else {
-            throw new Error("invalid number of args")
-        }
+    payWithDatum(address, value, datum) {
+        return this.payUnsafe(
+            address,
+            value,
+            TxOutputDatum.fromCast(datum, address.spendingContext.datum)
+        )
     }
 
     /**
-     * @overload
      * @param {AddressLike} address
      * @param {ValueLike} value
-     * @returns {TxBuilder}
-     *
-     * @overload
-     * @param {AddressLike} address
-     * @param {ValueLike} value
-     * @param {TxOutputDatum} datum
-     * @returns {TxBuilder}
-     *
-     * @overload
-     * @param {TxOutput<any, any> | TxOutput<any, any>[]} output
-     * @returns {TxBuilder}
-     *
-     * @param {([
-     *   AddressLike, ValueLike
-     * ] | [
-     *   AddressLike, ValueLike, TxOutputDatum
-     * ] | [
-     *   TxOutput<any, any> | TxOutput<any, any>[]
-     * ])} args
+     * @param {TxOutputDatum | undefined} datum
      * @returns {TxBuilder}
      */
-    payUnsafe(...args) {
-        // handle overloads
-        const outputs = (() => {
-            if (args.length == 1) {
-                return args[0]
-            } else if (args.length == 2) {
-                return new TxOutput(Address.new(args[0]), args[1], None)
-            } else if (args.length == 3) {
-                const datum = args[2]
+    payUnsafe(address, value, datum = undefined) {
+        const output = new TxOutput(Address.new(address), value, datum)
 
-                return new TxOutput(Address.new(args[0]), args[1], datum)
-            } else {
-                throw new Error("invalid arguments")
-            }
-        })()
-
-        if (Array.isArray(outputs)) {
-            outputs.forEach((output) => this.payUnsafe(output))
-            return this
-        }
-
-        const output = outputs
-        this.addOutput(output)
-
-        return this
+        return this.addOutput(output)
     }
 
     /**
@@ -1156,78 +943,60 @@ export class TxBuilder {
     }
 
     /**
-     * @overload
      * @param {number} key
      * @param {TxMetadataAttr} value
      * @returns {TxBuilder}
-     *
-     * @overload
-     * @param {{[key: number]: TxMetadataAttr}} attributes
-     * @returns {TxBuilder}
-     *
-     * @param {([number, TxMetadataAttr] | [{[key: number]: TxMetadataAttr}])} args
-     * @returns {TxBuilder}
      */
-    setMetadata(...args) {
-        if (args.length == 2) {
-            const [key, value] = args
-            this.metadata[key] = value
-        } else {
-            Object.entries(args[0]).forEach(([key, value]) =>
-                this.setMetadata(Number(key), value)
-            )
-        }
+    setMetadataAttribute(key, value) {
+        this.metadata[key] = value
 
         return this
     }
 
     /**
-     * @overload
-     * @param {TxInput<null, any> | TxInput<null, any>[]} utxos
+     * @param {{[key: number]: TxMetadataAttr}} attributes
      * @returns {TxBuilder}
-     *
+     */
+    setMetadataAttributes(attributes) {
+        Object.entries(attributes).forEach(([key, value]) =>
+            this.setMetadataAttribute(Number(key), value)
+        )
+
+        return this
+    }
+
+    /**
+     * @param {TxInput<null, any>[]} utxos
+     * @returns {TxBuilder}
+     */
+    spendWithoutRedeemer(...utxos) {
+        return this.spendUnsafe(utxos)
+    }
+
+    /**
      * @template TRedeemer
-     * @overload
      * @param {TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[]} utxos
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
-    /**
-     * @template TRedeemer
-     * @param {([
-     *   TxInput<null, any> | TxInput<null, any>[]
-     * ] | [
-     *   TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[],
-     *   TRedeemer
-     * ])} args
-     * @returns {TxBuilder}
-     */
-    spend(...args) {
-        if (args.length == 1) {
-            return this.spendUnsafe(args[0])
-        } else if (args.length == 2) {
-            const [utxos, redeemer] = args
-
-            if (Array.isArray(utxos)) {
-                if (utxos.length == 0) {
-                    throw new Error("expected at least one UTxO")
-                }
-
-                utxos.forEach((utxo) =>
-                    this.attachUplcProgram(utxo.spendingContext.program)
-                )
-                return this.spendUnsafe(utxos, (_tx) =>
-                    utxos[0].spendingContext.redeemer.toUplcData(redeemer)
-                )
-            } else {
-                this.attachUplcProgram(utxos.spendingContext.program)
-
-                return this.spendUnsafe(utxos, (_tx) =>
-                    utxos.spendingContext.redeemer.toUplcData(redeemer)
-                )
+    spendWithRedeemer(utxos, redeemer) {
+        if (Array.isArray(utxos)) {
+            if (utxos.length == 0) {
+                throw new Error("expected at least one UTxO")
             }
+
+            utxos.forEach((utxo) =>
+                this.attachUplcProgram(utxo.spendingContext.program)
+            )
+            return this.spendUnsafe(utxos, (_tx) =>
+                utxos[0].spendingContext.redeemer.toUplcData(redeemer)
+            )
         } else {
-            throw new Error("invalid number of arguments")
+            this.attachUplcProgram(utxos.spendingContext.program)
+
+            return this.spendUnsafe(utxos, (_tx) =>
+                utxos.spendingContext.redeemer.toUplcData(redeemer)
+            )
         }
     }
 
@@ -1237,7 +1006,7 @@ export class TxBuilder {
      * @param {LazyRedeemerData<TRedeemer>} redeemer
      * @returns {TxBuilder}
      */
-    spendLazy(utxos, redeemer) {
+    spendWithLazyRedeemer(utxos, redeemer) {
         if (Array.isArray(utxos)) {
             if (utxos.length == 0) {
                 throw new Error("expected at least one UTxO")
@@ -1268,10 +1037,10 @@ export class TxBuilder {
      * Add a UTxO instance as an input to the transaction being built.
      * Throws an error if the UTxO is locked at a script address but a redeemer isn't specified (unless the script is a known `NativeScript`).
      * @param {TxInput<any, any> | TxInput<any, any>[]} utxos
-     * @param {Option<UplcData | LazyRedeemerData>} redeemer
+     * @param {UplcData | LazyRedeemerData | undefined} redeemer
      * @returns {TxBuilder}
      */
-    spendUnsafe(utxos, redeemer = None) {
+    spendUnsafe(utxos, redeemer = undefined) {
         if (Array.isArray(utxos)) {
             utxos.forEach((utxo) => this.spendUnsafe(utxo, redeemer))
 
@@ -1381,42 +1150,27 @@ export class TxBuilder {
     }
 
     /**
-     * @overload
-     * @param {StakingAddress<null>} addr
+     * @param {StakingAddress<null>} address
      * @param {IntLike} lovelace
      * @returns {TxBuilder}
      */
+    withdrawWithoutRedeemer(address, lovelace) {
+        return this.withdrawUnsafe(address, lovelace)
+    }
+
     /**
      * @template TRedeemer
-     * @overload
-     * @param {StakingAddress<StakingContext<any, TRedeemer>>} addr
+     * @param {StakingAddress<StakingContext<any, TRedeemer>>} address
      * @param {IntLike} lovelace
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
-    /**
-     * @template TRedeemer
-     * @param {([
-     *   StakingAddress<null>, IntLike
-     * ] | [
-     *   StakingAddress<StakingContext<any, TRedeemer>>, IntLike, TRedeemer
-     * ])} args
-     * @returns {TxBuilder}
-     */
-    withdraw(...args) {
-        if (args.length == 2) {
-            return this.withdrawUnsafe(args[0], args[1])
-        } else if (args.length == 3) {
-            const [a, qty, redeemer] = args
+    withdrawWithRedeemer(address, lovelace, redeemer) {
+        this.attachUplcProgram(address.context.program)
 
-            this.attachUplcProgram(a.context.program)
-
-            return this.withdrawUnsafe(a, qty, (_tx) =>
-                a.context.redeemer.toUplcData(redeemer)
-            )
-        } else {
-            throw new Error("invalid number of arguments")
-        }
+        return this.withdrawUnsafe(address, lovelace, (_tx) =>
+            address.context.redeemer.toUplcData(redeemer)
+        )
     }
 
     /**
@@ -1426,7 +1180,7 @@ export class TxBuilder {
      * @param {LazyRedeemerData<TRedeemer>} redeemer
      * @returns {TxBuilder}
      */
-    withdrawLazy(addr, lovelace, redeemer) {
+    withdrawWithLazyRedeemer(addr, lovelace, redeemer) {
         return this.withdrawUnsafe(addr, lovelace, async (tx) => {
             const r = redeemer(tx)
             const redeemerData = r instanceof Promise ? await r : r
@@ -1436,13 +1190,16 @@ export class TxBuilder {
     }
 
     /**
-     * @param {StakingAddressLike} addr
+     * @param {StakingAddressLike} address
      * @param {IntLike} lovelace
-     * @param {Option<UplcData | LazyRedeemerData>} redeemer
+     * @param {UplcData | LazyRedeemerData | undefined} redeemer
      * @returns {TxBuilder}
      */
-    withdrawUnsafe(addr, lovelace, redeemer = None) {
-        const stakingAddress = StakingAddress.new(this.config.isMainnet, addr)
+    withdrawUnsafe(address, lovelace, redeemer = undefined) {
+        const stakingAddress = StakingAddress.new(
+            this.config.isMainnet,
+            address
+        )
 
         /**
          * @type {[StakingAddress, bigint]}
@@ -1468,6 +1225,58 @@ export class TxBuilder {
         this.withdrawals.sort(([a], [b]) => StakingAddress.compare(a, b))
 
         return this
+    }
+
+    /**
+     * @param {UplcData} data
+     * @returns {boolean}
+     */
+    hasDatum(data) {
+        return this.datums.some((prev) => prev.isEqual(data))
+    }
+
+    /**
+     * @returns {boolean}
+     */
+    hasMetadata() {
+        return Object.keys(this.metadata).length > 0
+    }
+
+    /**
+     * @returns {boolean}
+     */
+    hasUplcScripts() {
+        return (
+            this.v1Scripts.length > 0 ||
+            this.v2Scripts.length > 0 ||
+            this.v2RefScripts.length > 0
+        )
+    }
+
+    /**
+     * Excludes lovelace
+     * @returns {Assets}
+     */
+    sumInputAndMintedAssets() {
+        return this.sumInputAndMintedValue().assets
+    }
+
+    /**
+     * @returns {Value}
+     */
+    sumOutputValue() {
+        return this._outputs.reduce(
+            (prev, output) => prev.add(output.value),
+            new Value()
+        )
+    }
+
+    /**
+     * Excludes lovelace
+     * @returns {Assets}
+     */
+    sumOutputAssets() {
+        return this.sumOutputValue().assets
     }
 
     /**
@@ -1511,38 +1320,7 @@ export class TxBuilder {
     }
 
     /**
-     * Sorts that assets in the output if not already sorted (mutates `output`s) (needed by the Flint wallet)
-     * Throws an error if any the value entries are non-positive
-     * Throws an error if the output doesn't include a datum but is sent to a non-nativescript validator
      * @private
-     * @param {TxOutput} output
-     */
-    addOutput(output) {
-        output.value.assertAllPositive()
-
-        const spendingCredential = output.address.spendingCredential
-
-        if (
-            isNone(output.datum) &&
-            spendingCredential.isValidator() &&
-            !this.hasNativeScript(
-                /** @type {SpendingCredential<"Validator">} */ (
-                    spendingCredential
-                ).validatorHash.bytes
-            )
-        ) {
-            throw new Error(
-                "TxOutput must include datum when sending to validator which isn't a known NativeScript (hint: add the NativeScript to this transaction first)"
-            )
-        }
-
-        // sort the tokens in the outputs, needed by the flint wallet
-        output.value.assets.sort()
-
-        this._outputs.push(output)
-    }
-
-    /**
      * @param {TxInput} utxo
      */
     addRefInput(utxo) {
@@ -1578,7 +1356,7 @@ export class TxBuilder {
     }
 
     /**
-     * @privte
+     * @private
      * @param {DCert} dcert
      * @param {UplcData | LazyRedeemerData} data
      */
@@ -1667,21 +1445,6 @@ export class TxBuilder {
     }
 
     /**
-     * @param {UplcData} data
-     * @returns {boolean}
-     */
-    hasDatum(data) {
-        return this.datums.some((prev) => prev.isEqual(data))
-    }
-
-    /**
-     * @returns {boolean}
-     */
-    hasMetadata() {
-        return Object.keys(this.metadata).length > 0
-    }
-
-    /**
      * @private
      * @param {MintingPolicyHash} mph
      * @returns {boolean}
@@ -1697,17 +1460,6 @@ export class TxBuilder {
      */
     hasNativeScript(hash) {
         return this.nativeScripts.some((s) => equalsBytes(s.hash(), hash))
-    }
-
-    /**
-     * @returns {boolean}
-     */
-    hasUplcScripts() {
-        return (
-            this.v1Scripts.length > 0 ||
-            this.v2Scripts.length > 0 ||
-            this.v2RefScripts.length > 0
-        )
     }
 
     /**
@@ -1805,32 +1557,6 @@ export class TxBuilder {
     }
 
     /**
-     * Excludes lovelace
-     * @returns {Assets}
-     */
-    sumInputAndMintedAssets() {
-        return this.sumInputAndMintedValue().assets
-    }
-
-    /**
-     * @returns {Value}
-     */
-    sumOutputValue() {
-        return this._outputs.reduce(
-            (prev, output) => prev.add(output.value),
-            new Value()
-        )
-    }
-
-    /**
-     * Excludes lovelace
-     * @returns {Assets}
-     */
-    sumOutputAssets() {
-        return this.sumOutputValue().assets
-    }
-
-    /**
      * Private builder methods
      */
 
@@ -1902,7 +1628,7 @@ export class TxBuilder {
      * @param {Address} changeAddress
      * @param {TxInput[]} spareUtxos
      * @param {bigint} baseFee
-     * @returns {Option<TxOutput>} - collateral change output which can be corrected later
+     * @returns {TxOutput | undefined} - collateral change output which can be corrected later
      */
     balanceCollateral(params, changeAddress, spareUtxos, baseFee) {
         // if we previously added collateral, use it
@@ -2085,7 +1811,8 @@ export class TxBuilder {
     /**
      * @private
      * @returns {{
-     *   metadata: Option<TxMetadata>, metadataHash: Option<number[]>
+     *   metadata: TxMetadata | undefined,
+     *   metadataHash: number[] | undefined
      * }}
      */
     buildMetadata() {
@@ -2095,7 +1822,7 @@ export class TxBuilder {
 
             return { metadata, metadataHash }
         } else {
-            return { metadata: None, metadataHash: None }
+            return { metadata: undefined, metadataHash: undefined }
         }
     }
 
@@ -2143,8 +1870,8 @@ export class TxBuilder {
     /**
      * @private
      * @param {bigint} fee
-     * @param {Option<number>} firstValidSlot
-     * @param {Option<number>} lastValidSlot
+     * @param {number | undefined} firstValidSlot
+     * @param {number | undefined} lastValidSlot
      * @returns {TxBody}
      */
     buildDummyTxBody(fee, firstValidSlot, lastValidSlot) {
@@ -2227,10 +1954,10 @@ export class TxBuilder {
     /**
      * The execution itself might depend on the redeemers, so we must also be able to return the redeemers without any execution first
      * @private
-     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
+     * @param {RedeemerBuildContext | undefined} buildContext - execution and budget calculation is only performed when this is set
      * @returns {Promise<TxRedeemer[]>}
      */
-    async buildMintingRedeemers(buildContext = None) {
+    async buildMintingRedeemers(buildContext = undefined) {
         return Promise.all(
             this.mintingRedeemers.map(async ([mph, redeemerDataOrFn]) => {
                 const i = this._mintedTokens
@@ -2288,10 +2015,10 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
+     * @param {RedeemerBuildContext | undefined} buildContext - execution and budget calculation is only performed when this is set
      * @returns {Promise<TxRedeemer[]>}
      */
-    async buildSpendingRedeemers(buildContext = None) {
+    async buildSpendingRedeemers(buildContext = undefined) {
         return Promise.all(
             this.spendingRedeemers.map(async ([utxo, redeemerDataOrFn]) => {
                 const i = this._inputs.findIndex((inp) => inp.isEqual(utxo))
@@ -2312,11 +2039,11 @@ export class TxBuilder {
                 // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
                 // this finds the index based on staking address, but ^ uses the index we found here.
                 // Possibly the other thing should do the same as this.
-                const vh = expectSome(utxo.address.validatorHash)
+                const vh = expectDefined(utxo.address.validatorHash)
                 const script = this.getUplcScript(vh)
 
                 if (buildContext) {
-                    const datum = expectSome(utxo.datum?.data)
+                    const datum = expectDefined(utxo.datum?.data)
                     const r =
                         "kind" in redeemerDataOrFn
                             ? redeemerDataOrFn
@@ -2355,10 +2082,10 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
+     * @param {RedeemerBuildContext | undefined} buildContext - execution and budget calculation is only performed when this is set
      * @returns {Promise<TxRedeemer[]>}
      */
-    async buildRewardingRedeemers(buildContext = None) {
+    async buildRewardingRedeemers(buildContext = undefined) {
         return Promise.all(
             this.rewardingRedeemers.map(
                 async ([stakingAddress, redeemerDataOrFn]) => {
@@ -2383,7 +2110,7 @@ export class TxBuilder {
                             : dummyRedeemerData
                     )
 
-                    const svh = expectSome(
+                    const svh = expectDefined(
                         stakingAddress.toCredential().expectStakingHash()
                             .stakingValidatorHash
                     )
@@ -2430,13 +2157,13 @@ export class TxBuilder {
 
     /**
      * @private
-     * @param {Option<RedeemerBuildContext>} buildContext - execution and budget calculation is only performed when this is set
+     * @param {RedeemerBuildContext | undefined} buildContext - execution and budget calculation is only performed when this is set
      * @returns {Promise<TxRedeemer[]>}
      */
-    async buildCertifyingRedeemers(buildContext = None) {
+    async buildCertifyingRedeemers(buildContext = undefined) {
         return Promise.all(
             this.certifyingRedeemers.map(async ([dcert, redeemerDataOrFn]) => {
-                const svh = expectSome(
+                const svh = expectDefined(
                     dcert.credential.hash.stakingValidatorHash
                 )
 
@@ -2562,13 +2289,13 @@ export class TxBuilder {
      * @private
      * @param {NetworkParams} params
      * @param {TxRedeemer[]} redeemers
-     * @returns {Option<number[]>} - returns null if there are no redeemers
+     * @returns {number[] | undefined} - returns null if there are no redeemers
      */
     buildScriptDataHash(params, redeemers) {
         if (redeemers.length > 0) {
             return calcScriptDataHash(params, this.datums, redeemers)
         } else {
-            return None
+            return undefined
         }
     }
 
@@ -2576,8 +2303,8 @@ export class TxBuilder {
      * @private
      * @param {NetworkParams} params
      * @returns {{
-     *   firstValidSlot: Option<number>
-     *   lastValidSlot: Option<number>
+     *   firstValidSlot: number | undefined
+     *   lastValidSlot: number | undefined
      * }}
      */
     buildValidityTimeRange(params) {
@@ -2598,8 +2325,10 @@ export class TxBuilder {
         return {
             firstValidSlot: this.validFrom
                 ? slotOrTimeToSlot(this.validFrom)
-                : None,
-            lastValidSlot: this.validTo ? slotOrTimeToSlot(this.validTo) : None
+                : undefined,
+            lastValidSlot: this.validTo
+                ? slotOrTimeToSlot(this.validTo)
+                : undefined
         }
     }
 

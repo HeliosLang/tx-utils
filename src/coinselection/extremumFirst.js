@@ -2,51 +2,35 @@ import { TxInput, Value } from "@helios-lang/ledger"
 import { InsufficientFundsError } from "./InsufficientFundsError.js"
 
 /**
- * @template CSpending
- * @template CStaking
- * @typedef {import("./CoinSelection.js").CoinSelection<CSpending, CStaking>} CoinSelection
- */
-
-/**
- * @typedef {{
- *   dontTouchUninvolvedAssets?: boolean
- * }} SelectLargestFirstProps
+ * @import { CoinSelection } from "src/index.js"
  */
 
 /**
  * * Selects UTxOs from a list by iterating through the tokens in the given `Value` and picking the UTxOs containing the largest corresponding amount first.
- * @param {SelectLargestFirstProps} props
+ * @param {object} props
+ * @param {boolean} [props.dontTouchUninvolvedAssets]
  */
 export function selectLargestFirst(props = {}) {
     return selectExtremumFirst({ ...props, largestFirst: true })
 }
 
 /**
- * @typedef {{
- *   allowSelectingUninvolvedAssets?: boolean
- * }} SelectSmallestFirstProps
- */
-
-/**
  * Selects UTxOs from a list by iterating through the tokens in the given `Value` and picking the UTxOs containing the smallest corresponding amount first.
  * This method can be used to eliminate dust UTxOs from a wallet.
- * @param {SelectSmallestFirstProps} props
+ * @param {object} props
+ * @param {boolean} [props.allowSelectingUninvolvedAssets]
  */
 export function selectSmallestFirst(props = {}) {
     return selectExtremumFirst({ ...props, largestFirst: false })
 }
 
 /**
- * @typedef {{
- *   largestFirst: boolean
- *   allowSelectingUninvolvedAssets?: boolean
- * }} SelectExtremumFirstProps
- */
-
-/**
  * Loops through the policies and tokens of `amount`
  *   - if for a given asset there isn't enough already included, select the previously unselected utxos until the necessary quantity is filled (starting the extremum first)
- * @param {SelectExtremumFirstProps} props
+ * @param {object} props
+ * @param {boolean} props.largestFirst
+ * @param {boolean} [props.allowSelectingUninvolvedAssets]
+ *
  */
 function selectExtremumFirst({ largestFirst, allowSelectingUninvolvedAssets }) {
     /**

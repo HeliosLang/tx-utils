@@ -1,9 +1,3 @@
-/**
- * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
- * @typedef {import("./Network.js").Network} Network
- * @typedef {import("./Network.js").NetworkName} NetworkName
- */
-
 import {
     Address,
     AssetClass,
@@ -18,14 +12,53 @@ import {
     TxOutputId,
     Value
 } from "@helios-lang/ledger"
-import { None, expectSome } from "@helios-lang/type-utils"
+import { expectDefined } from "@helios-lang/type-utils"
 import { UplcProgramV2, decodeUplcData } from "@helios-lang/uplc"
 
 /**
- * Koios network interface.
- * @implements {Network}
+ * @import { NetworkParams } from "@helios-lang/ledger"
+ * @import { KoiosV0Client, NetworkName } from "src/index.js"
  */
-export class KoiosV0 {
+
+/**
+ * @param {NetworkName} networkName
+ * @returns {KoiosV0Client}
+ */
+export function makeKoiosV0Client(networkName) {
+    return new KoiosV0ClientImpl(networkName)
+}
+
+/**
+ * @param {TxInput} refUtxo
+ * @returns {Promise<KoiosV0Client>}
+ */
+export async function resolveKoiosV0Client(refUtxo) {
+    const preprodNetwork = new KoiosV0ClientImpl("preprod")
+
+    if (await preprodNetwork.hasUtxo(refUtxo)) {
+        return preprodNetwork
+    }
+
+    const previewNetwork = new KoiosV0ClientImpl("preview")
+
+    if (await previewNetwork.hasUtxo(refUtxo)) {
+        return previewNetwork
+    }
+
+    const mainnetNetwork = new KoiosV0ClientImpl("mainnet")
+
+    if (await mainnetNetwork.hasUtxo(refUtxo)) {
+        return mainnetNetwork
+    }
+
+    throw new Error("refUtxo not found on any network")
+}
+
+/**
+ * Koios network interface.
+ * @implements {KoiosV0Client}
+ */
+class KoiosV0ClientImpl {
     /**
      * @readonly
      * @type {NetworkName}
@@ -37,32 +70,6 @@ export class KoiosV0 {
      */
     constructor(networkName) {
         this.networkName = networkName
-    }
-
-    /**
-     * @param {TxInput} refUtxo
-     * @returns {Promise<KoiosV0>}
-     */
-    static async resolve(refUtxo) {
-        const preprodNetwork = new KoiosV0("preprod")
-
-        if (await preprodNetwork.hasUtxo(refUtxo)) {
-            return preprodNetwork
-        }
-
-        const previewNetwork = new KoiosV0("preview")
-
-        if (await previewNetwork.hasUtxo(refUtxo)) {
-            return previewNetwork
-        }
-
-        const mainnetNetwork = new KoiosV0("mainnet")
-
-        if (await mainnetNetwork.hasUtxo(refUtxo)) {
-            return mainnetNetwork
-        }
-
-        throw new Error("refUtxo not found on any network")
     }
 
     /**
@@ -164,7 +171,7 @@ export class KoiosV0 {
                 )
             }
 
-            const utxoIdxs = expectSome(txIds.get(rawTx.tx_hash))
+            const utxoIdxs = expectDefined(txIds.get(rawTx.tx_hash))
 
             for (let utxoIdx of utxoIdxs) {
                 const id = new TxOutputId(new TxId(rawTx.tx_hash), utxoIdx)
@@ -194,21 +201,23 @@ export class KoiosV0 {
                 const paymentAddr = Address.fromBech32(rawPaymentAddr)
 
                 /**
-                 * @type {Option<StakingAddress>}
+                 * @type {StakingAddress | undefined}
                  */
                 const stakeAddr = rawStakeAddr
                     ? StakingAddress.fromBech32(rawStakeAddr)
-                    : None
+                    : undefined
 
                 const address = Address.fromHashes(
                     this.networkName == "mainnet",
-                    expectSome(
+                    expectDefined(
                         paymentAddr.pubKeyHash ?? paymentAddr.validatorHash
                     ),
                     stakeAddr?.stakingHash?.hash
                 )
 
-                const lovelace = BigInt(parseInt(expectSome(rawOutput.value)))
+                const lovelace = BigInt(
+                    parseInt(expectDefined(rawOutput.value))
+                )
 
                 if (lovelace.toString() != rawOutput.value) {
                     throw new Error(
@@ -243,11 +252,11 @@ export class KoiosV0 {
                       )
                     : rawOutput.datum_hash
                       ? TxOutputDatum.Hash(new DatumHash(rawOutput.datum_hash))
-                      : None
+                      : undefined
 
                 const refScript = rawOutput.reference_script
                     ? UplcProgramV2.fromCbor(rawOutput.reference_script)
-                    : None
+                    : undefined
 
                 const txInput = new TxInput(
                     id,
@@ -263,7 +272,7 @@ export class KoiosV0 {
             }
         })
 
-        return ids.map((id) => expectSome(result.get(id.toString())))
+        return ids.map((id) => expectDefined(result.get(id.toString())))
     }
 
     /**
@@ -271,7 +280,7 @@ export class KoiosV0 {
      * @returns {Promise<TxInput>}
      */
     async getUtxo(id) {
-        return expectSome(await this.getUtxosInternal([id])[0])
+        return expectDefined(await this.getUtxosInternal([id])[0])
     }
 
     /**

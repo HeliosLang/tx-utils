@@ -1,13 +1,12 @@
 import { Address, Signature, Tx, TxId, TxInput } from "@helios-lang/ledger"
 
 /**
- * @typedef {import("../network/index.js").Network} Network
- * @typedef {import("../wallets/index.js").Wallet} Wallet
+ * @import { CardanoClient, Wallet } from "src/index.js"
  */
 
 /**
  * @param {Wallet} baseWallet
- * @param {Network} mask
+ * @param {CardanoClient} mask
  * @returns {Wallet}
  */
 export function maskWallet(baseWallet, mask) {
@@ -24,13 +23,13 @@ class MaskedWallet {
     baseWallet
 
     /**
-     * @type {Network}
+     * @type {CardanoClient}
      */
     mask
 
     /**
      * @param {Wallet} baseWallet
-     * @param {Network} mask
+     * @param {CardanoClient} mask
      */
     constructor(baseWallet, mask) {
         this.baseWallet = baseWallet

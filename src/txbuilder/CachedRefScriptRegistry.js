@@ -1,22 +1,20 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
 import { TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
-import { None } from "@helios-lang/type-utils"
 
 /**
- * @typedef {import("@helios-lang/uplc").UplcProgramV2I} UplcProgramV2I
- * @typedef {import("../network/index.js").ReadonlyNetwork} ReadonlyNetwork
- * @typedef {import("./RefScriptRegistry.js").ReadonlyRefScriptRegistry} ReadonlyRefScriptRegistry
+ * @import { UplcProgramV2I } from "@helios-lang/uplc"
+ * @import { ReadonlyCardanoClient, ReadonlyRefScriptRegistry } from "src/index.js"
  */
 
 /**
- * @param {ReadonlyNetwork} network
+ * @param {ReadonlyCardanoClient} client
  * @param {Record<string, {program: UplcProgramV2I, utxoId: TxOutputId | string}> | [UplcProgramV2I, TxOutputId | string][]} scripts
  * @returns {ReadonlyRefScriptRegistry}
  */
-export function makeCachedRefScriptRegistry(network, scripts) {
+export function makeCachedRefScriptRegistry(client, scripts) {
     if (Array.isArray(scripts)) {
         return new CachedRefScriptRegistry(
-            network,
+            client,
             Object.fromEntries(
                 scripts.map(([p, id]) => {
                     return [
@@ -28,7 +26,7 @@ export function makeCachedRefScriptRegistry(network, scripts) {
         )
     } else {
         return new CachedRefScriptRegistry(
-            network,
+            client,
             Object.fromEntries(
                 Object.entries(scripts).map(([h, obj]) => {
                     return [
@@ -50,9 +48,9 @@ export function makeCachedRefScriptRegistry(network, scripts) {
 class CachedRefScriptRegistry {
     /**
      * @private
-     * @type {ReadonlyNetwork}
+     * @type {ReadonlyCardanoClient}
      */
-    network
+    client
 
     /**
      * @private
@@ -62,17 +60,17 @@ class CachedRefScriptRegistry {
 
     /**
      *
-     * @param {ReadonlyNetwork} network
+     * @param {ReadonlyCardanoClient} network
      * @param {Record<string, {program: UplcProgramV2I, inputId: TxOutputId}>} scripts
      */
     constructor(network, scripts) {
-        this.network = network
+        this.client = network
         this.scripts = scripts
     }
 
     /**
      * @param {number[]} hash
-     * @returns {Promise<Option<{program: UplcProgramV2I, input: TxInput}>>}
+     * @returns {Promise<{program: UplcProgramV2I, input: TxInput} | undefined>}
      */
     async find(hash) {
         const h = bytesToHex(hash)
@@ -80,7 +78,7 @@ class CachedRefScriptRegistry {
         if (h in this.scripts) {
             const { program, inputId } = this.scripts[h]
 
-            const input = await this.network.getUtxo(inputId)
+            const input = await this.client.getUtxo(inputId)
 
             // make a copy of the input with the full original program, so we are sure to get all the additional information (source mapping etc.)
             const inputCopy = new TxInput(
@@ -89,7 +87,7 @@ class CachedRefScriptRegistry {
             )
             return { program, input: inputCopy }
         } else {
-            return None
+            return undefined
         }
     }
 }

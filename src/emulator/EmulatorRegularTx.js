@@ -1,30 +1,47 @@
 import { equalsBytes } from "@helios-lang/codec-utils"
 import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+
 /**
- * @typedef {import("./EmulatorTx.js").EmulatorTx} EmulatorTx
+ * @import { EmulatorRegularTx } from "src/index.js"
  */
 
 /**
- * @implements {EmulatorTx}
+ * @param {Tx} tx
+ * @returns {EmulatorRegularTx}
  */
-export class RegularTx {
+export function makeEmulatorRegularTx(tx) {
+    return new EmulatorRegularTxImpl(tx)
+}
+
+/**
+ * @implements {EmulatorRegularTx}
+ */
+class EmulatorRegularTxImpl {
     /**
+     * @private
      * @type {Tx}
      */
-    #tx
+    _tx
 
     /**
      * @param {Tx} tx
      */
     constructor(tx) {
-        this.#tx = tx
+        this._tx = tx
+    }
+
+    /**
+     * @type {"Regular"}
+     */
+    get kind() {
+        return "Regular"
     }
 
     /**
      * @returns {TxId}
      */
     id() {
-        return this.#tx.id()
+        return this._tx.id()
     }
 
     /**
@@ -32,7 +49,7 @@ export class RegularTx {
      * @returns {boolean}
      */
     consumes(utxo) {
-        const txInputs = this.#tx.body.inputs
+        const txInputs = this._tx.body.inputs
 
         return txInputs.some((txInput) => txInput.isEqual(utxo))
     }
@@ -45,7 +62,7 @@ export class RegularTx {
     collectUtxos(address, utxos) {
         utxos = utxos.filter((utxo) => !this.consumes(utxo))
 
-        const txOutputs = this.#tx.body.outputs
+        const txOutputs = this._tx.body.outputs
 
         txOutputs.forEach((txOutput, utxoId) => {
             if (equalsBytes(txOutput.address.bytes, address.bytes)) {
@@ -63,19 +80,19 @@ export class RegularTx {
 
     /**
      * @param {TxOutputId} id
-     * @returns {null | TxInput}
+     * @returns {TxInput | undefined}
      */
     getUtxo(id) {
         if (!id.txId.isEqual(this.id())) {
-            return null
+            return undefined
         }
 
         /**
-         * @type {null | TxInput}
+         * @type {TxInput | undefined}
          */
-        let utxo = null
+        let utxo = undefined
 
-        this.#tx.body.outputs.forEach((output, i) => {
+        this._tx.body.outputs.forEach((output, i) => {
             if (i == id.utxoIdx) {
                 utxo = new TxInput(id, output.copy())
             }
@@ -90,7 +107,7 @@ export class RegularTx {
     newUtxos() {
         const id = this.id()
 
-        return this.#tx.body.outputs.map((output, i) => {
+        return this._tx.body.outputs.map((output, i) => {
             return new TxInput(new TxOutputId(id, i), output.copy())
         })
     }
@@ -99,11 +116,14 @@ export class RegularTx {
      * @returns {TxInput[]}
      */
     consumedUtxos() {
-        return this.#tx.body.inputs
+        return this._tx.body.inputs
     }
 
+    /**
+     * @returns {void}
+     */
     dump() {
         console.log("REGULAR TX")
-        console.log(JSON.stringify(this.#tx.dump(), undefined, "  "))
+        console.log(JSON.stringify(this._tx.dump(), undefined, "  "))
     }
 }

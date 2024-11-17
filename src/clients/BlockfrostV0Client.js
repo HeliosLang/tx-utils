@@ -1,5 +1,4 @@
 import {
-    DEFAULT_NETWORK_PARAMS,
     Address,
     Tx,
     TxId,
@@ -9,25 +8,15 @@ import {
     TxOutputId,
     Value
 } from "@helios-lang/ledger"
-import { expectSome } from "@helios-lang/type-utils"
+import { expectDefined } from "@helios-lang/type-utils"
 import { UplcProgramV2, decodeUplcData } from "@helios-lang/uplc"
-import { TxSummary } from "../chain/TxSummary.js"
 import { SHELLEY_GENESIS_PARAMS } from "@helios-lang/ledger-shelley"
+import { makeTxSummary } from "../chain/index.js"
 
 /**
- * @typedef {import("@helios-lang/ledger").NetworkParams} NetworkParams
- * @typedef {import("@helios-lang/uplc").UplcProgramV2I} UplcProgramV2I
- * @typedef {import("./Network.js").Network} Network
- * @typedef {import("./Network.js").NetworkName} NetworkName
- */
-
-/**
- * The minimum wallet interface with which we can resolve which network is being used
- * Don't require full wallet interface, that way we can keep the network directory more decoupled from the wallets directory
- * @typedef {{
- *     utxos: Promise<TxInput[]>
- *     isMainnet: () => Promise<boolean>
- * }} ResolveableWallet
+ * @import { NetworkParams } from "@helios-lang/ledger"
+ * @import { UplcProgramV2I } from "@helios-lang/uplc"
+ * @import { BlockfrostV0Client, NetworkName, ReadonlyWallet, TxSummary } from "src/index.js"
  */
 
 /**
@@ -35,7 +24,7 @@ import { SHELLEY_GENESIS_PARAMS } from "@helios-lang/ledger-shelley"
  */
 
 /**
- * TODO: what is the type of `extraEntropy`
+ * TODO: what is the type of `extraEntropy`?
  * @typedef {{
  *   a0: number
  *   coins_per_utxo_size: LargeNumber
@@ -117,10 +106,115 @@ import { SHELLEY_GENESIS_PARAMS } from "@helios-lang/ledger-shelley"
  */
 
 /**
- * Blockfrost specific implementation of `Network`.
- * @implements {Network}
+ * @param {NetworkName} networkName
+ * @param {string} projectId
+ * @returns {BlockfrostV0Client}
  */
-export class BlockfrostV0 {
+export function makeBlockfrostV0Client(networkName, projectId) {
+    return new BlockfrostV0ClientImpl(networkName, projectId)
+}
+
+/**
+ * Connects to the same network a given `Wallet` or the given `TxInput` (preview, preprod or mainnet).
+ *
+ * Throws an error if a Blockfrost project_id is missing for that specific network.
+ * @overload
+ * @param {TxInput} utxo
+ * @param {{
+ *     preview?: string,
+ *     preprod?: string,
+ *     mainnet?: string
+ * }} projectIds
+ * @returns {Promise<BlockfrostV0Client>}
+ *
+ * @overload
+ * Connects to the same network a given `Wallet` is connected to (preview, preprod or mainnet).
+ * @param {ReadonlyWallet} wallet
+ * @param {{
+ *     preview?: string,
+ *     preprod?: string,
+ *     mainnet?: string
+ * }} projectIds
+ * @returns {Promise<BlockfrostV0Client>}
+ *
+ * @param {TxInput | ReadonlyWallet} utxoOrWallet
+ * @param {{
+ *     preview?: string,
+ *     preprod?: string,
+ *     mainnet?: string
+ * }} projectIds
+ * @returns {Promise<BlockfrostV0Client>}
+ */
+export async function resolveBlockfrostV0Client(utxoOrWallet, projectIds) {
+    if (utxoOrWallet instanceof TxInput) {
+        const refUtxo = utxoOrWallet
+        const mainnetProjectId = projectIds["mainnet"]
+        const preprodProjectId = projectIds["preprod"]
+        const previewProjectId = projectIds["preview"]
+
+        if (preprodProjectId !== undefined) {
+            const preprodNetwork = new BlockfrostV0ClientImpl(
+                "preprod",
+                preprodProjectId
+            )
+
+            if (await preprodNetwork.hasUtxo(refUtxo)) {
+                return preprodNetwork
+            }
+        }
+
+        if (previewProjectId !== undefined) {
+            const previewNetwork = new BlockfrostV0ClientImpl(
+                "preview",
+                previewProjectId
+            )
+
+            if (await previewNetwork.hasUtxo(refUtxo)) {
+                return previewNetwork
+            }
+        }
+
+        if (mainnetProjectId !== undefined) {
+            const mainnetNetwork = new BlockfrostV0ClientImpl(
+                "mainnet",
+                mainnetProjectId
+            )
+
+            if (await mainnetNetwork.hasUtxo(refUtxo)) {
+                return mainnetNetwork
+            }
+        }
+
+        throw new Error(
+            "refUtxo not found on a network for which you have a project id"
+        )
+    } else {
+        const wallet = utxoOrWallet
+
+        if (await wallet.isMainnet()) {
+            return new BlockfrostV0ClientImpl(
+                "mainnet",
+                expectDefined(projectIds["mainnet"])
+            )
+        } else {
+            const refUtxo = (await wallet.utxos)[0]
+
+            if (!refUtxo) {
+                throw new Error(
+                    "empty wallet, can't determine which testnet you are connecting to"
+                )
+            } else {
+                return resolveBlockfrostV0Client(refUtxo, projectIds)
+            }
+        }
+    }
+}
+
+/**
+ * Blockfrost specific implementation of `Network`.
+ * @implements {BlockfrostV0Client}
+ */
+class BlockfrostV0ClientImpl {
     /**
      * @readonly
      * @type {NetworkName}
@@ -141,103 +235,6 @@ export class BlockfrostV0 {
     constructor(networkName, projectId) {
         this.networkName = networkName
         this.projectId = projectId
-    }
-
-    /**
-     * Connects to the same network a given `Wallet` or the given `TxInput` (preview, preprod or mainnet).
-     *
-     * Throws an error if a Blockfrost project_id is missing for that specific network.
-     * @param {TxInput | ResolveableWallet} utxoOrWallet
-     * @param {{
-     *     preview?: string,
-     *     preprod?: string,
-     *     mainnet?: string
-     * }} projectIds
-     * @returns {Promise<BlockfrostV0>}
-     */
-    static async resolve(utxoOrWallet, projectIds) {
-        if (utxoOrWallet instanceof TxInput) {
-            return BlockfrostV0.resolveWithUtxo(utxoOrWallet, projectIds)
-        } else {
-            return BlockfrostV0.resolveWithWallet(utxoOrWallet, projectIds)
-        }
-    }
-
-    /**
-     * Throws an error if a Blockfrost project_id is missing for that specific network.
-     * @private
-     * @param {TxInput} refUtxo
-     * @param {{
-     *     preview?: string,
-     *     preprod?: string,
-     *     mainnet?: string
-     * }} projectIds
-     * @returns {Promise<BlockfrostV0>}
-     */
-    static async resolveWithUtxo(refUtxo, projectIds) {
-        const mainnetProjectId = projectIds["mainnet"]
-        const preprodProjectId = projectIds["preprod"]
-        const previewProjectId = projectIds["preview"]
-
-        if (preprodProjectId !== undefined) {
-            const preprodNetwork = new BlockfrostV0("preprod", preprodProjectId)
-
-            if (await preprodNetwork.hasUtxo(refUtxo)) {
-                return preprodNetwork
-            }
-        }
-
-        if (previewProjectId !== undefined) {
-            const previewNetwork = new BlockfrostV0("preview", previewProjectId)
-
-            if (await previewNetwork.hasUtxo(refUtxo)) {
-                return previewNetwork
-            }
-        }
-
-        if (mainnetProjectId !== undefined) {
-            const mainnetNetwork = new BlockfrostV0("mainnet", mainnetProjectId)
-
-            if (await mainnetNetwork.hasUtxo(refUtxo)) {
-                return mainnetNetwork
-            }
-        }
-
-        throw new Error(
-            "refUtxo not found on a network for which you have a project id"
-        )
-    }
-
-    /**
-     * Connects to the same network a given `Wallet` is connected to (preview, preprod or mainnet).
-     *
-     * Throws an error if a Blockfrost project_id is missing for that specific network.
-     * @private
-     * @param {ResolveableWallet} wallet
-     * @param {{
-     *     preview?: string,
-     *     preprod?: string,
-     *     mainnet?: string
-     * }} projectIds
-     * @returns {Promise<BlockfrostV0>}
-     */
-    static async resolveWithWallet(wallet, projectIds) {
-        if (await wallet.isMainnet()) {
-            return new BlockfrostV0(
-                "mainnet",
-                expectSome(projectIds["mainnet"])
-            )
-        } else {
-            const refUtxo = (await wallet.utxos)[0]
-
-            if (!refUtxo) {
-                throw new Error(
-                    "empty wallet, can't determine which testnet you are connecting to"
-                )
-            } else {
-                return BlockfrostV0.resolveWithUtxo(refUtxo, projectIds)
-            }
-        }
     }
 
     /**
@@ -393,7 +390,7 @@ export class BlockfrostV0 {
             throw new Error(`unexpected response from Blockfrost`)
         }
 
-        return new TxSummary({
+        return makeTxSummary({
             id: id,
             timestamp: Date.now(),
             inputs: await Promise.all(
@@ -584,9 +581,9 @@ export class BlockfrostV0 {
      */
     async restoreTxInput(obj) {
         /**
-         * @type {Option<UplcProgramV2I>}
+         * @type {UplcProgramV2I | undefined}
          */
-        let refScript = null
+        let refScript = undefined
 
         if (obj.reference_script_hash !== null) {
             const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/scripts/${obj.reference_script_hash}/cbor`
@@ -607,6 +604,8 @@ export class BlockfrostV0 {
                 console.error("blockfrost response is null or undefined")
             } else if (!("cbor" in responseJson)) {
                 console.error(`reponse.cbor not found in ${responseJson}`)
+            } else if (responseJson.cbor == null) {
+                console.error(`reponseJson.cbor is null`)
             } else {
                 refScript = UplcProgramV2.fromCbor(responseJson.cbor)
             }

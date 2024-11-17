@@ -11,11 +11,10 @@ import {
     rand
 } from "@helios-lang/crypto"
 import { PubKey, Signature } from "@helios-lang/ledger"
-import { None } from "@helios-lang/type-utils"
 
 /**
- * @typedef {import("@helios-lang/crypto").NumberGenerator} NumberGenerator
- * @typedef {import("./PrivateKey.js").PrivateKey} PrivateKey
+ * @import { NumberGenerator } from "@helios-lang/crypto"
+ * @import { Bip32PrivateKey } from "src/index.js"
  */
 
 /**
@@ -24,10 +23,58 @@ import { None } from "@helios-lang/type-utils"
 export const BIP32_HARDEN = 0x80000000
 
 /**
- * Ed25519-Bip32 extendable `PrivateKey`.
- * @implements {PrivateKey}
+ * @param {number[]} bytes
+ * @returns {Bip32PrivateKey}
  */
-export class Bip32PrivateKey {
+export function makeBip32PrivateKey(bytes) {
+    return new Bip32PrivateKeyImpl(bytes)
+}
+
+/**
+ * Generate a Bip32PrivateKey from a random number generator.
+ * This is not cryptographically secure, only use this for testing purpose
+ * @param {NumberGenerator} random
+ * @returns {Bip32PrivateKey}
+ */
+export function makeRandomBip32PrivateKey(
+    random = rand(Math.random() * Number.MAX_SAFE_INTEGER)
+) {
+    const bytes = generateBytes(random, 96)
+
+    return new Bip32PrivateKeyImpl(bytes)
+}
+
+/**
+ * @param {number[]} entropy
+ * @param {boolean} force
+ * @returns {Bip32PrivateKey}
+ */
+export function makeBip32PrivateKeyWithBip39Entropy(entropy, force = true) {
+    const bytes = pbkdf2(hmacSha2_512, [], entropy, 4096, 96)
+
+    const kl = bytes.slice(0, 32)
+    const kr = bytes.slice(32, 64)
+
+    if (!force) {
+        if ((kl[31] & 0b00100000) != 0) {
+            throw new Error("invalid root secret")
+        }
+    }
+
+    kl[0] &= 0b11111000
+    kl[31] &= 0b00011111
+    kl[31] |= 0b01000000
+
+    const c = bytes.slice(64, 96)
+
+    return new Bip32PrivateKeyImpl(kl.concat(kr).concat(c))
+}
+
+/**
+ * Ed25519-Bip32 extendable `PrivateKey`.
+ * @implements {Bip32PrivateKey}
+ */
+class Bip32PrivateKeyImpl {
     /**
      * 96 bytes
      * @type {number[]}
@@ -37,7 +84,7 @@ export class Bip32PrivateKey {
     /**
      * Derived and cached on demand
      * @private
-     * @type {Option<PubKey>}
+     * @type {PubKey | undefined}
      */
     pubKey
 
@@ -52,7 +99,7 @@ export class Bip32PrivateKey {
         }
 
         this.bytes = bytes
-        this.pubKey = None
+        this.pubKey = undefined
     }
 
     /**
@@ -88,41 +135,6 @@ export class Bip32PrivateKey {
     }
 
     /**
-     * Generate a Bip32PrivateKey from a random number generator.
-     * This is not cryptographically secure, only use this for testing purpose
-     * @param {NumberGenerator} random
-     * @returns {Bip32PrivateKey}
-     */
-    static random(random = rand(Math.random())) {
-        return new Bip32PrivateKey(generateBytes(random, 96))
-    }
-
-    /**
-     * @param {number[]} entropy
-     * @param {boolean} force
-     */
-    static fromBip39Entropy(entropy, force = true) {
-        const bytes = pbkdf2(hmacSha2_512, [], entropy, 4096, 96)
-
-        const kl = bytes.slice(0, 32)
-        const kr = bytes.slice(32, 64)
-
-        if (!force) {
-            if ((kl[31] & 0b00100000) != 0) {
-                throw new Error("invalid root secret")
-            }
-        }
-
-        kl[0] &= 0b11111000
-        kl[31] &= 0b00011111
-        kl[31] |= 0b01000000
-
-        const c = bytes.slice(64, 96)
-
-        return new Bip32PrivateKey(kl.concat(kr).concat(c))
-    }
-
-    /**
      * @param {number} i
      * @returns {Bip32PrivateKey}
      */
@@ -141,7 +153,7 @@ export class Bip32PrivateKey {
         const c = this.calcChildC(i).slice(32, 64)
 
         // TODO: discard child key whose public key is the identity point
-        return new Bip32PrivateKey(kl.concat(kr).concat(c))
+        return new Bip32PrivateKeyImpl(kl.concat(kr).concat(c))
     }
 
     /**

@@ -1,3 +1,4 @@
+import { strictEqual } from "node:assert"
 import { describe, it } from "node:test"
 import {
     Address,
@@ -8,7 +9,6 @@ import {
     Value
 } from "@helios-lang/ledger"
 import { selectSmallestFirst } from "./extremumFirst.js"
-import { strictEqual } from "node:assert"
 
 describe(selectSmallestFirst.name, () => {
     const utxos = [

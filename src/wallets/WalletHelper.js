@@ -1,27 +1,45 @@
-import { bytesToHex } from "@helios-lang/codec-utils"
-import { Address, PubKeyHash, TxInput, Value } from "@helios-lang/ledger"
-import { None, expectSome } from "@helios-lang/type-utils"
+import {
+    Address,
+    PubKeyHash,
+    Signature,
+    StakingAddress,
+    Tx,
+    TxId,
+    TxInput,
+    Value
+} from "@helios-lang/ledger"
+import { expectDefined as expectDefined } from "@helios-lang/type-utils"
 import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
-import { OfflineWallet } from "./OfflineWallet.js"
+import { makeOfflineWallet } from "./OfflineWallet.js"
 
 /**
- 
- * @typedef {import("../network/Network.js").ReadonlyNetwork} ReadonlyNetwork
- * @typedef {import("./OfflineWalletJsonSafe.js").OfflineWalletJsonSafe} OfflineWalletJsonSafe
- * @typedef {import("./Wallet.js").ReadonlyWallet} ReadonlyWallet
+ * @import { CoinSelection, OfflineWallet, OfflineWalletJsonSafe, ReadonlyCardanoClient, ReadonlyWallet, Wallet, WalletHelper } from "src/index.js"
  */
 
 /**
- * @template CSpending
- * @template CStaking
- * @typedef {import("../coinselection/index.js").CoinSelection<CSpending, CStaking>} CoinSelection
+ * @template {ReadonlyWallet} W
+ * @param {W} wallet
+ * @param {ReadonlyCardanoClient | undefined} fallback
+ * @returns {WalletHelper<W>}
  */
+export function makeWalletHelper(wallet, fallback = undefined) {
+    return new WalletHelperImpl(wallet)
+}
+
+/**
+ * @param {ReadonlyWallet} w
+ * @returns {w is Wallet}
+ */
+function isWallet(w) {
+    return "submitTx" in w && "signData" in w && "signTx" in w
+}
 
 /**
  * High-level helper class for instances that implement the `Wallet` interface.
  * @template {ReadonlyWallet} W
+ * @implements {WalletHelper<W>}
  */
-export class WalletHelper {
+class WalletHelperImpl {
     /**
      * @readonly
      * @type {W}
@@ -29,18 +47,26 @@ export class WalletHelper {
     wallet
 
     /**
+     * @private
      * @readonly
-     * @type {Option<ReadonlyNetwork>}
+     * @type {ReadonlyCardanoClient | undefined}
      */
     fallback
 
     /**
      * @param {W} wallet
-     * @param {Option<ReadonlyNetwork>} fallback
+     * @param {ReadonlyCardanoClient | undefined} fallback
      */
-    constructor(wallet, fallback = None) {
+    constructor(wallet, fallback = undefined) {
         this.wallet = wallet
         this.fallback = fallback
+    }
+
+    /**
+     * @returns {Promise<boolean>}
+     */
+    isMainnet() {
+        return this.wallet.isMainnet()
     }
 
     /**
@@ -61,7 +87,9 @@ export class WalletHelper {
      * @type {Promise<Address<null, unknown>>}
      */
     get baseAddress() {
-        return this.allAddresses.then((addresses) => expectSome(addresses[0]))
+        return this.allAddresses.then((addresses) =>
+            expectDefined(addresses[0])
+        )
     }
 
     /**
@@ -85,15 +113,29 @@ export class WalletHelper {
     }
 
     /**
+     * @type {Promise<Address[]>}
+     */
+    get usedAddresses() {
+        return this.wallet.usedAddresses
+    }
+
+    /**
+     * @type {Promise<Address[]>}
+     */
+    get unusedAddresses() {
+        return this.wallet.unusedAddresses
+    }
+
+    /**
      * First UTxO in `utxos`. Can be used to distinguish between preview and preprod networks.
-     * @type {Promise<Option<TxInput<null, unknown>>>}
+     * @type {Promise<TxInput<null, unknown> | undefined>}
      */
     get refUtxo() {
         return this.utxos.then((utxos) => {
             if (utxos.length == 0) {
-                return None
+                return undefined
             } else {
-                return expectSome(utxos[0])
+                return expectDefined(utxos[0])
             }
         })
     }
@@ -135,6 +177,20 @@ export class WalletHelper {
                 )
             }
         })()
+    }
+
+    /**
+     * @type {Promise<TxInput[]>}
+     */
+    get collateral() {
+        return this.wallet.collateral
+    }
+
+    /**
+     * @type {Promise<StakingAddress[]>}
+     */
+    get stakingAddresses() {
+        return this.wallet.stakingAddresses
     }
 
     /**
@@ -231,7 +287,7 @@ export class WalletHelper {
 
         const [selected, _notSelected] = selectSingle(utxos, value)
 
-        return expectSome(selected[0])
+        return expectDefined(selected[0])
     }
 
     /**
@@ -273,7 +329,7 @@ export class WalletHelper {
             this.wallet.stakingAddresses
         ])
 
-        return new OfflineWallet({
+        return makeOfflineWallet({
             isMainnet,
             usedAddresses,
             unusedAddresses,
@@ -281,5 +337,69 @@ export class WalletHelper {
             collateral,
             stakingAddresses
         })
+    }
+
+    /**
+     * @type {W extends Wallet ? (addr: Address, data: number[]) => Promise<Signature> : never}
+     */
+    get signData() {
+        const w = this.wallet
+
+        if (isWallet(w)) {
+            /**
+             * @param {Address} addr
+             * @param {number[]} data
+             * @returns {Promise<Signature>}
+             */
+            const fn = async (addr, data) => {
+                return w.signData(addr, data)
+            }
+
+            return /** @type {any} */ (fn)
+        } else {
+            throw new Error("signData not defined on ReadonlyWallet")
+        }
+    }
+
+    /**
+     * @type {W extends Wallet ? (tx: Tx) => Promise<Signature[]> : never}
+     */
+    get signTx() {
+        const w = this.wallet
+
+        if (isWallet(w)) {
+            /**
+             * @param {Tx} tx
+             * @returns {Promise<Signature[]>}
+             */
+            const fn = async (tx) => {
+                return w.signTx(tx)
+            }
+
+            return /** @type {any} */ (fn)
+        } else {
+            throw new Error("signTx not defined on ReadonlyWallet")
+        }
+    }
+
+    /**
+     * @type {W extends Wallet ? (tx: Tx) => Promise<TxId> : never}
+     */
+    get submitTx() {
+        const w = this.wallet
+
+        if (isWallet(w)) {
+            /**
+             * @param {Tx} tx
+             * @returns {Promise<TxId>}
+             */
+            const fn = async (tx) => {
+                return w.submitTx(tx)
+            }
+
+            return /** @type {any} */ (fn)
+        } else {
+            throw new Error("submitTx not defined on ReadonlyWallet")
+        }
     }
 }

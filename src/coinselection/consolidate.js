@@ -3,19 +3,7 @@ import { selectSmallestFirst } from "./extremumFirst.js"
 import { InsufficientFundsError } from "./InsufficientFundsError.js"
 
 /**
- * @template CSpending
- * @template CStaking
- * @typedef {import("./CoinSelection.js").CoinSelection<CSpending, CStaking>} CoinSelection
- */
-
-/**
- *   - maxUtxos defaults to 5
- *
- * @typedef {{
- *   includeAssets: AssetClass[]
- *   excludeAssets: AssetClass[]
- *   maxUtxos?: number
- * }} ConsolidateProps
+ * @import { CoinSelection } from "src/index.js"
  */
 
 /**
@@ -28,7 +16,10 @@ import { InsufficientFundsError } from "./InsufficientFundsError.js"
  * All UTxOs contain some lovelace, so require special treatment:
  *   - pure lovelace UTxOs are treated as containing the lovelace assetClass
  *   - UTxOs that contain lovelace in addition to other assetClasses are treated as containing those other assetClasses (but not lovelace)
- * @param {ConsolidateProps} props
+ * @param {object} props
+ * @param {AssetClass[]} props.includeAssets
+ * @param {AssetClass[]} props.excludeAssets
+ * @param {number} [props.maxUtxos] defaults to 5
  */
 export function consolidate(props) {
     const includeAssets = props.includeAssets

@@ -1,6 +1,5 @@
 import { BitWriter, padBits } from "@helios-lang/codec-utils"
 import { sha2_256 } from "@helios-lang/crypto"
-import { isNone } from "@helios-lang/type-utils"
 
 /**
  * Standard English Bip39 dictionary consisting of 2048 words allowing wallet root keys to be formed by a phrase of 12, 15, 18, 21 or 24 of these words.
@@ -2176,7 +2175,7 @@ export function convertEntropyToBip39Phrase(entropy, dict = BIP39_DICT_EN) {
 
         const w = dict[i]
 
-        if (isNone(w)) {
+        if (!w) {
             throw new Error(`dict entry ${i} not found`)
         }
 
