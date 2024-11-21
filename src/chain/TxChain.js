@@ -1,7 +1,8 @@
-import { Tx, TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
+import { makeTxInput, makeTxOutputId } from "@helios-lang/ledger"
 
 /**
- * @import { TxChain } from "src/index.js"
+ * @import { Tx, TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
+ * @import { TxChain } from "../index.js"
  */
 
 /**
@@ -106,7 +107,7 @@ class TxChainImpl {
          * @returns {void}
          */
         const pushOutput = (output, txI, utxoId) => {
-            const utxo = new TxInput(new TxOutputId(txIds[txI], utxoId), output)
+            const utxo = makeTxInput(makeTxOutputId(txIds[txI], utxoId), output)
 
             if (
                 this.txs

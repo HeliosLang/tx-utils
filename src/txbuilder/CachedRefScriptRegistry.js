@@ -1,14 +1,15 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
-import { TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
+import { makeTxInput, makeTxOutput, makeTxOutputId } from "@helios-lang/ledger"
 
 /**
- * @import { UplcProgramV2I } from "@helios-lang/uplc"
- * @import { ReadonlyCardanoClient, ReadonlyRefScriptRegistry } from "src/index.js"
+ * @import { TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { UplcProgramV2 } from "@helios-lang/uplc"
+ * @import { ReadonlyCardanoClient, ReadonlyRefScriptRegistry } from "../index.js"
  */
 
 /**
  * @param {ReadonlyCardanoClient} client
- * @param {Record<string, {program: UplcProgramV2I, utxoId: TxOutputId | string}> | [UplcProgramV2I, TxOutputId | string][]} scripts
+ * @param {Record<string, {program: UplcProgramV2, utxoId: TxOutputId | string}> | [UplcProgramV2, TxOutputId | string][]} scripts
  * @returns {ReadonlyRefScriptRegistry}
  */
 export function makeCachedRefScriptRegistry(client, scripts) {
@@ -19,7 +20,7 @@ export function makeCachedRefScriptRegistry(client, scripts) {
                 scripts.map(([p, id]) => {
                     return [
                         bytesToHex(p.hash()),
-                        { program: p, inputId: TxOutputId.new(id) }
+                        { program: p, inputId: makeTxOutputId(id) }
                     ]
                 })
             )
@@ -33,7 +34,7 @@ export function makeCachedRefScriptRegistry(client, scripts) {
                         h,
                         {
                             program: obj.program,
-                            inputId: TxOutputId.new(obj.utxoId)
+                            inputId: makeTxOutputId(obj.utxoId)
                         }
                     ]
                 })
@@ -54,14 +55,14 @@ class CachedRefScriptRegistry {
 
     /**
      * @private
-     * @type {Record<string, {program: UplcProgramV2I, inputId: TxOutputId}>}
+     * @type {Record<string, {program: UplcProgramV2, inputId: TxOutputId}>}
      */
     scripts
 
     /**
      *
      * @param {ReadonlyCardanoClient} network
-     * @param {Record<string, {program: UplcProgramV2I, inputId: TxOutputId}>} scripts
+     * @param {Record<string, {program: UplcProgramV2, inputId: TxOutputId}>} scripts
      */
     constructor(network, scripts) {
         this.client = network
@@ -70,7 +71,7 @@ class CachedRefScriptRegistry {
 
     /**
      * @param {number[]} hash
-     * @returns {Promise<{program: UplcProgramV2I, input: TxInput} | undefined>}
+     * @returns {Promise<{program: UplcProgramV2, input: TxInput} | undefined>}
      */
     async find(hash) {
         const h = bytesToHex(hash)
@@ -81,9 +82,9 @@ class CachedRefScriptRegistry {
             const input = await this.client.getUtxo(inputId)
 
             // make a copy of the input with the full original program, so we are sure to get all the additional information (source mapping etc.)
-            const inputCopy = new TxInput(
+            const inputCopy = makeTxInput(
                 inputId,
-                new TxOutput(input.address, input.value, input.datum, program)
+                makeTxOutput(input.address, input.value, input.datum, program)
             )
             return { program, input: inputCopy }
         } else {

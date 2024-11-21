@@ -10,11 +10,12 @@ import {
     pbkdf2,
     rand
 } from "@helios-lang/crypto"
-import { PubKey, Signature } from "@helios-lang/ledger"
+import { makePubKey, makeSignature } from "@helios-lang/ledger"
 
 /**
  * @import { NumberGenerator } from "@helios-lang/crypto"
- * @import { Bip32PrivateKey } from "src/index.js"
+ * @import { PubKey, Signature } from "@helios-lang/ledger"
+ * @import { Bip32PrivateKey } from "../index.js"
  */
 
 /**
@@ -177,13 +178,11 @@ class Bip32PrivateKeyImpl {
      * @returns {PubKey}
      */
     derivePubKey() {
-        if (this.pubKey) {
-            return this.pubKey
-        } else {
-            this.pubKey = new PubKey(Ed25519.derivePublicKey(this.k, false))
-
-            return this.pubKey
+        if (!this.pubKey) {
+            this.pubKey = makePubKey(Ed25519.derivePublicKey(this.k, false))
         }
+
+        return this.pubKey
     }
 
     /**
@@ -191,7 +190,7 @@ class Bip32PrivateKeyImpl {
      * @returns {Signature}
      */
     sign(message) {
-        return new Signature(
+        return makeSignature(
             this.derivePubKey(),
             Ed25519.sign(message, this.k, false)
         )

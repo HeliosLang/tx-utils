@@ -1,10 +1,10 @@
-import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+import { makeTxInput } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
 import { makeTxChain } from "./TxChain.js"
 
 /**
- * @import { NetworkParams } from "@helios-lang/ledger"
- * @import { ReadonlyCardanoClient, TxChain, TxChainBuilder } from "src/index.js"
+ * @import { Address, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { ReadonlyCardanoClient, TxChain, TxChainBuilder } from "../index.js"
  */
 
 /**
@@ -71,9 +71,9 @@ class TxChainBuilderImpl {
             const tx = this.txs[i]
 
             if (tx.id().isEqual(id.txId)) {
-                const output = expectDefined(tx.body.outputs[id.utxoIdx])
+                const output = expectDefined(tx.body.outputs[id.index])
 
-                return new TxInput(id, output)
+                return makeTxInput(id, output)
             }
         }
 

@@ -56,32 +56,10 @@ export {
     parseOfflineWallet
 } from "./wallets/index.js"
 
-import { StakingValidatorHash } from "@helios-lang/ledger"
-import { MintingPolicyHash } from "@helios-lang/ledger"
-import { TxOutputDatum } from "@helios-lang/ledger"
-import { AssetClass } from "@helios-lang/ledger"
-import { NativeScript } from "@helios-lang/ledger"
-import {
-    Address,
-    Assets,
-    DCert,
-    PubKey,
-    PubKeyHash,
-    Signature,
-    StakingAddress,
-    TokenValue,
-    Tx,
-    TxId,
-    TxInput,
-    TxOutput,
-    TxOutputId,
-    Value
-} from "@helios-lang/ledger"
-
 /**
  * @import { BytesLike, IntLike } from "@helios-lang/codec-utils"
- * @import { AddressLike, DatumPaymentContext, MintingContext, MintingPolicyHashLike, NetworkParams, PubKeyHashLike, SpendingContext, StakingAddressLike, StakingContext, TimeLike, TxInfo, TxMetadataAttr, TxOutputDatumCastable, ValueLike } from "@helios-lang/ledger"
- * @import { Cost, UplcData, UplcLoggingI, UplcProgramV1I, UplcProgramV2I } from "@helios-lang/uplc"
+ * @import { Address, AssetClass, Assets, DatumPaymentContext, DCert, MintingContext, MintingPolicyHash, MintingPolicyHashLike, NativeScript, NetworkParams, PubKey, PubKeyHash, PubKeyHashLike, ShelleyAddress, ShelleyAddressLike, Signature, SpendingContext, SpendingCredential, StakingAddress, StakingAddressLike, StakingContext, StakingValidatorHash, TimeLike, TokenValue, Tx, TxId, TxInfo, TxInput, TxMetadataAttr, TxOutput, TxOutputId, TxOutputDatum, TxOutputDatumCastable, ValidatorHash, Value, ValueLike } from "@helios-lang/ledger"
+ * @import { Cost, UplcData, UplcLogger, UplcProgramV1, UplcProgramV2 } from "@helios-lang/uplc"
  */
 
 /**
@@ -176,16 +154,16 @@ import {
  * @prop {Promise<StakingAddress[]>} stakingAddresses
  * Gets a list of unique reward addresses which can be used to UTxOs to.
  *
- * @prop {Promise<Address<null, unknown>[]>} usedAddresses
+ * @prop {Promise<Address<PubKeyHash>[]>} usedAddresses
  * Gets a list of addresses which contain(ed) UTxOs.
  *
- * @prop {Promise<Address<null, unknown>[]>} unusedAddresses
+ * @prop {Promise<Address<PubKeyHash>[]>} unusedAddresses
  * Gets a list of unique unused addresses which can be used to UTxOs to.
  *
- * @prop {Promise<TxInput<null, unknown>[]>} utxos
+ * @prop {Promise<TxInput<PubKeyHash>[]>} utxos
  * Gets the complete list of UTxOs (as `TxInput` instances) sitting at the addresses owned by the wallet.
  *
- * @prop {Promise<TxInput<null, unknown>[]>} collateral
+ * @prop {Promise<TxInput<PubKeyHash>[]>} collateral
  *
  * @prop {(addr: Address, data: number[]) => Promise<Signature>} signData
  * Sign a data payload with the users wallet.
@@ -200,12 +178,11 @@ import {
 /**
  * A function that returns two lists.
  * The first list contains the selected UTxOs, the second list contains the remaining UTxOs.
- * @template CSpending
- * @template CStaking
+ * @template {SpendingCredential} [SC=SpendingCredential]
  * @typedef {(
- *   utxos: TxInput<CSpending, CStaking>[],
+ *   utxos: TxInput<SC>[],
  *   amount: Value
- * ) => [TxInput<CSpending, CStaking>[], TxInput<CSpending, CStaking>[]]} CoinSelection
+ * ) => [TxInput<SC>[], TxInput<SC>[]]} CoinSelection
  */
 
 /**
@@ -272,15 +249,15 @@ import {
  * @prop {Promise<NetworkParams>} parameters
  * @prop {() => boolean} isMainnet
  * @prop {(addr: Address) => Promise<Value>} calcBalance
- * @prop {<CSpending=unknown, CStaking=unknown>(id: TxOutputId, addr?: Address<CSpending, CStaking> | undefined) => Promise<TxInput<CSpending, CStaking>>} getUtxo
- * @prop {<CSpending=unknown, CStaking=unknown>(addr: Address<CSpending, CStaking>) => Promise<TxInput<CSpending, CStaking>[]>} getUtxos
+ * @prop {<SC extends SpendingCredential=SpendingCredential>(id: TxOutputId, addr?: Address<SC> | undefined) => Promise<TxInput<SC>>} getUtxo
+ * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>) => Promise<TxInput<SC>[]>} getUtxos
  *
- * @prop {<CSpending=unknown, CStaking=unknown>(addr: Address<CSpending, CStaking>, value: Value) => Promise<TxInput<CSpending, CStaking>>} selectUtxo
+ * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>, value: Value) => Promise<TxInput<SC>>} selectUtxo
  * This method is used to select very specific UTxOs that contain known tokens/NFTs
  * If the UTxO isn't found that usually means something is wrong with the network synchronization
  * The onSelectUtxoFail callback can be used to trigger a synchronization action if the UTxO isn' foun
  *
- * @prop {<CSpending=unknown, CStaking=unknown>(addr: Address<CSpending, CStaking>, value: Value, coinSelection?: CoinSelection<CSpending, CStaking>) => Promise<TxInput<CSpending, CStaking>[]>} selectUtxos
+ * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>, value: Value, coinSelection?: CoinSelection<SC>) => Promise<TxInput<SC>[]>} selectUtxos
  * coinSelection defaults to selectSmallestFirst
  *
  * @prop {C extends CardanoClient ? (tx: Tx) => Promise<TxId> : never} submitTx
@@ -427,13 +404,13 @@ import {
 
 /**
  * @typedef {object} ReadonlyRefScriptRegistry
- * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgramV2I} | undefined>} find
+ * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgramV2} | undefined>} find
  */
 
 /**
  * @typedef {object} RefScriptRegistry
- * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgramV2I} | undefined>} find
- * @prop {(program: UplcProgramV2I) => Promise<TxOutputId>} register
+ * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgramV2} | undefined>} find
+ * @prop {(program: UplcProgramV2) => Promise<TxOutputId>} register
  */
 
 /**
@@ -460,7 +437,7 @@ import {
  * @prop {Bip32PrivateKey} spendingPrivateKey
  * @prop {PubKey} spendingPubKey
  * @prop {PubKey | undefined} stakingPubKey
- * @prop {Address<null, null>} address
+ * @prop {Address} address
  *
  * @prop {Promise<TxInput[]>} collateral
  * Don't define any collateral, let the TxBuilder use the regular inputs
@@ -498,11 +475,11 @@ import {
 
 /**
  * @typedef {{
- *   changeAddress: AddressLike | Promise<AddressLike>
+ *   changeAddress: ShelleyAddressLike | Promise<ShelleyAddressLike>
  *   spareUtxos?: TxInput[] | Promise<TxInput[]>
  *   networkParams?: NetworkParams | Promise<NetworkParams>
  *   maxAssetsPerChangeOutput?: number
- *   logOptions?: UplcLoggingI
+ *   logOptions?: UplcLogger
  *   throwBuildPhaseScriptErrors?: boolean
  *   beforeValidate?: (tx: Tx) => any | Promise<any>
  *   modifyExBudget?: ExBudgetModifier
@@ -549,7 +526,7 @@ import {
  * @prop {(utxo: TxInput | TxInput[]) => TxBuilder} addCollateral
  * @prop {(dcert: DCert) => TxBuilder} addDCert
  * @prop {(
- *   ...output: TxOutput<any, any>[]
+ *   ...output: TxOutput[]
  * ) => TxBuilder} addOutput
  * Sorts that assets in the output if not already sorted (mutates `output`s) (needed by the Flint wallet)
  * Throws an error if any the value entries are non-positive
@@ -565,7 +542,7 @@ import {
  *   script: NativeScript
  * ) => TxBuilder} attachNativeScript
  * @prop {(
- *   program: UplcProgramV1I | UplcProgramV2I
+ *   program: UplcProgramV1
  * ) => TxBuilder} attachUplcProgram
  * @prop {(
  *   hash: PubKeyHash,
@@ -577,7 +554,7 @@ import {
  *   redeemer: TRedeemer
  * ) => TxBuilder} delegateWithRedeemer
  * @prop {(
- *   hash: PubKeyHash | StakingValidatorHash<any, any>,
+ *   hash: PubKeyHash | StakingValidatorHash<any>,
  *   poolId: PubKeyHashLike,
  *   redeemer?: UplcData | LazyRedeemerData | undefined
  * ) => TxBuilder} delegateUnsafe
@@ -589,11 +566,11 @@ import {
  *   redeemer: TRedeemer
  * ) => TxBuilder} deregisterWithRedeemer
  * @prop {(
- *   hash: PubKeyHash | StakingValidatorHash<any, any>,
+ *   hash: PubKeyHash | StakingValidatorHash<any>,
  *   redeemer?: UplcData | LazyRedeemerData | undefined
  * ) => TxBuilder} deregisterUnsafe
  * @prop {(
- *   token: TokenValue<null>
+ *   token: TokenValue
  * ) => TxBuilder} mintTokenValueWithoutRedeemer
  * Adds minting instructions to the transaction without a redeemer
  *
@@ -604,7 +581,7 @@ import {
  * Adds minting instructions to the transaction, given a transaction context supporting redeemer transformation
  *
  * @prop {(
- *   assetClass: AssetClass<null>,
+ *   assetClass: AssetClass,
  *   quantity: IntLike
  * ) => TxBuilder} mintAssetClassWithoutRedeemer
  * Adds minting instructions to the transaction without a redeemer
@@ -629,7 +606,7 @@ import {
  *   redeemer?: UplcData | LazyRedeemerData | undefined
  * ) => TxBuilder} mintAssetClassUnsafe
  * @prop {(
- *   policy: MintingPolicyHash<null>,
+ *   policy: MintingPolicyHash,
  *   tokens: [BytesLike, IntLike][]
  * ) => TxBuilder} mintPolicyTokensWithoutRedeemer
  * Adds minting instructions to the transaction without a redeemer
@@ -652,21 +629,21 @@ import {
  * Also throws an error if the redeemer is `undefined`, and the minting policy isn't a known `NativeScript`.
  *
  * @prop {(
- *   address: Address<null, any>,
+ *   address: ShelleyAddress<PubKeyHash>,
  *   value: ValueLike
  * ) => TxBuilder} payWithoutDatum
  * @prop {<TDatum>(
- *   address: Address<DatumPaymentContext<TDatum>, any>,
+ *   address: ShelleyAddress<ValidatorHash<DatumPaymentContext<TDatum>>>,
  *   value: ValueLike,
  *   datum: TxOutputDatumCastable<TDatum>
  * ) => TxBuilder} payWithDatum
  * @prop {(
- *   addr: AddressLike,
+ *   addr: ShelleyAddressLike,
  *   value: ValueLike,
  *   datum?: TxOutputDatum | undefined
  * ) => TxBuilder} payUnsafe
  * @prop {(
- *   ...utxos: TxInput<any, any>[]
+ *   ...utxos: TxInput<any>[]
  * ) => TxBuilder} refer
  * Include a reference input
  *
@@ -678,18 +655,18 @@ import {
  *   attributes: {[key: number]: TxMetadataAttr}
  * ) => TxBuilder} setMetadataAttributes
  * @prop {(
- *   ...utxos: TxInput<null, any>[]
+ *   ...utxos: TxInput<PubKeyHash>[]
  * ) => TxBuilder} spendWithoutRedeemer
  * @prop {<TRedeemer>(
- *   utxos: TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[],
+ *   utxos: TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>> | TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>>[],
  *   redeemer: TRedeemer
  * ) => TxBuilder} spendWithRedeemer
  * @prop {<TRedeemer>(
- *   utxos: TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[],
+ *   utxos: TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>> | TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>>[],
  *   redeemer: LazyRedeemerData<TRedeemer>
  * ) => TxBuilder} spendWithLazyRedeemer
  * @prop {(
- *   utxos: TxInput<any, any> | TxInput<any, any>[],
+ *   utxos: TxInput<any> | TxInput<any>[],
  *   redeemer?: UplcData | LazyRedeemerData | undefined
  * ) => TxBuilder} spendUnsafe
  * Add a UTxO instance as an input to the transaction being built.
@@ -708,16 +685,16 @@ import {
  * Set the end of the valid time range by specifying a time.
  *
  * @prop {(
- *   addr: StakingAddress<null>,
+ *   addr: StakingAddress<PubKeyHash>,
  *   lovelace: IntLike
  * ) => TxBuilder} withdrawWithoutRedeemer
  * @prop {<TRedeemer>(
- *   addr: StakingAddress<StakingContext<any, TRedeemer>>,
+ *   addr: StakingAddress<StakingValidatorHash<StakingContext<any, TRedeemer>>>,
  *   lovelace: IntLike,
  *   redeemer: TRedeemer
  * ) => TxBuilder} withdrawWithRedeemer
  * @prop {<TRedeemer>(
- *   addr: StakingAddress<StakingContext<any, TRedeemer>>,
+ *   addr: StakingAddress<StakingValidatorHash<StakingContext<any, TRedeemer>>>,
  *   lovelace: IntLike,
  *   redeemer: LazyRedeemerData<TRedeemer>
  * ) => TxBuilder} withdrawWithLazyRedeemer
@@ -778,10 +755,10 @@ import {
  * @prop {TxInput[]} inputs
  * @prop {TxInput[]} outputs
  * @prop {number} timestamp
- * @prop {<CSpending = unknown, CStaking = unknown>(addresses: Address<CSpending, CStaking>[]) => TxInput<CSpending, CStaking>[]} getUtxosPaidTo
+ * @prop {<SC extends SpendingCredential=SpendingCredential>(addresses: Address<SC>[]) => TxInput<SC>[]} getUtxosPaidTo
  * @prop {(utxo: TxInput | TxOutputId) => boolean} spends
  * @prop {() => TxSummary} reverse
- * @prop {<CSpending = unknown, CStaking = unknown>(utxos: TxInput<CSpending, CStaking>[], addresses: Address<CSpending, CStaking>[]) => TxInput<CSpending, CStaking>[]} superimpose
+ * @prop {<SC extends SpendingCredential=SpendingCredential>(utxos: TxInput<SC>[], addresses: Address<SC>[]) => TxInput<SC>[]} superimpose
  * @prop {() => TxSummaryJsonSafe} toJsonSafe
  */
 
@@ -851,14 +828,14 @@ import {
  * @prop {() => Promise<boolean>} isMainnet
  * Returns `true` if the wallet is connected to the mainnet.
  *
- * @prop {Promise<Address<null, unknown>[]>} allAddresses
+ * @prop {Promise<Address[]>} allAddresses
  * Concatenation of `usedAddresses` and `unusedAddresses`.
  *
- * @prop {Promise<Address<null, unknown>>}  baseAddress
+ * @prop {Promise<Address>}  baseAddress
  * First `Address` in `allAddresses`.
  * Throws an error if there aren't any addresses.
  *
- * @prop {Promise<Address<null, unknown>>} changeAddress
+ * @prop {Promise<Address>} changeAddress
  * First `Address` in `unusedAddresses` (falls back to last `Address` in `usedAddresses` if `unusedAddresses` is empty or not defined).
  *
  * @prop {Promise<Address[]>} usedAddresses
@@ -867,10 +844,10 @@ import {
  * @prop {Promise<Address[]>} unusedAddresses
  * Returns a list of unique unused addresses which can be used to send UTxOs to with increased anonimity.
  *
- * @prop {Promise<TxInput<null, unknown> | undefined>} refUtxo
+ * @prop {Promise<TxInput | undefined>} refUtxo
  * First UTxO in `utxos`. Can be used to distinguish between preview and preprod networks.
  *
- * @prop {Promise<TxInput<null, unknown>[]>} utxos
+ * @prop {Promise<TxInput[]>} utxos
  * Uses the fallback if the list returned from underlying wallet is empty.
  *
  * @prop {Promise<TxInput[]>} collateral
@@ -888,15 +865,15 @@ import {
  * @prop {(pkh: PubKeyHash) => Promise<boolean>} isOwnPubKeyHash
  * Returns `true` if the given `PubKeyHash` is controlled by the wallet.
  *
- * @prop {(amount?: bigint) => Promise<TxInput<null, unknown>>} selectCollateral
+ * @prop {(amount?: bigint) => Promise<TxInput>} selectCollateral
  * Picks a single UTxO intended as collateral.
  * The amount defaults to 2 Ada, which should cover most things
  *
- * @prop {(value: Value) => Promise<TxInput<null, unknown>>} selectUtxo
+ * @prop {(value: Value) => Promise<TxInput>} selectUtxo
  * Returns only a single utxo.
  * Throws an error if a UTxO containing the given value isn't found.
  *
- * @prop {(amount: Value, coinSelection?: CoinSelection<null, unknown>) => Promise<TxInput<null, unknown>[]>} selectUtxos
+ * @prop {(amount: Value, coinSelection?: CoinSelection) => Promise<TxInput[]>} selectUtxos
  * Pick a number of UTxOs needed to cover a given Value.
  * The default coin selection strategy is to pick the smallest first.
  *

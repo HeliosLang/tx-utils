@@ -1,15 +1,12 @@
-import { TxInput, Value } from "@helios-lang/ledger"
-
 /**
- * @import { CoinSelection } from "src/index.js"
+ * @import { SpendingCredential, TxInput, Value } from "@helios-lang/ledger"
  */
 
 /**
- * @template CSpending
- * @template CStaking
- * @param {TxInput<CSpending, CStaking>[]} utxos
+ * @template {SpendingCredential} [SC=SpendingCredential]
+ * @param {TxInput<SC>[]} utxos
  * @param {Value} value
- * @returns {[TxInput<CSpending, CStaking>[], TxInput<CSpending, CStaking>[]]}
+ * @returns {[TxInput<SC>[], TxInput<SC>[]]}
  */
 export function selectSingle(utxos, value) {
     for (let i = 0; i < utxos.length; i++) {

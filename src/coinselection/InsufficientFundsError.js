@@ -1,4 +1,8 @@
-import { TxInput, Value } from "@helios-lang/ledger"
+import { addValues } from "@helios-lang/ledger"
+
+/**
+ * @import { TxInput, Value } from "@helios-lang/ledger"
+ */
 
 export class InsufficientFundsError extends Error {
     /**
@@ -7,7 +11,7 @@ export class InsufficientFundsError extends Error {
      */
     constructor(need, have) {
         super(
-            `Insufficient funds error: need ${JSON.stringify(need.dump(), undefined, 2)}, have UTxOs ${have.map((utxo) => JSON.stringify(utxo.dump(), undefined, 2))} (total ${JSON.stringify(Value.sum(have).dump(), undefined, 2)})`
+            `Insufficient funds error: need ${JSON.stringify(need.dump(), undefined, 2)}, have UTxOs ${have.map((utxo) => JSON.stringify(utxo.dump(), undefined, 2))} (total ${JSON.stringify(addValues(have).dump(), undefined, 2)})`
         )
     }
 }

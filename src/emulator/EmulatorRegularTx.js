@@ -1,8 +1,9 @@
 import { equalsBytes } from "@helios-lang/codec-utils"
-import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+import { makeTxInput, makeTxOutputId } from "@helios-lang/ledger"
 
 /**
- * @import { EmulatorRegularTx } from "src/index.js"
+ * @import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { EmulatorRegularTx } from "../index.js"
  */
 
 /**
@@ -19,6 +20,7 @@ export function makeEmulatorRegularTx(tx) {
 class EmulatorRegularTxImpl {
     /**
      * @private
+     * @readonly
      * @type {Tx}
      */
     _tx
@@ -67,8 +69,8 @@ class EmulatorRegularTxImpl {
         txOutputs.forEach((txOutput, utxoId) => {
             if (equalsBytes(txOutput.address.bytes, address.bytes)) {
                 utxos.push(
-                    new TxInput(
-                        new TxOutputId(this.id(), utxoId),
+                    makeTxInput(
+                        makeTxOutputId(this.id(), utxoId),
                         txOutput.copy()
                     )
                 )
@@ -93,8 +95,8 @@ class EmulatorRegularTxImpl {
         let utxo = undefined
 
         this._tx.body.outputs.forEach((output, i) => {
-            if (i == id.utxoIdx) {
-                utxo = new TxInput(id, output.copy())
+            if (i == id.index) {
+                utxo = makeTxInput(id, output.copy())
             }
         })
 
@@ -108,7 +110,7 @@ class EmulatorRegularTxImpl {
         const id = this.id()
 
         return this._tx.body.outputs.map((output, i) => {
-            return new TxInput(new TxOutputId(id, i), output.copy())
+            return makeTxInput(makeTxOutputId(id, i), output.copy())
         })
     }
 

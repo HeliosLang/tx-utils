@@ -1,9 +1,9 @@
-import { AssetClass, TxInput, Value } from "@helios-lang/ledger"
+import { ADA, makeValue } from "@helios-lang/ledger"
 import { selectSmallestFirst } from "./extremumFirst.js"
 import { InsufficientFundsError } from "./InsufficientFundsError.js"
 
 /**
- * @import { CoinSelection } from "src/index.js"
+ * @import { AssetClass, SpendingCredential, TxInput, Value } from "@helios-lang/ledger"
  */
 
 /**
@@ -26,19 +26,19 @@ export function consolidate(props) {
     const maxUtxos = props?.maxUtxos ?? 5
 
     /**
-     * @template CSpending
-     * @param {TxInput<CSpending, unknown>[]} utxos
+     * @template {SpendingCredential} [SC=SpendingCredential]
+     * @param {TxInput<SC>[]} utxos
      * @param {Value} amount
-     * @returns {[TxInput<CSpending, unknown>[], TxInput<CSpending, unknown>[]]}
+     * @returns {[TxInput<SC>[], TxInput<SC>[]]}
      */
     return (utxos, amount) => {
         /**
-         * @type {TxInput[]}
+         * @type {TxInput<SC>[]}
          */
         let selectedUtxos
 
         /**
-         * @type {TxInput[]}
+         * @type {TxInput<SC>[]}
          */
         let remainingUtxos
 
@@ -50,7 +50,7 @@ export function consolidate(props) {
 
                 // ignore pure lovelace utxos if lovelace isn't included assetClasses
                 if (utxoAssetClasses.length == 0) {
-                    return s.has(AssetClass.ADA.toString())
+                    return s.has(ADA.toString())
                 } else {
                     return utxoAssetClasses.every((ac) => s.has(ac.toString()))
                 }
@@ -67,13 +67,13 @@ export function consolidate(props) {
                 // retry filtering out using `excludeAssets`
                 const excludeAssets = props.excludeAssets
 
-                const s = collectAssetClasses(new Value(0n), excludeAssets)
+                const s = collectAssetClasses(makeValue(0n), excludeAssets)
 
                 const filteredUtxos = utxos.filter((utxo) => {
                     const utxoAssetClasses = utxo.value.assets.assetClasses
 
                     if (utxoAssetClasses.length == 0) {
-                        return !s.has(AssetClass.ADA.toString())
+                        return !s.has(ADA.toString())
                     } else {
                         return utxoAssetClasses.every(
                             (ac) => !s.has(ac.toString())

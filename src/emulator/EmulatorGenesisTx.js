@@ -1,16 +1,15 @@
 import { encodeIntBE, equalsBytes } from "@helios-lang/codec-utils"
 import {
-    Address,
-    Assets,
-    TxId,
-    TxInput,
-    TxOutput,
-    TxOutputId,
-    Value
+    makeTxId,
+    makeTxInput,
+    makeTxOutput,
+    makeTxOutputId,
+    makeValue
 } from "@helios-lang/ledger"
 
 /**
- * @import { EmulatorGenesisTx } from "src/index.js"
+ * @import { Address, Assets, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { EmulatorGenesisTx } from "../index.js"
  */
 
 /**
@@ -28,10 +27,33 @@ export function makeEmulatorGenesisTx(id, address, lovelace, assets) {
  * @implements {EmulatorGenesisTx}
  */
 class EmulatorGenesisTxImpl {
-    #id
-    #address
-    #lovelace
-    #assets
+    /**
+     * @private
+     * @readonly
+     * @type {number}
+     */
+    _id
+
+    /**
+     * @private
+     * @readonly
+     * @type {Address}
+     */
+    _address
+
+    /**
+     * @private
+     * @readonly
+     * @type {bigint}
+     */
+    _lovelace
+
+    /**
+     * @private
+     * @readonly
+     * @type {Assets}
+     */
+    _assets
 
     /**
      * @param {number} id
@@ -40,10 +62,10 @@ class EmulatorGenesisTxImpl {
      * @param {Assets} assets
      */
     constructor(id, address, lovelace, assets) {
-        this.#id = id
-        this.#address = address
-        this.#lovelace = lovelace
-        this.#assets = assets
+        this._id = id
+        this._address = address
+        this._lovelace = lovelace
+        this._assets = assets
     }
 
     /**
@@ -59,13 +81,13 @@ class EmulatorGenesisTxImpl {
      * @return {TxId}
      */
     id() {
-        let bytes = encodeIntBE(BigInt(this.#id))
+        let bytes = encodeIntBE(BigInt(this._id))
 
         if (bytes.length < 32) {
             bytes = new Array(32 - bytes.length).fill(0).concat(bytes)
         }
 
-        return new TxId(bytes)
+        return makeTxId(bytes)
     }
 
     /**
@@ -82,15 +104,15 @@ class EmulatorGenesisTxImpl {
      * @returns {TxInput[]}
      */
     collectUtxos(address, utxos) {
-        if (equalsBytes(this.#address.bytes, address.bytes)) {
+        if (equalsBytes(this._address.bytes, address.bytes)) {
             utxos = utxos.slice()
 
             utxos.push(
-                new TxInput(
-                    new TxOutputId(this.id(), 0),
-                    new TxOutput(
-                        this.#address,
-                        new Value(this.#lovelace, this.#assets.copy())
+                makeTxInput(
+                    makeTxOutputId(this.id(), 0),
+                    makeTxOutput(
+                        this._address,
+                        makeValue(this._lovelace, this._assets.copy())
                     )
                 )
             )
@@ -106,13 +128,13 @@ class EmulatorGenesisTxImpl {
      * @returns {TxInput | undefined}
      */
     getUtxo(id) {
-        if (!(this.id().isEqual(id.txId) && id.utxoIdx == 0)) {
+        if (!(this.id().isEqual(id.txId) && id.index == 0)) {
             return undefined
         }
 
-        return new TxInput(
-            new TxOutputId(this.id(), 0),
-            new TxOutput(this.#address, new Value(this.#lovelace, this.#assets))
+        return makeTxInput(
+            makeTxOutputId(this.id(), 0),
+            makeTxOutput(this._address, makeValue(this._lovelace, this._assets))
         )
     }
 
@@ -121,11 +143,11 @@ class EmulatorGenesisTxImpl {
      */
     newUtxos() {
         return [
-            new TxInput(
-                new TxOutputId(this.id(), 0),
-                new TxOutput(
-                    this.#address,
-                    new Value(this.#lovelace, this.#assets)
+            makeTxInput(
+                makeTxOutputId(this.id(), 0),
+                makeTxOutput(
+                    this._address,
+                    makeValue(this._lovelace, this._assets)
                 )
             )
         ]
@@ -144,7 +166,7 @@ class EmulatorGenesisTxImpl {
     dump() {
         console.log("GENESIS TX")
         console.log(
-            `id: ${this.#id.toString()},\naddress: ${this.#address.toBech32()},\nlovelace: ${this.#lovelace.toString()},\nassets: ${JSON.stringify(this.#assets.dump(), undefined, "    ")}`
+            `id: ${this._id.toString()},\naddress: ${this._address.toString()},\nlovelace: ${this._lovelace.toString()},\nassets: ${JSON.stringify(this._assets.dump(), undefined, "    ")}`
         )
     }
 }

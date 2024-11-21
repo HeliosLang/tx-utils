@@ -1,8 +1,8 @@
-import { TxInput, Value } from "@helios-lang/ledger"
+import { makeValue } from "@helios-lang/ledger"
 import { InsufficientFundsError } from "./InsufficientFundsError.js"
 
 /**
- * @import { CoinSelection } from "src/index.js"
+ * @import { SpendingCredential, TxInput, Value } from "@helios-lang/ledger"
  */
 
 /**
@@ -34,19 +34,18 @@ export function selectSmallestFirst(props = {}) {
  */
 function selectExtremumFirst({ largestFirst, allowSelectingUninvolvedAssets }) {
     /**
-     * @template CSpending
-     * @template CStaking
-     * @param {TxInput<CSpending, CStaking>[]} utxos
+     * @template {SpendingCredential} [SC=SpendingCredential]
+     * @param {TxInput<SC>[]} utxos
      * @param {Value} amount
-     * @returns {[TxInput<CSpending, CStaking>[], TxInput<CSpending, CStaking>[]]}
+     * @returns {[TxInput<SC>[], TxInput<SC>[]]}
      */
     return (utxos, amount) => {
-        let sum = new Value()
+        let sum = makeValue(0n)
 
-        /** @type {TxInput[]} */
+        /** @type {TxInput<SC>[]} */
         let notSelected = utxos.slice()
 
-        /** @type {TxInput[]} */
+        /** @type {TxInput<SC>[]} */
         const selected = []
 
         /**
@@ -119,14 +118,17 @@ function selectExtremumFirst({ largestFirst, allowSelectingUninvolvedAssets }) {
             const tokenNames = amount.assets.getPolicyTokenNames(mph)
 
             for (const tokenName of tokenNames) {
-                const need = amount.assets.getQuantity(mph, tokenName)
-                const have = sum.assets.getQuantity(mph, tokenName)
+                const need = amount.assets.getPolicyTokenQuantity(
+                    mph,
+                    tokenName
+                )
+                const have = sum.assets.getPolicyTokenQuantity(mph, tokenName)
 
                 if (have < need) {
                     const diff = need - have
 
                     select(diff, (utxo) =>
-                        utxo.value.assets.getQuantity(mph, tokenName)
+                        utxo.value.assets.getPolicyTokenQuantity(mph, tokenName)
                     )
                 }
             }

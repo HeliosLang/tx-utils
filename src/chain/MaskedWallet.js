@@ -1,7 +1,6 @@
-import { Address, Signature, Tx, TxId, TxInput } from "@helios-lang/ledger"
-
 /**
- * @import { CardanoClient, Wallet } from "src/index.js"
+ * @import { Address, Signature, SpendingCredential, Tx, TxId, TxInput } from "@helios-lang/ledger"
+ * @import { CardanoClient, Wallet } from "../index.js"
  */
 
 /**
@@ -60,7 +59,7 @@ class MaskedWallet {
     }
 
     /**
-     * @type {Promise<TxInput<unknown, unknown>[]>}
+     * @type {Promise<TxInput<SpendingCredential>[]>}
      */
     get utxos() {
         return this.baseWallet.usedAddresses
@@ -83,7 +82,7 @@ class MaskedWallet {
     }
 
     /**
-     * @param {Address<any, any>} addr
+     * @param {Address<SpendingCredential>} addr
      * @param {number[]} data
      * @returns {Promise<Signature>}
      */

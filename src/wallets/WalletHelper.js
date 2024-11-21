@@ -1,19 +1,11 @@
-import {
-    Address,
-    PubKeyHash,
-    Signature,
-    StakingAddress,
-    Tx,
-    TxId,
-    TxInput,
-    Value
-} from "@helios-lang/ledger"
+import { addValues } from "@helios-lang/ledger"
 import { expectDefined as expectDefined } from "@helios-lang/type-utils"
 import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 import { makeOfflineWallet } from "./OfflineWallet.js"
 
 /**
- * @import { CoinSelection, OfflineWallet, OfflineWalletJsonSafe, ReadonlyCardanoClient, ReadonlyWallet, Wallet, WalletHelper } from "src/index.js"
+ * @import { Address, PubKeyHash, Signature, StakingAddress, Tx, TxId, TxInput, Value } from "@helios-lang/ledger"
+ * @import { CoinSelection, OfflineWallet, OfflineWalletJsonSafe, ReadonlyCardanoClient, ReadonlyWallet, Wallet, WalletHelper } from "../index.js"
  */
 
 /**
@@ -71,7 +63,7 @@ class WalletHelperImpl {
 
     /**
      * Concatenation of `usedAddresses` and `unusedAddresses`.
-     * @type {Promise<Address<null, unknown>[]>}
+     * @type {Promise<Address[]>}
      */
     get allAddresses() {
         return this.wallet.usedAddresses.then((usedAddress) =>
@@ -84,7 +76,7 @@ class WalletHelperImpl {
     /**
      * First `Address` in `allAddresses`.
      * Throws an error if there aren't any addresses
-     * @type {Promise<Address<null, unknown>>}
+     * @type {Promise<Address>}
      */
     get baseAddress() {
         return this.allAddresses.then((addresses) =>
@@ -94,7 +86,7 @@ class WalletHelperImpl {
 
     /**
      * First `Address` in `unusedAddresses` (falls back to last `Address` in `usedAddresses` if `unusedAddresses` is empty or not defined).
-     * @type {Promise<Address<null, unknown>>}
+     * @type {Promise<Address>}
      */
     get changeAddress() {
         return this.wallet.unusedAddresses.then((addresses) => {
@@ -128,7 +120,7 @@ class WalletHelperImpl {
 
     /**
      * First UTxO in `utxos`. Can be used to distinguish between preview and preprod networks.
-     * @type {Promise<TxInput<null, unknown> | undefined>}
+     * @type {Promise<TxInput | undefined>}
      */
     get refUtxo() {
         return this.utxos.then((utxos) => {
@@ -142,7 +134,7 @@ class WalletHelperImpl {
 
     /**
      * Falls back to using the network
-     * @type {Promise<TxInput<null, unknown>[]>}
+     * @type {Promise<TxInput[]>}
      */
     get utxos() {
         return (async () => {
@@ -197,21 +189,26 @@ class WalletHelperImpl {
      * @returns {Promise<Value>}
      */
     async calcBalance() {
-        return Value.sum(await this.utxos)
+        return addValues(await this.utxos)
     }
 
     /**
      * Returns `true` if the `PubKeyHash` in the given `Address` is controlled by the wallet.
+     * Assumes wallet only contains Shelley-era address
      * @param {Address} addr
      * @returns {Promise<boolean>}
      */
     async isOwnAddress(addr) {
-        const pkh = addr.pubKeyHash
+        if (addr.era == "Shelley") {
+            const pkh = addr.spendingCredential
 
-        if (!pkh) {
-            return false
+            if (pkh.kind != "PubKeyHash") {
+                return false
+            } else {
+                return this.isOwnPubKeyHash(pkh)
+            }
         } else {
-            return this.isOwnPubKeyHash(pkh)
+            return false
         }
     }
 
@@ -224,10 +221,12 @@ class WalletHelperImpl {
         const addresses = await this.allAddresses
 
         for (const addr of addresses) {
-            const aPkh = addr.pubKeyHash
+            if (addr.era == "Shelley") {
+                const aPkh = addr.spendingCredential
 
-            if (aPkh && aPkh.isEqual(pkh)) {
-                return true
+                if (aPkh && aPkh.kind == "PubKeyHash" && aPkh.isEqual(pkh)) {
+                    return true
+                }
             }
         }
 
@@ -237,7 +236,7 @@ class WalletHelperImpl {
     /**
      * Picks a single UTxO intended as collateral.
      * @param {bigint} amount - defaults to 2 Ada, which should cover most things
-     * @returns {Promise<TxInput<null, unknown>>}
+     * @returns {Promise<TxInput>}
      */
     async selectCollateral(amount = 2000000n) {
         // first try the collateral utxos that the wallet (might) provide
@@ -280,7 +279,7 @@ class WalletHelperImpl {
      * Throws an error if token not found
      * Returns only a single utxo
      * @param {Value} value
-     * @returns {Promise<TxInput<null, unknown>>}
+     * @returns {Promise<TxInput>}
      */
     async selectUtxo(value) {
         const utxos = await this.utxos
@@ -293,8 +292,8 @@ class WalletHelperImpl {
     /**
      * Pick a number of UTxOs needed to cover a given Value. The default coin selection strategy is to pick the smallest first.
      * @param {Value} amount
-     * @param {CoinSelection<null, unknown>} coinSelection
-     * @returns {Promise<TxInput<null, unknown>[]>}
+     * @param {CoinSelection} coinSelection
+     * @returns {Promise<TxInput[]>}
      */
     async selectUtxos(amount, coinSelection = selectSmallestFirst()) {
         return coinSelection(await this.utxos, amount)[0]

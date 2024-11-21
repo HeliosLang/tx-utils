@@ -1,9 +1,5 @@
 {
     "compilerOptions": {
-        "baseUrl": "./",
-        "paths": {
-            "src": ["./src"]
-        },
         "checkJs": true,
         "declaration": true,
         "declarationMap": true,
@@ -17,5 +13,5 @@
         "lib": ["es6"]
     },
     "exclude": ["node_modules", "**/*.d.ts"],
-    "include": ["src/**/*.js", "node_modules/@helios-lang/type-utils"]
+    "include": ["src/**/*.js"]
 }

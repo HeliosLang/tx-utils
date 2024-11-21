@@ -1,43 +1,53 @@
 import { bytesToHex, equalsBytes, toInt } from "@helios-lang/codec-utils"
 import {
-    Address,
-    Assets,
-    AssetClass,
-    calcScriptDataHash,
-    DCert,
-    MintingPolicyHash,
-    NativeScript,
-    NetworkParamsHelper,
-    PubKeyHash,
-    ScriptPurpose,
-    SpendingCredential,
-    StakingAddress,
-    Tx,
-    TxBody,
-    TxId,
-    TxInput,
-    TxMetadata,
-    TxOutput,
-    TxOutputDatum,
-    TxRedeemer,
-    TxWitnesses,
-    ValidatorHash,
-    Value,
-    TokenValue,
-    toTime,
-    ScriptContextV2,
     DEFAULT_NETWORK_PARAMS,
+    addValues,
+    appendTxInput,
     calcRefScriptsSize,
-    StakingValidatorHash
+    calcScriptDataHash,
+    compareStakingAddresses,
+    hashNativeScript,
+    makeAddress,
+    makeAssets,
+    makeAssetClass,
+    makeCertifyingPurpose,
+    makeDelegationDCert,
+    makeDeregistrationDCert,
+    makeDummyTxId,
+    makeMintingPolicyHash,
+    makeMintingPurpose,
+    makeNetworkParamsHelper,
+    makeRewardingPurpose,
+    makeScriptContextV2,
+    makeSpendingPurpose,
+    makeTx,
+    makeTxBody,
+    makeTxCertifyingRedeemer,
+    makeTxMetadata,
+    makeTxMintingRedeemer,
+    makeTxOutput,
+    makeTxOutputDatum,
+    makeTxRewardingRedeemer,
+    makeTxSpendingRedeemer,
+    makeTxWitnesses,
+    makeValue,
+    toTime,
+    makePubKeyHash
 } from "@helios-lang/ledger"
-import { expectDefined, isLeft, isRight, isUndefined } from "@helios-lang/type-utils"
-import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
+import {
+    expectDefined,
+    isLeft,
+    isRight,
+    isUndefined
+} from "@helios-lang/type-utils"
+import { makeUplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
 
 /**
  * @import { BytesLike, IntLike } from "@helios-lang/codec-utils"
- * @import { AddressLike, AssetClassLike, DatumPaymentContext, MintingContext, MintingPolicyHashLike, NetworkParams, PubKeyHashLike, SpendingContext, StakingAddressLike, StakingContext, TimeLike, TxInfo, TxMetadataAttr, TxOutputDatumCastable, ValueLike } from "@helios-lang/ledger"
- * @import { CekResult, Cost, UplcLoggingI, UplcData, UplcProgramV1I, UplcProgramV2I } from "@helios-lang/uplc"
- * @import { ExBudgetModifier, LazyRedeemerData, TxBuilder, TxBuilderConfig, TxBuilderFinalConfig } from "src/index.js"
+ * @import { Address, AssetClass, AssetClassLike, Assets, DatumPaymentContext, DCert, MintingContext, MintingPolicyHash, MintingPolicyHashLike, NativeScript, NetworkParams, NetworkParamsHelper, PubKeyHash, PubKeyHashLike, ShelleyAddress, ShelleyAddressLike, SpendingContext, StakingAddress, StakingAddressLike, StakingCredential, StakingContext, StakingValidatorHash, TimeLike, TokenValue, Tx, TxBody, TxInfo, TxInput, TxMetadata, TxMetadataAttr, TxOutput, TxOutputDatum, TxOutputDatumCastable, TxRedeemer, ValidatorHash, Value, ValueLike } from "@helios-lang/ledger"
+ * @import { Either } from "@helios-lang/type-utils"
+ * @import { CekResult, Cost, UplcLogger, UplcData, UplcProgramV1, UplcProgramV2 } from "@helios-lang/uplc"
+ * @import { ExBudgetModifier, LazyRedeemerData, TxBuilder, TxBuilderConfig, TxBuilderFinalConfig } from "../index.js"
  */
 
 /**
@@ -46,7 +56,7 @@ import { UplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @prop {number | undefined} firstValidSlot
  * @prop {number | undefined} lastValidSlot
  * @prop {boolean} [throwBuildPhaseScriptErrors] - if false, script errors will be thrown only during validate phase of the build.  Default is true for build(), false for buildUnsafe()
- * @prop {UplcLoggingI} [logOptions] - an externally-provided logger
+ * @prop {UplcLogger} [logOptions] - an externally-provided logger
  * @prop {NetworkParams} networkParams
  * @prop {ExBudgetModifier} [modifyExBudget]
  */
@@ -172,19 +182,19 @@ class TxBuilderImpl {
 
     /**
      * @private
-     * @type {UplcProgramV1I[]}
+     * @type {UplcProgramV1[]}
      */
     v1Scripts
 
     /**
      * @private
-     * @type {UplcProgramV2I[]}
+     * @type {UplcProgramV2[]}
      */
     v2RefScripts
 
     /**
      * @private
-     * @type {UplcProgramV2I[]}
+     * @type {UplcProgramV2[]}
      */
     v2Scripts
 
@@ -309,14 +319,17 @@ class TxBuilderImpl {
      */
     async buildUnsafe(config) {
         // extract arguments
-        const changeAddress = Address.new(await config.changeAddress)
+        const changeAddress = makeAddress(await config.changeAddress)
         const throwBuildPhaseScriptErrors =
             config.throwBuildPhaseScriptErrors ?? false
+        /**
+         * @type {NetworkParams}
+         */
         const params =
             config?.networkParams instanceof Promise
                 ? await config.networkParams
                 : (config?.networkParams ?? DEFAULT_NETWORK_PARAMS())
-        const helper = new NetworkParamsHelper(params)
+        const helper = makeNetworkParamsHelper(params)
         const spareUtxos = (
             config.spareUtxos instanceof Promise
                 ? await config.spareUtxos
@@ -380,8 +393,8 @@ class TxBuilderImpl {
 
         // TODO: correct the fee and the changeOutput
 
-        const tx = new Tx(
-            new TxBody({
+        const tx = makeTx(
+            makeTxBody({
                 inputs: this._inputs,
                 outputs: this._outputs,
                 refInputs: this._refInputs,
@@ -397,7 +410,7 @@ class TxBuilderImpl {
                 metadataHash,
                 scriptDataHash
             }),
-            new TxWitnesses({
+            makeTxWitnesses({
                 signatures: [],
                 datums: this.datums,
                 redeemers,
@@ -428,7 +441,9 @@ class TxBuilderImpl {
             // console.log(" -- recomputing collateral")
             const minCollateral = tx.calcMinCollateral(params)
 
-            const collateralInput = Value.sum(tx.body.collateral).lovelace
+            const collateralInput = /** @type {Value} */ (
+                addValues(tx.body.collateral)
+            ).lovelace
             const currentCollateralValue =
                 collateralInput - collateralChangeOutput.value.lovelace
 
@@ -451,7 +466,7 @@ class TxBuilderImpl {
         this.dcerts = []
         this._inputs = []
         this.metadata = {}
-        this._mintedTokens = new Assets()
+        this._mintedTokens = makeAssets()
         this.mintingRedeemers = []
         this.nativeScripts = []
         this._outputs = []
@@ -480,7 +495,7 @@ class TxBuilderImpl {
             utxo.forEach((utxo) => this.addCollateral(utxo))
             return this
         } else {
-            TxInput.append(this.collateral, utxo, true)
+            appendTxInput(this.collateral, utxo, true)
             return this
         }
     }
@@ -492,11 +507,12 @@ class TxBuilderImpl {
     addDCert(dcert) {
         this.dcerts.push(dcert)
 
-        if (dcert.isDelegate() || /** @type {DCert} */ (dcert).isDeregister()) {
-            const stakingHash = dcert.credential.expectStakingHash()
-
-            if (stakingHash.isPubKey()) {
-                this.addSigners(stakingHash.hash)
+        if (
+            dcert.kind == "DelegationDCert" ||
+            dcert.kind == "DeregistrationDCert"
+        ) {
+            if (dcert.credential.kind == "PubKeyHash") {
+                this.addSigners(dcert.credential)
             }
         }
 
@@ -507,23 +523,23 @@ class TxBuilderImpl {
      * Sorts that assets in the output if not already sorted (mutates `output`s) (needed by the Flint wallet)
      * Throws an error if any the value entries are non-positive
      * Throws an error if the output doesn't include a datum but is sent to a non-nativescript validator
-     * @param {TxOutput<any, any>[]} outputs
+     * @param {TxOutput[]} outputs
      * @returns {TxBuilder}
      */
     addOutput(...outputs) {
         for (let output of outputs) {
             output.value.assertAllPositive()
 
+            if (output.address.era != "Shelley") {
+                throw new Error(`unhandled ${output.address.era} era address`)
+            }
+
             const spendingCredential = output.address.spendingCredential
 
             if (
                 isUndefined(output.datum) &&
-                spendingCredential.isValidator() &&
-                !this.hasNativeScript(
-                    /** @type {SpendingCredential<"Validator">} */ (
-                        spendingCredential
-                    ).validatorHash.bytes
-                )
+                spendingCredential.kind == "ValidatorHash" &&
+                !this.hasNativeScript(spendingCredential.bytes)
             ) {
                 throw new Error(
                     "TxOutput must include datum when sending to validator which isn't a known NativeScript (hint: add the NativeScript to this transaction first)"
@@ -574,7 +590,7 @@ class TxBuilderImpl {
      * @returns {TxBuilder}
      */
     attachNativeScript(script) {
-        if (!this.hasNativeScript(script.hash())) {
+        if (!this.hasNativeScript(hashNativeScript(script))) {
             this.nativeScripts.push(script)
         }
 
@@ -582,7 +598,7 @@ class TxBuilderImpl {
     }
 
     /**
-     * @param {UplcProgramV1I | UplcProgramV2I} program
+     * @param {UplcProgramV1 | UplcProgramV2} program
      * @return {TxBuilder}
      */
     attachUplcProgram(program) {
@@ -625,16 +641,16 @@ class TxBuilderImpl {
     }
 
     /**
-     * @param {PubKeyHash | StakingValidatorHash<any, any>} hash
+     * @param {StakingCredential} hash
      * @param {PubKeyHashLike} poolId
      * @param {UplcData | LazyRedeemerData | undefined} redeemer
      * @returns {TxBuilder}
      */
     delegateUnsafe(hash, poolId, redeemer = undefined) {
-        const dcert = DCert.Delegate(hash, poolId)
+        const dcert = makeDelegationDCert(hash, makePubKeyHash(poolId))
         this.addDCert(dcert)
 
-        if (hash instanceof StakingValidatorHash) {
+        if (hash.kind == "StakingValidatorHash") {
             if (redeemer) {
                 if (this.hasNativeScript(hash.bytes)) {
                     throw new Error(
@@ -684,15 +700,15 @@ class TxBuilderImpl {
     }
 
     /**
-     * @param {PubKeyHash | StakingValidatorHash<any, any>} hash
+     * @param {StakingCredential} hash
      * @param {UplcData | LazyRedeemerData | undefined} redeemer
      * @returns {TxBuilder}
      */
     deregisterUnsafe(hash, redeemer = undefined) {
-        const dcert = DCert.Deregister(hash)
+        const dcert = makeDeregistrationDCert(hash)
         this.addDCert(dcert)
 
-        if (hash instanceof StakingValidatorHash) {
+        if (hash.kind == "StakingValidatorHash") {
             if (redeemer) {
                 if (this.hasNativeScript(hash.bytes)) {
                     throw new Error(
@@ -721,7 +737,7 @@ class TxBuilderImpl {
 
     /**
      * Adds minting instructions to the transaction without a redeemer
-     * @param {TokenValue<null>} token
+     * @param {TokenValue} token
      * @returns {TxBuilder}
      */
     mintTokenValueWithoutRedeemer(token) {
@@ -741,19 +757,20 @@ class TxBuilderImpl {
      * @returns {TxBuilder}
      */
     mintTokenValueWithRedeemer(token, redeemer) {
+        const context = token.assetClass.mph.context
         // 2-arg form A
-        this.attachUplcProgram(token.context.program)
+        this.attachUplcProgram(context.program)
 
         return this.mintAssetClassUnsafe(
             token.assetClass,
             token.quantity,
-            (_tx) => token.context.redeemer.toUplcData(redeemer)
+            (_tx) => context.redeemer.toUplcData(redeemer)
         )
     }
 
     /**
      * Adds minting instructions to the transaction without a redeemer
-     * @param {AssetClass<null>} assetClass
+     * @param {AssetClass} assetClass
      * @param {IntLike} quantity
      * @returns {TxBuilder}
      */
@@ -770,10 +787,12 @@ class TxBuilderImpl {
      * @returns {TxBuilder}
      */
     mintAssetClassWithRedeemer(assetClass, quantity, redeemer) {
-        this.attachUplcProgram(assetClass.context.program)
+        const context = assetClass.mph.context
+
+        this.attachUplcProgram(context.program)
 
         return this.mintAssetClassUnsafe(assetClass, quantity, (_tx) =>
-            assetClass.context.redeemer.toUplcData(redeemer)
+            context.redeemer.toUplcData(redeemer)
         )
     }
 
@@ -786,19 +805,21 @@ class TxBuilderImpl {
      * @returns {TxBuilder}
      */
     mintAssetClassWithLazyRedeemer(assetClass, quantity, redeemer) {
-        this.attachUplcProgram(assetClass.context.program)
+        const context = assetClass.mph.context
+
+        this.attachUplcProgram(context.program)
 
         return this.mintAssetClassUnsafe(assetClass, quantity, async (tx) => {
             const r = redeemer(tx)
             const redeemerData = r instanceof Promise ? await r : r
 
-            return assetClass.context.redeemer.toUplcData(redeemerData)
+            return context.redeemer.toUplcData(redeemerData)
         })
     }
 
     /**
      * Adds minting instructions to the transaction without a redeemer
-     * @param {MintingPolicyHash<null | unknown>} policy
+     * @param {MintingPolicyHash} policy
      * @param {[BytesLike, IntLike][]} tokens
      * @returns {TxBuilder}
      */
@@ -829,7 +850,7 @@ class TxBuilderImpl {
      * @returns {TxBuilder}
      */
     mintAssetClassUnsafe(assetClass, quantity, redeemer = undefined) {
-        const ac = AssetClass.new(assetClass)
+        const ac = makeAssetClass(assetClass)
 
         const mph = ac.mph
         const tokens = [
@@ -852,9 +873,9 @@ class TxBuilderImpl {
      * @returns {TxBuilder}
      */
     mintPolicyTokensUnsafe(policy, tokens, redeemer = undefined) {
-        const mph = MintingPolicyHash.new(policy)
+        const mph = makeMintingPolicyHash(policy)
 
-        this._mintedTokens.addTokens(mph, tokens)
+        this._mintedTokens.addPolicyTokens(mph, tokens)
 
         if (redeemer) {
             if (this.hasNativeScript(mph.bytes)) {
@@ -882,7 +903,7 @@ class TxBuilderImpl {
     }
 
     /**
-     * @param {Address<null, any>} address
+     * @param {ShelleyAddress} address
      * @param {ValueLike} value
      * @returns {TxBuilder}
      */
@@ -892,34 +913,36 @@ class TxBuilderImpl {
 
     /**
      * @template TDatum
-     * @param {Address<DatumPaymentContext<TDatum>, any>} address
+     * @param {ShelleyAddress<ValidatorHash<DatumPaymentContext<TDatum>>>} address
      * @param {ValueLike} value
      * @param {TxOutputDatumCastable<TDatum>} datum
      * @returns {TxBuilder}
      */
     payWithDatum(address, value, datum) {
+        const context = address.spendingCredential.context
+
         return this.payUnsafe(
             address,
             value,
-            TxOutputDatum.fromCast(datum, address.spendingContext.datum)
+            makeTxOutputDatum(datum, context.datum)
         )
     }
 
     /**
-     * @param {AddressLike} address
+     * @param {ShelleyAddressLike} address
      * @param {ValueLike} value
      * @param {TxOutputDatum | undefined} datum
      * @returns {TxBuilder}
      */
     payUnsafe(address, value, datum = undefined) {
-        const output = new TxOutput(Address.new(address), value, datum)
+        const output = makeTxOutput(makeAddress(address), value, datum)
 
         return this.addOutput(output)
     }
 
     /**
      * Include a reference input
-     * @param {TxInput<any, any>[]} utxos
+     * @param {TxInput[]} utxos
      * @returns {TxBuilder}
      */
     refer(...utxos) {
@@ -966,7 +989,7 @@ class TxBuilderImpl {
     }
 
     /**
-     * @param {TxInput<null, any>[]} utxos
+     * @param {TxInput<PubKeyHash>[]} utxos
      * @returns {TxBuilder}
      */
     spendWithoutRedeemer(...utxos) {
@@ -975,7 +998,7 @@ class TxBuilderImpl {
 
     /**
      * @template TRedeemer
-     * @param {TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[]} utxos
+     * @param {TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>> | TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>>[]} utxos
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
@@ -986,23 +1009,26 @@ class TxBuilderImpl {
             }
 
             utxos.forEach((utxo) =>
-                this.attachUplcProgram(utxo.spendingContext.program)
+                this.attachUplcProgram(getTxInputSpendingContext(utxo).program)
             )
-            return this.spendUnsafe(utxos, (_tx) =>
-                utxos[0].spendingContext.redeemer.toUplcData(redeemer)
-            )
-        } else {
-            this.attachUplcProgram(utxos.spendingContext.program)
 
             return this.spendUnsafe(utxos, (_tx) =>
-                utxos.spendingContext.redeemer.toUplcData(redeemer)
+                getTxInputSpendingContext(utxos[0]).redeemer.toUplcData(
+                    redeemer
+                )
+            )
+        } else {
+            this.attachUplcProgram(getTxInputSpendingContext(utxos).program)
+
+            return this.spendUnsafe(utxos, (_tx) =>
+                getTxInputSpendingContext(utxos).redeemer.toUplcData(redeemer)
             )
         }
     }
 
     /**
      * @template TRedeemer
-     * @param {TxInput<SpendingContext<any, any, any, TRedeemer>, any> | TxInput<SpendingContext<any, any, any, TRedeemer>, any>[]} utxos
+     * @param {TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>> | TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>>[]} utxos
      * @param {LazyRedeemerData<TRedeemer>} redeemer
      * @returns {TxBuilder}
      */
@@ -1013,22 +1039,25 @@ class TxBuilderImpl {
             }
 
             utxos.forEach((utxo) =>
-                this.attachUplcProgram(utxo.spendingContext.program)
+                this.attachUplcProgram(getTxInputSpendingContext(utxo).program)
             )
-            return this.spendUnsafe(utxos, async (tx) => {
-                const r = redeemer(tx)
-                const redeemerData = r instanceof Promise ? await r : r
-                return utxos[0].spendingContext.redeemer.toUplcData(
-                    redeemerData
-                )
-            })
-        } else {
-            this.attachUplcProgram(utxos.spendingContext.program)
 
             return this.spendUnsafe(utxos, async (tx) => {
                 const r = redeemer(tx)
                 const redeemerData = r instanceof Promise ? await r : r
-                return utxos.spendingContext.redeemer.toUplcData(redeemerData)
+                return getTxInputSpendingContext(utxos[0]).redeemer.toUplcData(
+                    redeemerData
+                )
+            })
+        } else {
+            this.attachUplcProgram(getTxInputSpendingContext(utxos).program)
+
+            return this.spendUnsafe(utxos, async (tx) => {
+                const r = redeemer(tx)
+                const redeemerData = r instanceof Promise ? await r : r
+                return getTxInputSpendingContext(utxos).redeemer.toUplcData(
+                    redeemerData
+                )
             })
         }
     }
@@ -1036,7 +1065,7 @@ class TxBuilderImpl {
     /**
      * Add a UTxO instance as an input to the transaction being built.
      * Throws an error if the UTxO is locked at a script address but a redeemer isn't specified (unless the script is a known `NativeScript`).
-     * @param {TxInput<any, any> | TxInput<any, any>[]} utxos
+     * @param {TxInput | TxInput[]} utxos
      * @param {UplcData | LazyRedeemerData | undefined} redeemer
      * @returns {TxBuilder}
      */
@@ -1050,6 +1079,11 @@ class TxBuilderImpl {
         const utxo = utxos
 
         const origOutput = utxo.output
+
+        if (utxo.address.era != "Shelley") {
+            throw new Error(`unexpected ${utxo.address.era} era address`)
+        }
+
         const spendingCredential = utxo.address.spendingCredential
         const datum = origOutput?.datum
 
@@ -1057,20 +1091,14 @@ class TxBuilderImpl {
         this.addInput(utxo)
 
         if (redeemer) {
-            if (!spendingCredential.isValidator()) {
+            if (spendingCredential.kind != "ValidatorHash") {
                 throw new Error(
                     "input isn't locked by a script, (hint: omit the redeemer)"
                 )
             }
 
             // this cast is needed because Typescript is failing to properly import the type assertions
-            if (
-                !this.hasUplcScript(
-                    /** @type {SpendingCredential<"Validator">} */ (
-                        spendingCredential
-                    ).validatorHash.bytes
-                )
-            ) {
+            if (!this.hasUplcScript(spendingCredential.bytes)) {
                 throw new Error(
                     "input is locked by an unknown script (hint: attach the script before calling TxBuilder.spend()"
                 )
@@ -1082,20 +1110,14 @@ class TxBuilderImpl {
                 throw new Error("expected non-null datum")
             }
 
-            if (datum.isHash()) {
-                this.addDatum(datum.data)
+            if (datum.kind == "HashedTxOutputDatum") {
+                this.addDatum(expectDefined(datum.data))
             }
-        } else if (spendingCredential.isValidator()) {
+        } else if (spendingCredential.kind == "ValidatorHash") {
             // redeemerless spending from a validator is only possible if it is a native script
 
             // this cast is needed because Typescript is failing to properly import the type assertions
-            if (
-                !this.hasNativeScript(
-                    /** @type {SpendingCredential<"Validator">} */ (
-                        spendingCredential
-                    ).validatorHash.bytes
-                )
-            ) {
+            if (!this.hasNativeScript(spendingCredential.bytes)) {
                 throw new Error(
                     "input is locked by a script, but redeemer isn't specified (hint: if this is a NativeScript, attach that script before calling TxBuiilder.spend())"
                 )
@@ -1150,7 +1172,7 @@ class TxBuilderImpl {
     }
 
     /**
-     * @param {StakingAddress<null>} address
+     * @param {StakingAddress<PubKeyHash>} address
      * @param {IntLike} lovelace
      * @returns {TxBuilder}
      */
@@ -1160,22 +1182,24 @@ class TxBuilderImpl {
 
     /**
      * @template TRedeemer
-     * @param {StakingAddress<StakingContext<any, TRedeemer>>} address
+     * @param {StakingAddress<StakingValidatorHash<StakingContext<any, TRedeemer>>>} address
      * @param {IntLike} lovelace
      * @param {TRedeemer} redeemer
      * @returns {TxBuilder}
      */
     withdrawWithRedeemer(address, lovelace, redeemer) {
-        this.attachUplcProgram(address.context.program)
+        const context = address.stakingCredential.context
+
+        this.attachUplcProgram(context.program)
 
         return this.withdrawUnsafe(address, lovelace, (_tx) =>
-            address.context.redeemer.toUplcData(redeemer)
+            context.redeemer.toUplcData(redeemer)
         )
     }
 
     /**
      * @template TRedeemer
-     * @param {StakingAddress<StakingContext<any, TRedeemer>>} addr
+     * @param {StakingAddress<StakingValidatorHash<StakingContext<any, TRedeemer>>>} addr
      * @param {IntLike} lovelace
      * @param {LazyRedeemerData<TRedeemer>} redeemer
      * @returns {TxBuilder}
@@ -1185,22 +1209,19 @@ class TxBuilderImpl {
             const r = redeemer(tx)
             const redeemerData = r instanceof Promise ? await r : r
 
-            return addr.context.redeemer.toUplcData(redeemerData)
+            return addr.stakingCredential.context.redeemer.toUplcData(
+                redeemerData
+            )
         })
     }
 
     /**
-     * @param {StakingAddressLike} address
+     * @param {StakingAddress} stakingAddress
      * @param {IntLike} lovelace
      * @param {UplcData | LazyRedeemerData | undefined} redeemer
      * @returns {TxBuilder}
      */
-    withdrawUnsafe(address, lovelace, redeemer = undefined) {
-        const stakingAddress = StakingAddress.new(
-            this.config.isMainnet,
-            address
-        )
-
+    withdrawUnsafe(stakingAddress, lovelace, redeemer = undefined) {
         /**
          * @type {[StakingAddress, bigint]}
          */
@@ -1222,7 +1243,7 @@ class TxBuilderImpl {
             this.withdrawals[i] = entry
         }
 
-        this.withdrawals.sort(([a], [b]) => StakingAddress.compare(a, b))
+        this.withdrawals.sort(([a], [b]) => compareStakingAddresses(a, b))
 
         return this
     }
@@ -1267,7 +1288,7 @@ class TxBuilderImpl {
     sumOutputValue() {
         return this._outputs.reduce(
             (prev, output) => prev.add(output.value),
-            new Value()
+            makeValue(0n)
         )
     }
 
@@ -1300,7 +1321,7 @@ class TxBuilderImpl {
      * @param {TxInput} input
      */
     addInput(input) {
-        TxInput.append(this._inputs, input, true)
+        appendTxInput(this._inputs, input, true)
     }
 
     /**
@@ -1310,7 +1331,7 @@ class TxBuilderImpl {
      * @param {UplcData | LazyRedeemerData} data
      */
     addMintingRedeemer(policy, data) {
-        const mph = MintingPolicyHash.new(policy)
+        const mph = makeMintingPolicyHash(policy)
 
         if (this.hasMintingRedeemer(mph)) {
             throw new Error("redeemer already added")
@@ -1324,7 +1345,7 @@ class TxBuilderImpl {
      * @param {TxInput} utxo
      */
     addRefInput(utxo) {
-        TxInput.append(this._refInputs, utxo, true)
+        appendTxInput(this._refInputs, utxo, true)
     }
 
     /**
@@ -1368,7 +1389,7 @@ class TxBuilderImpl {
     /**
      * Doesn't re-add or throw an error if the script was previously added
      * @private
-     * @param {UplcProgramV1I} script
+     * @param {UplcProgramV1} script
      */
     addV1Script(script) {
         const h = script.hash()
@@ -1380,7 +1401,7 @@ class TxBuilderImpl {
     /**
      * Doesn't re-add or throw an error if the script was previously added
      * @private
-     * @param {UplcProgramV2I} script
+     * @param {UplcProgramV2} script
      */
     addV2Script(script) {
         const h = script.hash()
@@ -1393,7 +1414,7 @@ class TxBuilderImpl {
      * Doesn't re-add or throw an error if the script was previously added
      * Removes the same regular script if it was added before
      * @private
-     * @param {UplcProgramV2I} script
+     * @param {UplcProgramV2} script
      */
     addV2RefScript(script) {
         const h = script.hash()
@@ -1408,7 +1429,7 @@ class TxBuilderImpl {
     /**
      * @private
      * @param {number[] | MintingPolicyHash | ValidatorHash | StakingValidatorHash} hash
-     * @returns {UplcProgramV1I | UplcProgramV2I}
+     * @returns {UplcProgramV1 | UplcProgramV2}
      */
     getUplcScript(hash) {
         const hashBytes = Array.isArray(hash) ? hash : hash.bytes
@@ -1429,18 +1450,20 @@ class TxBuilderImpl {
             return v1Script
         }
 
-        if (hash instanceof MintingPolicyHash) {
+        if (Array.isArray(hash)) {
+            throw new Error(`script for ${bytesToHex(hash)} not found`)
+        } else if (hash.kind == "MintingPolicyHash") {
             throw new Error(
                 `script for minting policy ${hash.toHex()} not found`
             )
-        } else if (hash instanceof ValidatorHash) {
+        } else if (hash.kind == "ValidatorHash") {
             throw new Error(`script for validator ${hash.toHex()} not found`)
-        } else if (hash instanceof StakingValidatorHash) {
+        } else if (hash.kind == "StakingValidatorHash") {
             throw new Error(
                 `script for staking validator ${hash.toHex()} not found`
             )
         } else {
-            throw new Error(`script for ${bytesToHex(hash)} not found`)
+            throw new Error("unexpected hash type")
         }
     }
 
@@ -1459,7 +1482,9 @@ class TxBuilderImpl {
      * @returns {boolean}
      */
     hasNativeScript(hash) {
-        return this.nativeScripts.some((s) => equalsBytes(s.hash(), hash))
+        return this.nativeScripts.some((s) =>
+            equalsBytes(hashNativeScript(s), hash)
+        )
     }
 
     /**
@@ -1541,7 +1566,7 @@ class TxBuilderImpl {
     sumInputValue() {
         return this._inputs.reduce(
             (prev, input) => prev.add(input.value),
-            new Value()
+            makeValue(0n)
         )
     }
 
@@ -1552,7 +1577,7 @@ class TxBuilderImpl {
      */
     sumInputAndMintedValue() {
         return this.sumInputValue()
-            .add(new Value(0n, this._mintedTokens))
+            .add(makeValue(0n, this._mintedTokens))
             .assertAllPositive()
     }
 
@@ -1562,11 +1587,11 @@ class TxBuilderImpl {
 
     /**
      * @private
-     * @param {Address} changeAddress
+     * @param {ShelleyAddress} changeAddress
      * @param {number} maxAssetsPerChangeOutput
      */
     balanceAssets(changeAddress, maxAssetsPerChangeOutput) {
-        if (changeAddress.spendingCredential.isValidator()) {
+        if (changeAddress.spendingCredential.kind == "ValidatorHash") {
             throw new Error("can't send change to validator")
         }
 
@@ -1584,22 +1609,26 @@ class TxBuilderImpl {
             if (maxAssetsPerChangeOutput > 0) {
                 const maxAssetsPerOutput = maxAssetsPerChangeOutput
 
-                let changeAssets = new Assets()
+                let changeAssets = makeAssets()
                 let tokensAdded = 0
 
                 diff.getPolicies().forEach((mph) => {
                     const tokens = diff.getPolicyTokens(mph)
                     tokens.forEach(([token, quantity], i) => {
-                        changeAssets.addComponent(mph, token, quantity)
+                        changeAssets.addPolicyTokenQuantity(
+                            mph,
+                            token,
+                            quantity
+                        )
                         tokensAdded += 1
                         if (tokensAdded == maxAssetsPerOutput) {
                             this.addOutput(
-                                new TxOutput(
+                                makeTxOutput(
                                     changeAddress,
-                                    new Value(0n, changeAssets)
+                                    makeValue(0n, changeAssets)
                                 )
                             )
-                            changeAssets = new Assets()
+                            changeAssets = makeAssets()
                             tokensAdded = 0
                         }
                     })
@@ -1608,13 +1637,13 @@ class TxBuilderImpl {
                 // If we are here and have No assets, they we're done
                 if (!changeAssets.isZero()) {
                     this.addOutput(
-                        new TxOutput(changeAddress, new Value(0n, changeAssets))
+                        makeTxOutput(changeAddress, makeValue(0n, changeAssets))
                     )
                 }
             } else {
-                const changeOutput = new TxOutput(
+                const changeOutput = makeTxOutput(
                     changeAddress,
-                    new Value(0n, diff)
+                    makeValue(0n, diff)
                 )
 
                 this.addOutput(changeOutput)
@@ -1640,7 +1669,7 @@ class TxBuilderImpl {
             return
         }
 
-        const helper = new NetworkParamsHelper(params)
+        const helper = makeNetworkParamsHelper(params)
 
         const minCollateral =
             (baseFee * BigInt(helper.minCollateralPct) + 100n) / 100n // integer division that rounds up
@@ -1659,7 +1688,9 @@ class TxBuilderImpl {
             const cleanInputs = inputs
                 .filter(
                     (utxo) =>
-                        !utxo.address.validatorHash &&
+                        (utxo.address.era == "Byron" ||
+                            utxo.address.spendingCredential.kind !=
+                                "ValidatorHash") &&
                         utxo.value.assets.isZero()
                 )
                 .sort((a, b) => Number(a.value.lovelace - b.value.lovelace))
@@ -1682,19 +1713,19 @@ class TxBuilderImpl {
         addCollateralInputs(spareUtxos.map((utxo) => utxo))
 
         // create the collateral return output if there is enough lovelace
-        const changeOutput = new TxOutput(changeAddress, new Value(0n))
+        const changeOutput = makeTxOutput(changeAddress, makeValue(0n))
         changeOutput.correctLovelace(params)
 
         if (collateral < minCollateral) {
             throw new Error("unable to find enough collateral input")
         } else {
             if (collateral > minCollateral + changeOutput.value.lovelace) {
-                changeOutput.value = new Value(0n)
+                changeOutput.value = makeValue(0n)
 
                 changeOutput.correctLovelace(params)
 
                 if (collateral > minCollateral + changeOutput.value.lovelace) {
-                    changeOutput.value = new Value(collateral - minCollateral)
+                    changeOutput.value = makeValue(collateral - minCollateral)
                     this.collateralReturn = changeOutput
                 } else {
                     console.log(
@@ -1730,7 +1761,7 @@ class TxBuilderImpl {
         let nonChangeOutputValue = this.sumOutputValue()
 
         // assume a change output is always needed
-        const changeOutput = new TxOutput(changeAddress, new Value(0n))
+        const changeOutput = makeTxOutput(changeAddress, makeValue(0n))
 
         changeOutput.correctLovelace(params)
 
@@ -1739,20 +1770,20 @@ class TxBuilderImpl {
         const minLovelace = changeOutput.value.lovelace
 
         let inputValue = this.sumInputAndMintedValue()
-        let feeValue = new Value(fee)
+        let feeValue = makeValue(fee)
 
         nonChangeOutputValue = feeValue.add(nonChangeOutputValue)
 
-        const helper = new NetworkParamsHelper(params)
+        const helper = makeNetworkParamsHelper(params)
 
         // stake certificates
-        const stakeAddrDeposit = new Value(helper.stakeAddressDeposit)
+        const stakeAddrDeposit = makeValue(helper.stakeAddressDeposit)
         this.dcerts.forEach((dcert) => {
-            if (dcert.isRegister()) {
+            if (dcert.kind == "RegistrationDCert") {
                 // in case of stake registrations, count stake key deposits as additional output ADA
                 nonChangeOutputValue =
                     nonChangeOutputValue.add(stakeAddrDeposit)
-            } else if (/** @type {DCert} */ (dcert).isDeregister()) {
+            } else if (dcert.kind == "DeregistrationDCert") {
                 // in case of stake de-registrations, count stake key deposits as additional input ADA
                 inputValue = inputValue.add(stakeAddrDeposit)
             }
@@ -1817,7 +1848,7 @@ class TxBuilderImpl {
      */
     buildMetadata() {
         if (this.hasMetadata()) {
-            const metadata = new TxMetadata(this.metadata)
+            const metadata = makeTxMetadata(this.metadata)
             const metadataHash = metadata.hash()
 
             return { metadata, metadataHash }
@@ -1851,7 +1882,7 @@ class TxBuilderImpl {
             execContext.networkParams,
             dummyRedeemers,
             this.datums,
-            TxId.dummy()
+            makeDummyTxId()
         )
 
         const buildContext = {
@@ -1875,7 +1906,7 @@ class TxBuilderImpl {
      * @returns {TxBody}
      */
     buildDummyTxBody(fee, firstValidSlot, lastValidSlot) {
-        return new TxBody({
+        return makeTxBody({
             inputs: this._inputs,
             outputs: this._outputs,
             refInputs: this._refInputs,
@@ -1904,28 +1935,28 @@ class TxBuilderImpl {
         })
 
         this.spendingRedeemers.map(([utxo]) => {
-            const vh = utxo.address.validatorHash
-
-            if (vh) {
-                allHashes.push(vh.bytes)
+            if (
+                utxo.address.era == "Shelley" &&
+                utxo.address.spendingCredential.kind == "ValidatorHash"
+            ) {
+                allHashes.push(utxo.address.spendingCredential.bytes)
             }
         })
 
         this.rewardingRedeemers.forEach(([stakingAddress]) => {
-            const svh = stakingAddress
-                .toCredential()
-                .expectStakingHash().stakingValidatorHash
+            const svh = stakingAddress.stakingCredential
 
-            if (svh) {
+            if (svh.kind == "StakingValidatorHash") {
                 allHashes.push(svh.bytes)
             }
         })
 
         this.certifyingRedeemers.forEach(([dcert]) => {
-            const svh = dcert.credential.hash.stakingValidatorHash
-
-            if (svh) {
-                allHashes.push(svh.bytes)
+            if (
+                "credential" in dcert &&
+                dcert.credential.kind == "StakingValidatorHash"
+            ) {
+                allHashes.push(dcert.credential.bytes)
             }
         })
 
@@ -1970,7 +2001,7 @@ class TxBuilderImpl {
                           ? redeemerDataOrFn(buildContext.txInfo)
                           : redeemerDataOrFn()
 
-                let redeemer = TxRedeemer.Minting(
+                let redeemer = makeTxMintingRedeemer(
                     i,
                     dummyRedeemerData instanceof Promise
                         ? await dummyRedeemerData
@@ -1989,9 +2020,9 @@ class TxBuilderImpl {
                         summary: `mint @${i}`,
                         args: [
                             redeemerData,
-                            new ScriptContextV2(
+                            makeScriptContextV2(
                                 buildContext.txInfo,
-                                ScriptPurpose.Minting(redeemer, mph)
+                                makeMintingPurpose(mph)
                             ).toUplcData()
                         ],
                         buildContext
@@ -2006,7 +2037,7 @@ class TxBuilderImpl {
                           )
                         : profile.cost
 
-                    redeemer = TxRedeemer.Minting(i, redeemerData, cost)
+                    redeemer = makeTxMintingRedeemer(i, redeemerData, cost)
                 }
                 return redeemer
             })
@@ -2029,7 +2060,7 @@ class TxBuilderImpl {
                           ? redeemerDataOrFn(buildContext.txInfo)
                           : redeemerDataOrFn()
 
-                let redeemer = TxRedeemer.Spending(
+                let redeemer = makeTxSpendingRedeemer(
                     i,
                     dummyRedeemerData instanceof Promise
                         ? await dummyRedeemerData
@@ -2039,7 +2070,19 @@ class TxBuilderImpl {
                 // it's tempting to delegate this to TxRedeemer.getRedeemerDetails()
                 // this finds the index based on staking address, but ^ uses the index we found here.
                 // Possibly the other thing should do the same as this.
-                const vh = expectDefined(utxo.address.validatorHash)
+                if (utxo.address.era != "Shelley") {
+                    throw new Error(
+                        `unexpected ${utxo.address.era} era address`
+                    )
+                }
+
+                if (utxo.address.spendingCredential.kind != "ValidatorHash") {
+                    throw new Error(
+                        "Address doesn't have a ValidatorHash spending credential"
+                    )
+                }
+
+                const vh = expectDefined(utxo.address.spendingCredential)
                 const script = this.getUplcScript(vh)
 
                 if (buildContext) {
@@ -2055,9 +2098,9 @@ class TxBuilderImpl {
                         args: [
                             datum,
                             redeemerData,
-                            new ScriptContextV2(
+                            makeScriptContextV2(
                                 buildContext.txInfo,
-                                ScriptPurpose.Spending(redeemer, utxo.id)
+                                makeSpendingPurpose(utxo.id)
                             ).toUplcData()
                         ],
                         buildContext
@@ -2072,7 +2115,7 @@ class TxBuilderImpl {
                           )
                         : profile.cost
 
-                    redeemer = TxRedeemer.Spending(i, redeemerData, cost)
+                    redeemer = makeTxSpendingRedeemer(i, redeemerData, cost)
                 }
 
                 return redeemer
@@ -2103,17 +2146,23 @@ class TxBuilderImpl {
                             : buildContext
                               ? redeemerDataOrFn(buildContext.txInfo)
                               : redeemerDataOrFn()
-                    let redeemer = TxRedeemer.Rewarding(
+                    let redeemer = makeTxRewardingRedeemer(
                         i,
                         dummyRedeemerData instanceof Promise
                             ? await dummyRedeemerData
                             : dummyRedeemerData
                     )
 
-                    const svh = expectDefined(
-                        stakingAddress.toCredential().expectStakingHash()
-                            .stakingValidatorHash
-                    )
+                    if (
+                        stakingAddress.stakingCredential.kind !=
+                        "StakingValidatorHash"
+                    ) {
+                        throw new Error(
+                            "StakingAddress doen't have a StakingValidatorHash credential"
+                        )
+                    }
+
+                    const svh = stakingAddress.stakingCredential
                     const script = this.getUplcScript(svh)
 
                     if (buildContext) {
@@ -2126,11 +2175,10 @@ class TxBuilderImpl {
                             summary: `rewards @${i}`,
                             args: [
                                 redeemerData,
-                                new ScriptContextV2(
+                                makeScriptContextV2(
                                     buildContext.txInfo,
-                                    ScriptPurpose.Rewarding(
-                                        redeemer,
-                                        stakingAddress.toCredential()
+                                    makeRewardingPurpose(
+                                        stakingAddress.stakingCredential
                                     )
                                 ).toUplcData()
                             ],
@@ -2146,7 +2194,11 @@ class TxBuilderImpl {
                               )
                             : profile.cost
 
-                        redeemer = TxRedeemer.Rewarding(i, redeemerData, cost)
+                        redeemer = makeTxRewardingRedeemer(
+                            i,
+                            redeemerData,
+                            cost
+                        )
                     }
 
                     return redeemer
@@ -2163,13 +2215,23 @@ class TxBuilderImpl {
     async buildCertifyingRedeemers(buildContext = undefined) {
         return Promise.all(
             this.certifyingRedeemers.map(async ([dcert, redeemerDataOrFn]) => {
-                const svh = expectDefined(
-                    dcert.credential.hash.stakingValidatorHash
-                )
+                if (!("credential" in dcert)) {
+                    throw new Error("DCert doesn't have a credential")
+                }
+
+                if (dcert.credential.kind != "StakingValidatorHash") {
+                    throw new Error(
+                        "DCert doesn't have a StakingValidatorHash credential"
+                    )
+                }
+
+                const svh = dcert.credential
 
                 const i = this.dcerts.findIndex(
                     (dc) =>
-                        dc.credential.hash.stakingValidatorHash?.isEqual(svh) &&
+                        "credential" in dc &&
+                        dc.credential.kind == "StakingValidatorHash" &&
+                        dc.credential.isEqual(svh) &&
                         dc.kind == dcert.kind
                 )
 
@@ -2180,7 +2242,7 @@ class TxBuilderImpl {
                         : buildContext
                           ? redeemerDataOrFn(buildContext.txInfo)
                           : redeemerDataOrFn()
-                let redeemer = TxRedeemer.Certifying(
+                let redeemer = makeTxCertifyingRedeemer(
                     i,
                     dummyRedeemerData instanceof Promise
                         ? await dummyRedeemerData
@@ -2199,9 +2261,9 @@ class TxBuilderImpl {
                         summary: `dcert ${dcert.kind} @${i}`,
                         args: [
                             redeemerData,
-                            new ScriptContextV2(
+                            makeScriptContextV2(
                                 buildContext.txInfo,
-                                ScriptPurpose.Certifying(redeemer, dcert)
+                                makeCertifyingPurpose(dcert)
                             ).toUplcData()
                         ],
                         buildContext
@@ -2216,7 +2278,7 @@ class TxBuilderImpl {
                           )
                         : profile.cost
 
-                    redeemer = TxRedeemer.Certifying(i, redeemerData, cost)
+                    redeemer = makeTxCertifyingRedeemer(i, redeemerData, cost)
                 }
 
                 return redeemer
@@ -2226,7 +2288,7 @@ class TxBuilderImpl {
 
     /**
      * @private
-     * @param {UplcProgramV1I | UplcProgramV2I} script
+     * @param {UplcProgramV1 | UplcProgramV2} script
      * @param {Object} options
      * @param {string} options.summary
      * @param {UplcData[]} options.args
@@ -2237,9 +2299,9 @@ class TxBuilderImpl {
         const throwBuildPhaseScriptErrors =
             buildContext.throwBuildPhaseScriptErrors ?? true
 
-        const { logOptions = { logPrint() {}, lastMsg: "" } } = buildContext
+        const { logOptions = { logPrint() {}, lastMessage: "" } } = buildContext
 
-        const argsData = args.map((a) => new UplcDataValue(a))
+        const argsData = args.map((a) => makeUplcDataValue(a))
         const profile = script.eval(argsData, { logOptions })
         // XXX if the script fails, we signal the logger to emit the diagnostics.
         // if the script runs correctly, logging will arrive during transaction validation instead.
@@ -2308,7 +2370,7 @@ class TxBuilderImpl {
      * }}
      */
     buildValidityTimeRange(params) {
-        const helper = new NetworkParamsHelper(params)
+        const helper = makeNetworkParamsHelper(params)
 
         /**
          * @param {Either<{slot: number}, {timestamp: number}>} slotOrTime
@@ -2368,4 +2430,19 @@ class TxBuilderImpl {
             }
         }
     }
+}
+
+/**
+ * @template TRedeemer
+ * @param {TxInput<ValidatorHash<SpendingContext<any, any, any, TRedeemer>>>} utxo
+ * @returns {SpendingContext<any, any, any, TRedeemer>}
+ */
+function getTxInputSpendingContext(utxo) {
+    const address = utxo.address
+
+    if (address.era != "Shelley") {
+        throw new Error(`unexpected ${address.era} era address`)
+    }
+
+    return address.spendingCredential.context
 }

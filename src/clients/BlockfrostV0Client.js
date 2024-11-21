@@ -1,22 +1,20 @@
 import {
-    Address,
-    Tx,
-    TxId,
-    TxInput,
-    TxOutput,
-    TxOutputDatum,
-    TxOutputId,
-    Value
+    makeInlineTxOutputDatum,
+    makeTxId,
+    makeTxInput,
+    makeTxOutput,
+    makeTxOutputId,
+    parseBlockfrostValue,
+    parseShelleyAddress
 } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
-import { UplcProgramV2, decodeUplcData } from "@helios-lang/uplc"
-import { SHELLEY_GENESIS_PARAMS } from "@helios-lang/ledger-shelley"
+import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
 import { makeTxSummary } from "../chain/index.js"
 
 /**
- * @import { NetworkParams } from "@helios-lang/ledger"
- * @import { UplcProgramV2I } from "@helios-lang/uplc"
- * @import { BlockfrostV0Client, NetworkName, ReadonlyWallet, TxSummary } from "src/index.js"
+ * @import { Address, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { UplcProgramV2 } from "@helios-lang/uplc"
+ * @import { BlockfrostV0Client, NetworkName, ReadonlyWallet, TxSummary } from "../index.js"
  */
 
 /**
@@ -126,7 +124,8 @@ export function makeBlockfrostV0Client(networkName, projectId) {
  *     mainnet?: string
  * }} projectIds
  * @returns {Promise<BlockfrostV0Client>}
- *
+ */
+/**
  * @overload
  * Connects to the same network a given `Wallet` is connected to (preview, preprod or mainnet).
  * @param {ReadonlyWallet} wallet
@@ -136,7 +135,8 @@ export function makeBlockfrostV0Client(networkName, projectId) {
  *     mainnet?: string
  * }} projectIds
  * @returns {Promise<BlockfrostV0Client>}
- *
+ */
+/**
  * @param {TxInput | ReadonlyWallet} utxoOrWallet
  * @param {{
  *     preview?: string,
@@ -146,7 +146,7 @@ export function makeBlockfrostV0Client(networkName, projectId) {
  * @returns {Promise<BlockfrostV0Client>}
  */
 export async function resolveBlockfrostV0Client(utxoOrWallet, projectIds) {
-    if (utxoOrWallet instanceof TxInput) {
+    if ("kind" in utxoOrWallet && utxoOrWallet.kind == "TxInput") {
         const refUtxo = utxoOrWallet
         const mainnetProjectId = projectIds["mainnet"]
         const preprodProjectId = projectIds["preprod"]
@@ -189,7 +189,10 @@ export async function resolveBlockfrostV0Client(utxoOrWallet, projectIds) {
             "refUtxo not found on a network for which you have a project id"
         )
     } else {
-        const wallet = utxoOrWallet
+        /**
+         * @type {ReadonlyWallet}
+         */
+        const wallet = /** @type {any} */ (utxoOrWallet)
 
         if (await wallet.isMainnet()) {
             return new BlockfrostV0ClientImpl(
@@ -306,7 +309,7 @@ class BlockfrostV0ClientImpl {
              * @type {NetworkParams}
              */
             const params = {
-                secondsPerSlot: SHELLEY_GENESIS_PARAMS.slotLength,
+                secondsPerSlot: 1,
                 collateralPercentage: bfParams.collateral_percent,
                 costModelParamsV1: convertOldCostModels(
                     bfParams.cost_models.PlutusV1
@@ -321,7 +324,7 @@ class BlockfrostV0ClientImpl {
                 maxTxExCpu: parseInt(bfParams.max_tx_ex_steps),
                 maxTxExMem: parseInt(bfParams.max_tx_ex_mem),
                 maxTxSize: bfParams.max_tx_size,
-                refScriptFeePerByte:
+                refScriptsFeePerByte:
                     "min_fee_ref_script_cost_per_byte" in bfParams
                         ? bfParams.min_fee_ref_script_cost_per_byte
                         : 0,
@@ -441,7 +444,7 @@ class BlockfrostV0ClientImpl {
             throw new Error(`unexpected response from Blockfrost`)
         }
 
-        const obj = outputs[id.utxoIdx]
+        const obj = outputs[id.index]
 
         if (!obj) {
             console.log(responseObj)
@@ -449,7 +452,7 @@ class BlockfrostV0ClientImpl {
         }
 
         obj["tx_hash"] = txId.toHex()
-        obj["output_index"] = Number(id.utxoIdx)
+        obj["output_index"] = Number(id.index)
 
         return await this.restoreTxInput(obj)
     }
@@ -465,7 +468,7 @@ class BlockfrostV0ClientImpl {
          * TODO: pagination
          */
 
-        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/addresses/${address.toBech32()}/utxos?order=asc`
+        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/addresses/${address.toString()}/utxos?order=asc`
 
         try {
             const response = await fetch(url, {
@@ -562,7 +565,7 @@ class BlockfrostV0ClientImpl {
             // analyze error and throw a different error if it was detected that an input UTxO might not exist
             throw new Error(responseText)
         } else {
-            return new TxId(JSON.parse(responseText))
+            return makeTxId(JSON.parse(responseText))
         }
     }
 
@@ -581,7 +584,7 @@ class BlockfrostV0ClientImpl {
      */
     async restoreTxInput(obj) {
         /**
-         * @type {UplcProgramV2I | undefined}
+         * @type {UplcProgramV2 | undefined}
          */
         let refScript = undefined
 
@@ -607,18 +610,18 @@ class BlockfrostV0ClientImpl {
             } else if (responseJson.cbor == null) {
                 console.error(`reponseJson.cbor is null`)
             } else {
-                refScript = UplcProgramV2.fromCbor(responseJson.cbor)
+                refScript = decodeUplcProgramV2FromCbor(responseJson.cbor)
             }
         }
 
-        return new TxInput(
-            new TxOutputId(TxId.new(obj.tx_hash), obj.output_index),
-            new TxOutput(
-                Address.fromBech32(obj.address),
-                Value.fromBlockfrost(obj.amount),
+        return makeTxInput(
+            makeTxOutputId(makeTxId(obj.tx_hash), obj.output_index),
+            makeTxOutput(
+                parseShelleyAddress(obj.address),
+                parseBlockfrostValue(obj.amount),
                 obj.inline_datum
-                    ? TxOutputDatum.Inline(decodeUplcData(obj.inline_datum))
-                    : null,
+                    ? makeInlineTxOutputDatum(decodeUplcData(obj.inline_datum))
+                    : undefined,
                 refScript
             )
         )

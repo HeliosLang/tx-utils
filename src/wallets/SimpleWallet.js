@@ -1,14 +1,5 @@
 import { mulberry32 } from "@helios-lang/crypto"
-import {
-    Address,
-    PubKey,
-    PubKeyHash,
-    Signature,
-    StakingAddress,
-    Tx,
-    TxId,
-    TxInput
-} from "@helios-lang/ledger"
+import { makeAddress, makeStakingAddress } from "@helios-lang/ledger"
 import {
     BIP39_DICT_EN,
     restoreRootPrivateKey,
@@ -17,7 +8,8 @@ import {
 
 /**
  * @import { NumberGenerator } from "@helios-lang/crypto"
- * @import { Bip32PrivateKey, CardanoClient, RootPrivateKey, SimpleWallet } from "src/index.js"
+ * @import { Address, PubKey, PubKeyHash, Signature, StakingAddress, Tx, TxId, TxInput } from "@helios-lang/ledger"
+ * @import { Bip32PrivateKey, CardanoClient, RootPrivateKey, SimpleWallet } from "../index.js"
  */
 
 /**
@@ -25,13 +17,15 @@ import {
  * @param {RootPrivateKey} key
  * @param {CardanoClient} cardanoClient
  * @returns {SimpleWallet}
- *
+ */
+/**
  * @overload
  * @param {Bip32PrivateKey} spendingPrivateKey
  * @param {Bip32PrivateKey | undefined} stakingPrivateKey
  * @param {CardanoClient} cardanoClient
  * @returns {SimpleWallet}
- *
+ */
+/**
  * @param {(
  *   [RootPrivateKey, CardanoClient]
  *   | [Bip32PrivateKey, Bip32PrivateKey | undefined, CardanoClient]
@@ -129,7 +123,7 @@ class SimpleWalletImpl {
      * @type {Address}
      */
     get address() {
-        return Address.fromHashes(
+        return makeAddress(
             this.cardanoClient.isMainnet(),
             this.spendingPubKeyHash,
             this.stakingPubKeyHash
@@ -150,7 +144,7 @@ class SimpleWalletImpl {
      * @type {PubKeyHash}
      */
     get spendingPubKeyHash() {
-        return this.spendingPubKey.toHash()
+        return this.spendingPubKey.hash()
     }
 
     /**
@@ -158,9 +152,9 @@ class SimpleWalletImpl {
      */
     get stakingAddress() {
         if (this.stakingPubKey) {
-            return StakingAddress.fromHash(
+            return makeStakingAddress(
                 this.cardanoClient.isMainnet(),
-                this.stakingPubKey.toHash()
+                this.stakingPubKey.hash()
             )
         } else {
             return undefined
@@ -182,7 +176,7 @@ class SimpleWalletImpl {
      * @type {PubKeyHash | undefined}
      */
     get stakingPubKeyHash() {
-        return this.stakingPubKey?.toHash()
+        return this.stakingPubKey?.hash()
     }
 
     /**

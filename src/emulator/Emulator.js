@@ -1,12 +1,8 @@
 import { generateBytes, mulberry32 } from "@helios-lang/crypto"
 import {
-    Address,
-    Assets,
+    makeAssets,
     DEFAULT_NETWORK_PARAMS,
-    Tx,
-    TxId,
-    TxInput,
-    TxOutputId
+    makeTxOutputId
 } from "@helios-lang/ledger"
 import { SECOND } from "../duration/index.js"
 import { makeRootPrivateKey } from "../keys/index.js"
@@ -17,8 +13,8 @@ import { makeEmulatorRegularTx } from "./EmulatorRegularTx.js"
 /**
  * @import { IntLike } from "@helios-lang/codec-utils"
  * @import { NumberGenerator } from "@helios-lang/crypto"
- * @import { NetworkParams } from "@helios-lang/ledger"
- * @import { Emulator, EmulatorTx, EmulatorGenesisTx, SimpleWallet } from "src/index.js"
+ * @import { Address, Assets, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { Emulator, EmulatorTx, EmulatorGenesisTx, SimpleWallet } from "../index.js"
  */
 
 /**
@@ -157,7 +153,7 @@ class EmulatorImpl {
      * @param {Assets} assets
      * @returns {SimpleWallet}
      */
-    createWallet(lovelace = 0n, assets = new Assets([])) {
+    createWallet(lovelace = 0n, assets = makeAssets([])) {
         const rootKey = makeRootPrivateKey(generateBytes(this._random, 32))
         const wallet = makeSimpleWallet(rootKey, this)
 
@@ -173,7 +169,7 @@ class EmulatorImpl {
      * @param {Assets} assets
      * @returns {TxOutputId}
      */
-    createUtxo(wallet, lovelace, assets = new Assets([])) {
+    createUtxo(wallet, lovelace, assets = makeAssets([])) {
         const tx = makeEmulatorGenesisTx(
             this.genesis.length,
             wallet.address,
@@ -184,7 +180,7 @@ class EmulatorImpl {
         this.genesis.push(tx)
         this.mempool.push(tx)
 
-        return new TxOutputId(tx.id(), 0)
+        return makeTxOutputId(tx.id(), 0)
     }
 
     /**
@@ -224,7 +220,7 @@ class EmulatorImpl {
     async getUtxos(address) {
         this.warnMempool()
 
-        return this._addressUtxos[address.toBech32()] ?? []
+        return this._addressUtxos[address.toString()] ?? []
     }
 
     /**
@@ -330,7 +326,7 @@ class EmulatorImpl {
                 const key = utxo.id.toString()
                 this._allUtxos[key] = utxo
 
-                const addr = utxo.address.toBech32()
+                const addr = utxo.address.toString()
 
                 if (addr in this._addressUtxos) {
                     this._addressUtxos[addr].push(utxo)
@@ -342,7 +338,7 @@ class EmulatorImpl {
             tx.consumedUtxos().forEach((utxo) => {
                 this._consumedUtxos.add(utxo.id.toString())
 
-                const addr = utxo.address.toBech32()
+                const addr = utxo.address.toString()
 
                 if (addr in this._addressUtxos) {
                     this._addressUtxos[addr] = this._addressUtxos[addr].filter(

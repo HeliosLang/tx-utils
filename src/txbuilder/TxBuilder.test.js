@@ -1,6 +1,6 @@
 import { describe, it } from "node:test"
 import { strictEqual } from "node:assert"
-import { Tx, TxInput, TxOutput } from "@helios-lang/ledger"
+import { decodeTx, makeTxInput, makeTxOutput } from "@helios-lang/ledger"
 import { makeTxBuilder } from "./TxBuilder.js"
 
 describe("basic TxBuilder", () => {
@@ -14,7 +14,7 @@ describe("basic TxBuilder", () => {
      */
     const signedRefHex =
         "84a30081825820d4b22d33611fb2b3764080cb349b3f12d353aef1d4319ee33e44594bbebe5e83000182a200581d6085842b5f34a2b74e6639cbf1cf4f0826f146db513b7bc04f4b024337011b000000025370c627a200581d6005746ec08108232ef6f3046caeaa3c5c63b9c4470b303d85aedbf69a011a00989680021a00028759a10081825820a0e006bbd52e9db2dcd904e90c335212d2968fcae92ee9dd01204543c314359b584073afc3d75355883cd9a83140ed6480354578148f861f905d65a75b773d004eca5869f7f2a580c6d9cc7d54da3b307aa6cb1b8d4eb57603e37eff83ca56ec620cf5f6"
-    const signedRef = Tx.fromCbor(signedRefHex)
+    const signedRef = decodeTx(signedRefHex)
 
     it("building basic tx leads to lower or same fee than cardano-cli", async () => {
         const wallet1 =
@@ -22,9 +22,9 @@ describe("basic TxBuilder", () => {
         const wallet2 =
             "addr_test1vqzhgmkqsyyzxthk7vzxet4283wx8wwygu9nq0v94mdldxs0d56ku"
 
-        const input1 = new TxInput(
+        const input1 = makeTxInput(
             "d4b22d33611fb2b3764080cb349b3f12d353aef1d4319ee33e44594bbebe5e83#0",
-            new TxOutput(wallet1, 10_000_000_000n)
+            makeTxOutput(wallet1, 10_000_000_000n)
         )
         const tx = await makeTxBuilder({ isMainnet: false })
             .spendUnsafe(input1)

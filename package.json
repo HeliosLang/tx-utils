@@ -1,12 +1,13 @@
 {
     "name": "@helios-lang/tx-utils",
     "version": "0.2.27",
-    "description": "Coinselection, query layers, wallets",
+    "description": "Coinselection, Cardano query layer clients, emulator, wallets",
     "main": "src/index.js",
     "types": "types/index.d.ts",
     "type": "module",
     "scripts": {
         "build": "pnpm run prettify && pnpm run build:types && pnpm run test:suite",
+        "build:docs": "typedoc --tsconfig ./jsconfig.json",
         "build:types": "tsc -p jsconfig.json --noEmit false --emitDeclarationOnly",
         "lockfile:sync": "pnpm install --ignore-workspace",
         "prepack": "pnpm run build",
@@ -27,14 +28,14 @@
     "devDependencies": {
         "@types/node": "^20.12.4",
         "prettier": "^3.3.3",
+        "typedoc": "^0.26.11",
         "typescript": "^5.6.2"
     },
     "dependencies": {
-        "@helios-lang/codec-utils": "^0.2.1",
-        "@helios-lang/crypto": "^0.1.17",
-        "@helios-lang/ledger": "^0.5.13",
-        "@helios-lang/ledger-shelley": "^0.1.5",
+        "@helios-lang/codec-utils": "^0.3.1",
+        "@helios-lang/crypto": "^0.2.0",
+        "@helios-lang/ledger": "^0.6.3",
         "@helios-lang/type-utils": "^0.2.8",
-        "@helios-lang/uplc": "^0.6.1"
+        "@helios-lang/uplc": "^0.7.5"
     }
 }

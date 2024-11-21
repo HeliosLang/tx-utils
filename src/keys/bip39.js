@@ -1,4 +1,4 @@
-import { BitWriter, padBits } from "@helios-lang/codec-utils"
+import { makeBitWriter, padBits } from "@helios-lang/codec-utils"
 import { sha2_256 } from "@helios-lang/crypto"
 
 /**
@@ -2076,7 +2076,7 @@ export function convertBip39PhraseToEntropy(phrase, dict = BIP39_DICT_EN) {
         )
     }
 
-    const bw = new BitWriter()
+    const bw = makeBitWriter()
 
     phrase.forEach((w) => {
         const i = dict.indexOf(w)

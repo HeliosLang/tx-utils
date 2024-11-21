@@ -1,16 +1,16 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
 import {
-    Address,
-    Signature,
-    StakingAddress,
-    Tx,
-    TxId,
-    TxInput,
-    TxWitnesses
+    decodeTxInput,
+    decodeTxWitnesses,
+    makeShelleyAddress,
+    makeSignature,
+    makeStakingAddress,
+    makeTxId
 } from "@helios-lang/ledger"
 
 /**
- * @import { Cip30FullHandle, Cip30Wallet } from "src/index.js"
+ * @import { Address, PubKeyHash, ShelleyAddress, Signature, StakingAddress, Tx, TxId, TxInput } from "@helios-lang/ledger"
+ * @import { Cip30FullHandle, Cip30Wallet } from "../index.js"
  */
 
 /**
@@ -63,57 +63,69 @@ class Cip30WalletImpl {
                 )
             }
 
-            return addresses.map((a) => new StakingAddress(a))
+            return addresses.map((a) => makeStakingAddress(a))
         })
     }
 
     /**
      * Gets a list of addresses which contain(ed) UTxOs.
-     * @type {Promise<Address<null, unknown>[]>}
+     * @type {Promise<ShelleyAddress<PubKeyHash>[]>}
      */
     get usedAddresses() {
-        return this.handle
-            .getUsedAddresses()
-            .then((addresses) => addresses.map((a) => new Address(a)))
+        return this.handle.getUsedAddresses().then((addresses) =>
+            addresses.map((a) => {
+                const addr = makeShelleyAddress(a)
+
+                if (addr.spendingCredential.kind != "PubKeyHash") {
+                    throw new Error("expected PubKeyHash spending credentiel")
+                }
+
+                return /** @type {ShelleyAddress<PubKeyHash>} */ (addr)
+            })
+        )
     }
 
     /**
      * Gets a list of unique unused addresses which can be used to UTxOs to.
-     * @type {Promise<Address<null, unknown>[]>}
+     * @type {Promise<ShelleyAddress<PubKeyHash>[]>}
      */
     get unusedAddresses() {
-        return this.handle
-            .getUnusedAddresses()
-            .then((addresses) => addresses.map((a) => new Address(a)))
+        return this.handle.getUnusedAddresses().then((addresses) =>
+            addresses.map((a) => {
+                const addr = makeShelleyAddress(a)
+
+                if (addr.spendingCredential.kind != "PubKeyHash") {
+                    throw new Error("expected PubKeyHash spending credentiel")
+                }
+
+                return /** @type {ShelleyAddress<PubKeyHash>} */ (addr)
+            })
+        )
     }
 
     /**
      * Gets the complete list of UTxOs (as `TxInput` instances) sitting at the addresses owned by the wallet.
-     * @type {Promise<TxInput<null, unknown>[]>}
+     * @type {Promise<TxInput<PubKeyHash>[]>}
      */
     get utxos() {
         return this.handle
             .getUtxos()
             .then((utxos) =>
                 utxos.map(
-                    (u) =>
-                        /** @type {TxInput<null, unknown>} */ (
-                            TxInput.fromCbor(u)
-                        )
+                    (u) => /** @type {TxInput<PubKeyHash>} */ (decodeTxInput(u))
                 )
             )
     }
 
     /**
-     * @type {Promise<TxInput<null, unknown>[]>}
+     * @type {Promise<TxInput<PubKeyHash>[]>}
      */
     get collateral() {
         const getCollateral =
             this.handle.getCollateral || this.handle.experimental.getCollateral
         return getCollateral().then((utxos) =>
             utxos.map(
-                (u) =>
-                    /** @type {TxInput<null, unknown>} */ (TxInput.fromCbor(u))
+                (u) => /** @type {TxInput<PubKeyHash>} */ (decodeTxInput(u))
             )
         )
     }
@@ -126,9 +138,9 @@ class Cip30WalletImpl {
      * @return {Promise<Signature>}
      */
     async signData(addr, data) {
-        if (!(addr instanceof Address)) {
+        if (addr.kind != "Address" || addr.era != "Shelley") {
             throw new Error(
-                `The value in the addr parameter is not a Cardano Address object.`
+                `The value in the addr parameter is not a Cardano Shelley-era Address object.`
             )
         } else if (data.length == 0) {
             throw new Error(`The data argument is empty. Must be non-empty`)
@@ -142,7 +154,7 @@ class Cip30WalletImpl {
             bytesToHex(data)
         )
 
-        return new Signature(key, signature)
+        return makeSignature(key, signature)
     }
 
     /**
@@ -153,7 +165,7 @@ class Cip30WalletImpl {
     async signTx(tx) {
         const res = await this.handle.signTx(bytesToHex(tx.toCbor()), true)
 
-        return TxWitnesses.fromCbor(res).signatures
+        return decodeTxWitnesses(res).signatures
     }
 
     /**
@@ -164,6 +176,6 @@ class Cip30WalletImpl {
     async submitTx(tx) {
         const responseText = await this.handle.submitTx(bytesToHex(tx.toCbor()))
 
-        return new TxId(responseText)
+        return makeTxId(responseText)
     }
 }

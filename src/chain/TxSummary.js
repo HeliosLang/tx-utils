@@ -1,5 +1,12 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
-import { Address, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+import {
+    decodeTxInput,
+    isValidTxId,
+    isValidTxInputCbor,
+    makeTxId,
+    makeTxInput,
+    makeTxOutputId
+} from "@helios-lang/ledger"
 import {
     isArray,
     isFormattedString,
@@ -8,8 +15,8 @@ import {
 } from "@helios-lang/type-utils"
 
 /**
- * @import { AssertExtends, FirstArgType } from "@helios-lang/type-utils"
- * @import { TxSummary, TxSummaryJsonSafe } from "src/index.js"
+ * @import { Address, SpendingCredential, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { TxSummary, TxSummaryJsonSafe } from "../index.js"
  */
 
 /**
@@ -31,7 +38,7 @@ import {
  */
 export function makeTxSummary(props) {
     return new TxSummaryImpl({
-        id: typeof props.id == "string" ? TxId.new(props.id) : props.id,
+        id: typeof props.id == "string" ? makeTxId(props.id) : props.id,
         inputs: props.inputs.map(
             /**
              * @param {TxInput | string} utxo
@@ -39,7 +46,7 @@ export function makeTxSummary(props) {
              */
             (utxo) => {
                 if (typeof utxo == "string") {
-                    return TxInput.fromCbor(utxo)
+                    return decodeTxInput(utxo)
                 } else {
                     return utxo
                 }
@@ -52,7 +59,7 @@ export function makeTxSummary(props) {
              */
             (utxo) => {
                 if (typeof utxo == "string") {
-                    return TxInput.fromCbor(utxo)
+                    return decodeTxInput(utxo)
                 } else {
                     return utxo
                 }
@@ -96,20 +103,19 @@ export function compareTxSummaries(a, b) {
 export function summarizeTx(tx, timestamp) {
     const id = tx.id()
     const inputs = tx.body.inputs.slice()
-    const outputs = tx.body.outputs.map(
-        (output, i) => new TxInput(new TxOutputId(id, i), output)
+    const outputs = tx.body.outputs.map((output, i) =>
+        makeTxInput(makeTxOutputId(id, i), output)
     )
 
     return new TxSummaryImpl({ id, inputs, outputs, timestamp })
 }
 
 /**
- * @template [CSpending=unknown]
- * @template [CStaking=unknown]
- * @param {TxInput<CSpending, CStaking>[]} utxos
+ * @template {SpendingCredential} [SC=SpendingCredential]
+ * @param {TxInput<SC>[]} utxos
  * @param {TxSummary[]} summaries - sorted inplace
- * @param {Address<CSpending, CStaking>[]} addresses - only track a limited number of addresses
- * @returns {TxInput<CSpending, CStaking>[]}
+ * @param {Address<SC>[]} addresses - only track a limited number of addresses
+ * @returns {TxInput<SC>[]}
  */
 export function superimposeUtxosOnSummaries(utxos, summaries, addresses) {
     summaries.sort(compareTxSummaries)
@@ -127,9 +133,9 @@ export function superimposeUtxosOnSummaries(utxos, summaries, addresses) {
  */
 export function isTxSummaryJsonSafe(input) {
     return isObject(input, {
-        id: isFormattedString(TxId.isValid),
-        inputs: isArray(isFormattedString(TxInput.isValidCbor(true))),
-        outputs: isArray(isFormattedString(TxInput.isValidCbor(true))),
+        id: isFormattedString(isValidTxId),
+        inputs: isArray(isFormattedString(isValidTxInputCbor(true))),
+        outputs: isArray(isFormattedString(isValidTxInputCbor(true))),
         timestamp: isNumber
     })
 }
@@ -175,14 +181,15 @@ class TxSummaryImpl {
     }
 
     /**
-     * @template [CSpending=unknown]
-     * @template [CStaking=unknown]
-     * @param {Address<CSpending, CStaking>[]} addresses
-     * @returns {TxInput<CSpending, CStaking>[]}
+     * @template {SpendingCredential} [SC=SpendingCredential]
+     * @param {Address<SC>[]} addresses
+     * @returns {TxInput<SC>[]}
      */
     getUtxosPaidTo(addresses) {
-        return this.outputs.filter((output) =>
-            addresses.some((a) => output.address.isEqual(a))
+        return /** @type {TxInput<SC>[]} */ (
+            this.outputs.filter((output) =>
+                addresses.some((a) => output.address.isEqual(a))
+            )
         )
     }
 
@@ -191,7 +198,7 @@ class TxSummaryImpl {
      * @returns {boolean}
      */
     spends(utxo) {
-        const utxoId = utxo instanceof TxOutputId ? utxo : utxo.id
+        const utxoId = utxo.kind == "TxOutputId" ? utxo : utxo.id
 
         return this.inputs.some((input) => input.id.isEqual(utxoId))
     }
@@ -210,11 +217,10 @@ class TxSummaryImpl {
     }
 
     /**
-     * @template [CSpending=unknown]
-     * @template [CStaking=unknown]
-     * @param {TxInput<CSpending, CStaking>[]} utxos
-     * @param {Address<CSpending, CStaking>[]} addresses
-     * @returns {TxInput<CSpending, CStaking>[]}
+     * @template {SpendingCredential} [SC=SpendingCredential]
+     * @param {TxInput<SC>[]} utxos
+     * @param {Address<SC>[]} addresses
+     * @returns {TxInput<SC>[]}
      */
     superimpose(utxos, addresses) {
         utxos = utxos.filter((utxo) => !this.spends(utxo))

@@ -1,5 +1,4 @@
 import { generateBytes, mulberry32 } from "@helios-lang/crypto"
-import { PubKey, Signature } from "@helios-lang/ledger"
 import {
     BIP32_HARDEN,
     makeBip32PrivateKeyWithBip39Entropy
@@ -12,7 +11,8 @@ import {
 
 /**
  * @import { NumberGenerator } from "@helios-lang/crypto"
- * @import { Bip32PrivateKey, RootPrivateKey } from "src/index.js"
+ * @import { PubKey, Signature } from "@helios-lang/ledger"
+ * @import { Bip32PrivateKey, RootPrivateKey } from "../index.js"
  */
 
 /**

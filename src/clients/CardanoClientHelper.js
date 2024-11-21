@@ -1,17 +1,9 @@
-import {
-    Address,
-    Tx,
-    TxId,
-    TxInput,
-    TxOutput,
-    TxOutputId,
-    Value
-} from "@helios-lang/ledger"
+import { addValues, makeTxInput, makeTxOutput } from "@helios-lang/ledger"
 import { selectSmallestFirst } from "../coinselection/index.js"
 
 /**
- * @import { NetworkParams } from "@helios-lang/ledger"
- * @import { CardanoClient, CardanoClientHelper, CardanoClientHelperOptions, CoinSelection, ReadonlyCardanoClient } from "src/index.js"
+ * @import { Address, NetworkParams, SpendingCredential, Tx, TxId, TxInput, TxOutputId, Value } from "@helios-lang/ledger"
+ * @import { CardanoClient, CardanoClientHelper, CardanoClientHelperOptions, CoinSelection, ReadonlyCardanoClient } from "../index.js"
  */
 
 /**
@@ -75,15 +67,14 @@ class CardanoClientHelperImpl {
      * @returns {Promise<Value>}
      */
     async calcBalance(address) {
-        return Value.sum(await this.getUtxos(address))
+        return addValues(await this.getUtxos(address))
     }
 
     /**
-     * @template [CSpending=unknown]
-     * @template [CStaking=unknown]
+     * @template {SpendingCredential} [SC=SpendingCredential]
      * @param {TxOutputId} id
-     * @param {Address<CSpending, CStaking> | undefined} address
-     * @returns {Promise<TxInput<CSpending, CStaking>>}
+     * @param {Address<SC> | undefined} address
+     * @returns {Promise<TxInput<SC>>}
      */
     async getUtxo(id, address = undefined) {
         const utxo = await this.client.getUtxo(id)
@@ -95,9 +86,9 @@ class CardanoClientHelperImpl {
                 )
             }
 
-            return new TxInput(
+            return makeTxInput(
                 id,
-                new TxOutput(
+                makeTxOutput(
                     address,
                     utxo.value,
                     utxo.datum,
@@ -105,23 +96,22 @@ class CardanoClientHelperImpl {
                 )
             )
         } else {
-            return utxo
+            return /** @type {any} */ (utxo)
         }
     }
 
     /**
-     * @template CSpending
-     * @template CStaking
-     * @param {Address<CSpending, CStaking>} address
-     * @returns {Promise<TxInput<CSpending, CStaking>[]>}
+     * @template {SpendingCredential} [SC=SpendingCredential]
+     * @param {Address<SC>} address
+     * @returns {Promise<TxInput<SC>[]>}
      */
     async getUtxos(address) {
         const utxos = await this.client.getUtxos(address)
 
         return utxos.map((utxo) => {
-            return new TxInput(
+            return makeTxInput(
                 utxo.id,
-                new TxOutput(
+                makeTxOutput(
                     address,
                     utxo.value,
                     utxo.datum,
@@ -135,15 +125,14 @@ class CardanoClientHelperImpl {
      * This method is used to select very specific UTxOs that contain known tokens/NFTs
      * If the UTxO isn't found that usually means something is wrong with the network synchronization
      * The onSelectUtxoFail callback can be used to trigger a synchronization action if the UTxO isn' found
-     * @template CSpending
-     * @template CStaking
-     * @param {Address<CSpending, CStaking>} address
+     * @template {SpendingCredential} [SC=SpendingCredential]
+     * @param {Address<SC>} address
      * @param {Value} value
-     * @returns {Promise<TxInput<CSpending, CStaking>>}
+     * @returns {Promise<TxInput<SC>>}
      */
     async selectUtxo(address, value) {
         const findUtxo = async () => {
-            const utxos = /** @type {TxInput<CSpending, CStaking>[]} */ (
+            const utxos = /** @type {TxInput<SC>[]} */ (
                 await this.getUtxos(address)
             )
 
@@ -173,24 +162,21 @@ class CardanoClientHelperImpl {
         }
 
         throw new Error(
-            `no UTxO found at ${address.toBech32()} that is large enough to cover ${JSON.stringify(value.dump(), undefined, 4)}`
+            `no UTxO found at ${address.toString()} that is large enough to cover ${JSON.stringify(value.dump(), undefined, 4)}`
         )
     }
 
     /**
-     * @template CSpending
-     * @template CStaking
-     * @param {Address<CSpending, CStaking>} address
+     * @template {SpendingCredential} [SC=SpendingCredential]
+     * @param {Address<SC>} address
      * @param {Value} value
-     * @param {CoinSelection<CSpending, CStaking>} coinSelection
-     * @returns {Promise<TxInput<CSpending, CStaking>[]>}
+     * @param {CoinSelection<SC>} coinSelection
+     * @returns {Promise<TxInput<SC>[]>}
      */
     async selectUtxos(address, value, coinSelection = selectSmallestFirst()) {
         const utxos = await this.getUtxos(address)
 
-        return /** @type {TxInput<CSpending, CStaking>[]} */ (
-            coinSelection(utxos, value)[0]
-        )
+        return /** @type {TxInput<SC>[]} */ (coinSelection(utxos, value)[0])
     }
 
     /**

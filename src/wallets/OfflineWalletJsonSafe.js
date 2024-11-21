@@ -1,4 +1,8 @@
-import { Address, StakingAddress, TxInput } from "@helios-lang/ledger"
+import {
+    isValidBech32Address,
+    isValidBech32StakingAddress,
+    isValidTxInputCbor
+} from "@helios-lang/ledger"
 import {
     assert,
     expect,
@@ -10,7 +14,7 @@ import {
 
 /**
  * @import { NotifyOnFalse } from "@helios-lang/type-utils"
- * @import { OfflineWalletJsonSafe } from "src/index.js"
+ * @import { OfflineWalletJsonSafe } from "../index.js"
  */
 
 /**
@@ -24,9 +28,9 @@ export function isOfflineWalletJsonSafe(input, onFalse = undefined) {
     if (
         !isObject(input, {
             isMainnet: isBoolean,
-            usedAddresses: isArray(isFormattedString(Address.isValidBech32)),
-            unusedAddresses: isArray(isFormattedString(Address.isValidBech32)),
-            utxos: isArray(isFormattedString(TxInput.isValidCbor(true)))
+            usedAddresses: isArray(isFormattedString(isValidBech32Address)),
+            unusedAddresses: isArray(isFormattedString(isValidBech32Address)),
+            utxos: isArray(isFormattedString(isValidTxInputCbor(true)))
         })
     ) {
         if (onFalse) {
@@ -37,7 +41,7 @@ export function isOfflineWalletJsonSafe(input, onFalse = undefined) {
 
     if (
         "collateral" in input &&
-        !isArray(input.collateral, isFormattedString(TxInput.isValidCbor(true)))
+        !isArray(input.collateral, isFormattedString(isValidTxInputCbor(true)))
     ) {
         if (onFalse) {
             onFalse("invalid OfflineWalletJsonSafe.collateral")
@@ -49,7 +53,7 @@ export function isOfflineWalletJsonSafe(input, onFalse = undefined) {
         "stakingAddresses" in input &&
         !isArray(
             input.stakingAddresses,
-            isFormattedString(StakingAddress.isValidBech32)
+            isFormattedString(isValidBech32StakingAddress)
         )
     ) {
         if (onFalse) {

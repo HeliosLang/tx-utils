@@ -1,33 +1,33 @@
-import { describe, it } from "node:test"
-import { makeTxSummary, isTxSummaryJsonSafe } from "./TxSummary.js"
-import {
-    Address,
-    TxId,
-    TxInput,
-    TxOutput,
-    TxOutputId,
-    Value
-} from "@helios-lang/ledger"
-import { bytesToHex } from "@helios-lang/codec-utils"
 import { deepEqual, strictEqual } from "node:assert"
+import { describe, it } from "node:test"
+import { bytesToHex } from "@helios-lang/codec-utils"
+import {
+    makeDummyAddress,
+    makeDummyTxId,
+    makeDummyTxOutputId,
+    makeTxInput,
+    makeTxOutput,
+    makeValue
+} from "@helios-lang/ledger"
+import { makeTxSummary, isTxSummaryJsonSafe } from "./TxSummary.js"
 
 describe(isTxSummaryJsonSafe.name, () => {
     it("ok for valid", () => {
         const valid = {
-            id: TxId.dummy().toHex(),
+            id: makeDummyTxId().toHex(),
             inputs: [
                 bytesToHex(
-                    new TxInput(
-                        TxOutputId.dummy(),
-                        new TxOutput(Address.dummy(true), new Value(0n))
+                    makeTxInput(
+                        makeDummyTxOutputId(),
+                        makeTxOutput(makeDummyAddress(true), makeValue(0n))
                     ).toCbor(true)
                 )
             ],
             outputs: [
                 bytesToHex(
-                    new TxInput(
-                        TxOutputId.dummy(),
-                        new TxOutput(Address.dummy(true), new Value(0n))
+                    makeTxInput(
+                        makeDummyTxOutputId(),
+                        makeTxOutput(makeDummyAddress(true), makeValue(0n))
                     ).toCbor(true)
                 )
             ],
@@ -39,20 +39,20 @@ describe(isTxSummaryJsonSafe.name, () => {
 
     it("nok for invalid", () => {
         const valid = {
-            id: TxId.dummy().toHex(),
+            id: makeDummyTxId().toHex(),
             inputs: [
                 bytesToHex(
-                    new TxInput(
-                        TxOutputId.dummy(),
-                        new TxOutput(Address.dummy(true), new Value(0n))
+                    makeTxInput(
+                        makeDummyTxOutputId(),
+                        makeTxOutput(makeDummyAddress(true), makeValue(0n))
                     ).toCbor(false)
                 )
             ],
             outputs: [
                 bytesToHex(
-                    new TxInput(
-                        TxOutputId.dummy(),
-                        new TxOutput(Address.dummy(true), new Value(0n))
+                    makeTxInput(
+                        makeDummyTxOutputId(),
+                        makeTxOutput(makeDummyAddress(true), makeValue(0n))
                     ).toCbor(true)
                 )
             ],
@@ -66,25 +66,25 @@ describe(isTxSummaryJsonSafe.name, () => {
 describe("TxSummary", () => {
     it("superimpose ignores utxos that have already been included", () => {
         const utxos = [
-            new TxInput(
-                TxOutputId.dummy(),
-                new TxOutput(Address.dummy(false), new Value(0))
+            makeTxInput(
+                makeDummyTxOutputId(),
+                makeTxOutput(makeDummyAddress(false), makeValue(0))
             )
         ]
 
         const summary = makeTxSummary({
-            id: TxId.dummy(),
+            id: makeDummyTxId(),
             inputs: [],
             outputs: [
-                new TxInput(
-                    TxOutputId.dummy(),
-                    new TxOutput(Address.dummy(false), new Value(0))
+                makeTxInput(
+                    makeDummyTxOutputId(),
+                    makeTxOutput(makeDummyAddress(false), makeValue(0))
                 )
             ],
             timestamp: 0
         })
 
-        const newUtxos = summary.superimpose(utxos, [Address.dummy(false)])
+        const newUtxos = summary.superimpose(utxos, [makeDummyAddress(false)])
 
         deepEqual(newUtxos, utxos)
     })

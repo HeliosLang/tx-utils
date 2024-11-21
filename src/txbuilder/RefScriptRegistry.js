@@ -1,24 +1,24 @@
 import { bytesToHex, equalsBytes } from "@helios-lang/codec-utils"
 import {
-    Address,
-    TxInput,
-    TxOutput,
-    TxOutputDatum,
-    TxOutputId,
-    Value
+    makeDummyAddress,
+    makeInlineTxOutputDatum,
+    makeTxOutput,
+    makeTxOutputId,
+    makeValue
 } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
-import { IntData } from "@helios-lang/uplc"
+import { makeIntData } from "@helios-lang/uplc"
 import { makeWalletHelper } from "../wallets/index.js"
 import { makeTxBuilder } from "./TxBuilder.js"
 
 /**
- * @import { UplcProgramV2I } from "@helios-lang/uplc"
- * @import { CardanoClient, RefScriptRegistry, Wallet } from "src/index.js"
+ * @import { ShelleyAddress, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { UplcProgramV2 } from "@helios-lang/uplc"
+ * @import { CardanoClient, RefScriptRegistry, Wallet } from "../index.js"
  */
 
 /**
- * @param {{client: CardanoClient, agent: Wallet, address?: Address<any, any>}} args
+ * @param {{client: CardanoClient, agent: Wallet, address?: ShelleyAddress}} args
  * @returns {RefScriptRegistry}
  */
 export function makeRefScriptRegistry(args) {
@@ -43,21 +43,26 @@ class RefScriptRegistryImpl {
 
     /**
      * @private
-     * @type {Address<any, any>}
+     * @type {ShelleyAddress}
      */
     _address
 
     /**
      * @private
-     * @type {Record<string, {program: UplcProgramV2I, utxoId: TxOutputId}>}
+     * @type {Record<string, {program: UplcProgramV2, utxoId: TxOutputId}>}
      */
     _cache
 
     /**
      * @param {CardanoClient} client
      * @param {Wallet} agent
+     * @param {ShelleyAddress} address
      */
-    constructor(client, agent, address = Address.dummy(client.isMainnet(), 0)) {
+    constructor(
+        client,
+        agent,
+        address = makeDummyAddress(client.isMainnet(), 0)
+    ) {
         this._network = client
         this._agent = agent
         this._address = address
@@ -66,14 +71,14 @@ class RefScriptRegistryImpl {
 
     /**
      * @private
-     * @type {Address<any, any>}
+     * @type {ShelleyAddress}
      */
     get address() {
         return this._address
     }
 
     /**
-     * @param {UplcProgramV2I} program
+     * @param {UplcProgramV2} program
      * @returns {Promise<TxOutputId>}
      */
     async register(program) {
@@ -85,10 +90,10 @@ class RefScriptRegistryImpl {
 
         const b = makeTxBuilder({ isMainnet: this._network.isMainnet() })
 
-        const output = new TxOutput(
+        const output = makeTxOutput(
             this.address,
-            new Value(0),
-            TxOutputDatum.Inline(new IntData(0)),
+            makeValue(0),
+            makeInlineTxOutputDatum(makeIntData(0)),
             program
         )
 
@@ -103,7 +108,7 @@ class RefScriptRegistryImpl {
             tx.addSignatures(await this._agent.signTx(tx))
         )
 
-        const utxoId = new TxOutputId(id, 0)
+        const utxoId = makeTxOutputId(id, 0)
 
         this._cache[h] = {
             program,
@@ -115,7 +120,7 @@ class RefScriptRegistryImpl {
 
     /**
      * @param {number[]} hash
-     * @returns {Promise<{input: TxInput<any, any>, program: UplcProgramV2I} | undefined>}
+     * @returns {Promise<{input: TxInput, program: UplcProgramV2} | undefined>}
      */
     async find(hash) {
         const h = bytesToHex(hash)

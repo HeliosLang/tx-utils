@@ -1,23 +1,24 @@
 import {
-    Address,
-    AssetClass,
-    Assets,
-    DatumHash,
-    StakingAddress,
-    Tx,
-    TxId,
-    TxInput,
-    TxOutput,
-    TxOutputDatum,
-    TxOutputId,
-    Value
+    makeAssetClass,
+    makeAssets,
+    makeDatumHash,
+    makeHashedTxOutputDatum,
+    makeInlineTxOutputDatum,
+    makeShelleyAddress,
+    makeTxId,
+    makeTxInput,
+    makeTxOutput,
+    makeTxOutputId,
+    makeValue,
+    parseShelleyAddress,
+    parseStakingAddress
 } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
-import { UplcProgramV2, decodeUplcData } from "@helios-lang/uplc"
+import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
 
 /**
- * @import { NetworkParams } from "@helios-lang/ledger"
- * @import { KoiosV0Client, NetworkName } from "src/index.js"
+ * @import { Address, AssetClass, NetworkParams, StakingAddress, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { KoiosV0Client, NetworkName } from "../index.js"
  */
 
 /**
@@ -125,9 +126,9 @@ class KoiosV0ClientImpl {
             const prev = txIds.get(id.txId.toHex())
 
             if (prev) {
-                prev.push(id.utxoIdx)
+                prev.push(id.index)
             } else {
-                txIds.set(id.txId.toHex(), [id.utxoIdx])
+                txIds.set(id.txId.toHex(), [id.index])
             }
         })
 
@@ -174,9 +175,9 @@ class KoiosV0ClientImpl {
             const utxoIdxs = expectDefined(txIds.get(rawTx.tx_hash))
 
             for (let utxoIdx of utxoIdxs) {
-                const id = new TxOutputId(new TxId(rawTx.tx_hash), utxoIdx)
+                const id = makeTxOutputId(makeTxId(rawTx.tx_hash), utxoIdx)
 
-                const rawOutput = rawOutputs[id.utxoIdx]
+                const rawOutput = rawOutputs[id.index]
 
                 if (!rawOutput) {
                     throw new Error(`UTxO ${id.toString()} doesn't exist`)
@@ -198,21 +199,19 @@ class KoiosV0ClientImpl {
                     )
                 }
 
-                const paymentAddr = Address.fromBech32(rawPaymentAddr)
+                const paymentAddr = parseShelleyAddress(rawPaymentAddr)
 
                 /**
                  * @type {StakingAddress | undefined}
                  */
                 const stakeAddr = rawStakeAddr
-                    ? StakingAddress.fromBech32(rawStakeAddr)
+                    ? parseStakingAddress(rawStakeAddr)
                     : undefined
 
-                const address = Address.fromHashes(
+                const address = makeShelleyAddress(
                     this.networkName == "mainnet",
-                    expectDefined(
-                        paymentAddr.pubKeyHash ?? paymentAddr.validatorHash
-                    ),
-                    stakeAddr?.stakingHash?.hash
+                    paymentAddr.spendingCredential,
+                    stakeAddr?.stakingCredential
                 )
 
                 const lovelace = BigInt(
@@ -239,7 +238,7 @@ class KoiosV0ClientImpl {
                     }
 
                     assets.push([
-                        AssetClass.new(
+                        makeAssetClass(
                             `${rawAsset.policy_id}.${rawAsset.asset_name ?? ""}`
                         ),
                         qty
@@ -247,22 +246,24 @@ class KoiosV0ClientImpl {
                 }
 
                 const datum = rawOutput.inline_datum
-                    ? TxOutputDatum.Inline(
+                    ? makeInlineTxOutputDatum(
                           decodeUplcData(rawOutput.inline_datum.bytes)
                       )
                     : rawOutput.datum_hash
-                      ? TxOutputDatum.Hash(new DatumHash(rawOutput.datum_hash))
+                      ? makeHashedTxOutputDatum(
+                            makeDatumHash(rawOutput.datum_hash)
+                        )
                       : undefined
 
                 const refScript = rawOutput.reference_script
-                    ? UplcProgramV2.fromCbor(rawOutput.reference_script)
+                    ? decodeUplcProgramV2FromCbor(rawOutput.reference_script)
                     : undefined
 
-                const txInput = new TxInput(
+                const txInput = makeTxInput(
                     id,
-                    new TxOutput(
+                    makeTxOutput(
                         address,
-                        new Value(lovelace, Assets.fromAssetClasses(assets)),
+                        makeValue(lovelace, makeAssets(assets)),
                         datum,
                         refScript
                     )
@@ -290,6 +291,10 @@ class KoiosV0ClientImpl {
     async getUtxos(address) {
         const url = `${this.rootUrl}/api/v0/credential_utxos`
 
+        if (address.era != "Shelley") {
+            throw new Error("expected Shelley address")
+        }
+
         const response = await fetch(url, {
             method: "POST",
             headers: {
@@ -297,7 +302,7 @@ class KoiosV0ClientImpl {
                 "content-type": "application/json"
             },
             body: JSON.stringify({
-                _payment_credentials: [address.spendingCredential.hash.toHex()]
+                _payment_credentials: [address.spendingCredential.toHex()]
             })
         })
 
@@ -318,7 +323,7 @@ class KoiosV0ClientImpl {
 
         const ids = obj.map((rawId) => {
             const utxoIdx = Number(rawId.tx_index)
-            const id = new TxOutputId(new TxId(rawId.tx_hash), utxoIdx)
+            const id = makeTxOutputId(makeTxId(rawId.tx_hash), utxoIdx)
 
             return id
         })
@@ -378,6 +383,6 @@ class KoiosV0ClientImpl {
             throw new Error(responseText)
         }
 
-        return new TxId(responseText)
+        return makeTxId(responseText)
     }
 }
