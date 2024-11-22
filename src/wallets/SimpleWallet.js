@@ -8,7 +8,7 @@ import {
 
 /**
  * @import { NumberGenerator } from "@helios-lang/crypto"
- * @import { Address, PubKey, PubKeyHash, Signature, StakingAddress, Tx, TxId, TxInput } from "@helios-lang/ledger"
+ * @import { Address, PubKey, PubKeyHash, ShelleyAddress, Signature, StakingAddress, Tx, TxId, TxInput } from "@helios-lang/ledger"
  * @import { Bip32PrivateKey, CardanoClient, RootPrivateKey, SimpleWallet } from "../index.js"
  */
 
@@ -46,6 +46,15 @@ export function makeSimpleWallet(...args) {
     } else {
         throw new Error("invalid number of arguments to makeSimpleWallet")
     }
+}
+
+/**
+ * @param {RootPrivateKey} key
+ * @param {CardanoClient} client
+ * @returns {SimpleWallet}
+ */
+export function makeUnstakedSimpleWallet(key, client) {
+    return new SimpleWalletImpl(key.deriveSpendingKey(), undefined, client)
 }
 
 /**
@@ -120,7 +129,7 @@ class SimpleWalletImpl {
     }
 
     /**
-     * @type {Address}
+     * @type {ShelleyAddress<PubKeyHash>}
      */
     get address() {
         return makeAddress(
@@ -132,7 +141,7 @@ class SimpleWalletImpl {
 
     /**
      * Don't define any collateral, let the TxBuilder use the regular inputs
-     * @type {Promise<TxInput[]>}
+     * @type {Promise<TxInput<PubKeyHash>[]>}
      */
     get collateral() {
         return new Promise((resolve, _) => {
@@ -180,7 +189,7 @@ class SimpleWalletImpl {
     }
 
     /**
-     * @type {Promise<Address[]>}
+     * @type {Promise<ShelleyAddress<PubKeyHash>[]>}
      */
     get unusedAddresses() {
         return new Promise((resolve, _) => {
@@ -190,7 +199,7 @@ class SimpleWalletImpl {
 
     /**
      * Assumed wallet was initiated with at least 1 UTxO at the pubkeyhash address.
-     * @type {Promise<Address[]>}
+     * @type {Promise<ShelleyAddress<PubKeyHash>[]>}
      */
     get usedAddresses() {
         return new Promise((resolve, _) => {
@@ -199,11 +208,13 @@ class SimpleWalletImpl {
     }
 
     /**
-     * @type {Promise<TxInput[]>}
+     * @type {Promise<TxInput<PubKeyHash>[]>}
      */
     get utxos() {
         return new Promise((resolve, _) => {
-            resolve(this.cardanoClient.getUtxos(this.address))
+            resolve(
+                /** @type {any} */ (this.cardanoClient.getUtxos(this.address))
+            )
         })
     }
 

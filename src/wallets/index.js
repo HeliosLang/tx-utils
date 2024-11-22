@@ -8,6 +8,7 @@ export {
 export {
     makeRandomSimpleWallet,
     makeSimpleWallet,
+    makeUnstakedSimpleWallet,
     restoreSimpleWallet
 } from "./SimpleWallet.js"
 export { makeWalletHelper } from "./WalletHelper.js"

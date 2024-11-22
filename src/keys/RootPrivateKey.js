@@ -84,17 +84,6 @@ class RootPrivateKeyImpl {
     }
 
     /**
-     * @param {string[]} phrase
-     * @param {string[]} dict
-     * @returns {RootPrivateKey}
-     */
-    static fromPhrase(phrase, dict = BIP39_DICT_EN) {
-        const entropy = convertBip39PhraseToEntropy(phrase, dict)
-
-        return new RootPrivateKeyImpl(entropy)
-    }
-
-    /**
      * @type {number[]}
      */
     get bytes() {

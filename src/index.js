@@ -52,6 +52,7 @@ export {
     makeOfflineWallet,
     makeRandomSimpleWallet,
     makeSimpleWallet,
+    makeUnstakedSimpleWallet,
     makeWalletHelper,
     parseOfflineWallet
 } from "./wallets/index.js"
@@ -437,22 +438,22 @@ export {
  * @prop {Bip32PrivateKey} spendingPrivateKey
  * @prop {PubKey} spendingPubKey
  * @prop {PubKey | undefined} stakingPubKey
- * @prop {Address} address
+ * @prop {ShelleyAddress<PubKeyHash>} address
  *
- * @prop {Promise<TxInput[]>} collateral
+ * @prop {Promise<TxInput<PubKeyHash>[]>} collateral
  * Don't define any collateral, let the TxBuilder use the regular inputs
  *
  * @prop {PubKeyHash} spendingPubKeyHash
  * @prop {StakingAddress | undefined} stakingAddress
  * @prop {Promise<StakingAddress[]>} stakingAddresses
  * @prop {PubKeyHash | undefined} stakingPubKeyHash
- * @prop {Promise<Address[]>} usedAddresses
+ * @prop {Promise<ShelleyAddress<PubKeyHash>[]>} usedAddresses
  * Assumed wallet was initiated with at least 1 UTxO at the pubkeyhash address.
  *
- * @prop {Promise<Address[]>} unusedAddresses
+ * @prop {Promise<ShelleyAddress<PubKeyHash>[]>} unusedAddresses
  * Returns an empty list
  *
- * @prop {Promise<TxInput[]>} utxos
+ * @prop {Promise<TxInput<PubKeyHash>[]>} utxos
  * @prop {() => Promise<boolean>} isMainnet
  *
  * @prop {(addr: Address, data: number[]) => Promise<Signature>} signData
