@@ -29,7 +29,11 @@ export {
     WEEK,
     DEFAULT_TX_VALIDITY_OFFSETS
 } from "./duration/index.js"
-export { makeEmulator } from "./emulator/index.js"
+export {
+    makeEmulator,
+    makeEmulatorGenesisTx,
+    makeEmulatorRegularTx
+} from "./emulator/index.js"
 export {
     BIP39_DICT_EN,
     makeBip32PrivateKey,
