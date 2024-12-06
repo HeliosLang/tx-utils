@@ -1,3 +1,4 @@
+import { bytesToHex } from "@helios-lang/codec-utils"
 import {
     makeInlineTxOutputDatum,
     makeTxId,
@@ -12,7 +13,7 @@ import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
 import { makeTxSummary } from "../chain/index.js"
 
 /**
- * @import { Address, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
  * @import { UplcProgramV2 } from "@helios-lang/uplc"
  * @import { BlockfrostV0Client, NetworkName, ReadonlyWallet, TxSummary } from "../index.js"
  */
@@ -464,41 +465,72 @@ class BlockfrostV0ClientImpl {
      * @returns {Promise<TxInput[]>}
      */
     async getUtxos(address) {
-        /**
-         * TODO: pagination
-         */
+        return this.getUtxosInternal(address)
+    }
 
-        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/addresses/${address.toString()}/utxos?order=asc`
+    /**
+     * @param {Address} address
+     * @param {AssetClass} assetClass
+     * @returns {Promise<TxInput[]>}
+     */
+    async getUtxosWithAssetClass(address, assetClass) {
+        return this.getUtxosInternal(address, assetClass)
+    }
+
+    /**
+     * Gets a complete list of UTxOs at a given `Address` with an optional given asset class
+     * Returns oldest UTxOs first, newest last.
+     * @private
+     * @param {Address} address
+     * @param {AssetClass} [assetClass]
+     * @returns {Promise<TxInput[]>}
+     */
+    async getUtxosInternal(address, assetClass = undefined) {
+        const MAX = 100
+        const assetClassStr = assetClass
+            ? `/${assetClass.mph.toHex()}${bytesToHex(assetClass.tokenName)}`
+            : ""
+        const baseUrl = `https://cardano-${this.networkName}.blockfrost.io/api/v0/addresses/${address.toString()}/utxos/${assetClassStr}?count=${MAX}&order=asc`
+        const fetchOptions = {
+            headers: {
+                project_id: this.projectId
+            }
+        }
+        let page = 1
+        let hasMorePages = true
+
+        /**
+         * TODO: correct blockfrost type
+         * @type {any[]}
+         */
+        let results = []
 
         try {
-            const response = await fetch(url, {
-                headers: {
-                    project_id: this.projectId
+            while (hasMorePages) {
+                const url = `${baseUrl}&page=${page}`
+                const response = await fetch(url, fetchOptions)
+
+                if (response.status == 404) {
+                    return []
                 }
-            })
 
-            if (response.status == 404) {
-                return []
-            }
+                /**
+                 * @type {any}
+                 */
+                const obj = await response.json()
 
-            /**
-             * @type {any}
-             */
-            let all = await response.json()
+                if (obj?.status_code >= 300) {
+                    hasMorePages = false
+                } else {
+                    if (!Array.isArray(obj)) {
+                        throw new Error("expected")
+                    }
 
-            if (all?.status_code >= 300) {
-                all = []
-            }
+                    results = results.concat(obj)
 
-            try {
-                return await Promise.all(
-                    all.map((obj) => {
-                        return this.restoreTxInput(obj)
-                    })
-                )
-            } catch (e) {
-                console.error("unable to parse blockfrost utxo format:", all)
-                throw e
+                    hasMorePages = obj.length == MAX
+                }
+                page += 1
             }
         } catch (e) {
             if (
@@ -508,6 +540,17 @@ class BlockfrostV0ClientImpl {
             } else {
                 throw e
             }
+        }
+
+        try {
+            return await Promise.all(
+                results.map((obj) => {
+                    return this.restoreTxInput(obj)
+                })
+            )
+        } catch (e) {
+            console.error("unable to parse blockfrost utxo format:", results)
+            throw e
         }
     }
 

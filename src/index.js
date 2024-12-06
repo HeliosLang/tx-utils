@@ -212,6 +212,9 @@ export {
  *
  * @prop {(address: Address) => Promise<TxInput[]>} getUtxos
  * Returns a complete list of UTxOs at a given address.
+ *
+ * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} [getUtxosWithAssetClass]
+ * Optionally more efficient method to get a complete list of UTxOs at a given address, filtered to contain a given AssetClass
  */
 
 /**
@@ -236,6 +239,9 @@ export {
  * @prop {(address: Address) => Promise<TxInput[]>} getUtxos
  * Returns a complete list of UTxOs at a given address.
  *
+ * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} [getUtxosWithAssetClass]
+ * Optionally more efficient method to get a complete list of UTxOs at a given address, filtered to contain a given AssetClass
+ *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain and returns the id of that transaction upon success.
  */
@@ -257,6 +263,7 @@ export {
  * @prop {(addr: Address) => Promise<Value>} calcBalance
  * @prop {<SC extends SpendingCredential=SpendingCredential>(id: TxOutputId, addr?: Address<SC> | undefined) => Promise<TxInput<SC>>} getUtxo
  * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>) => Promise<TxInput<SC>[]>} getUtxos
+ * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>, assetClass: AssetClass) => Promise<TxInput<SC>[]>} getUtxosWithAssetClass
  *
  * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>, value: Value) => Promise<TxInput<SC>>} selectUtxo
  * This method is used to select very specific UTxOs that contain known tokens/NFTs

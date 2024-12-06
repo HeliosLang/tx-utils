@@ -2,7 +2,7 @@ import { addValues, makeTxInput, makeTxOutput } from "@helios-lang/ledger"
 import { selectSmallestFirst } from "../coinselection/index.js"
 
 /**
- * @import { Address, NetworkParams, SpendingCredential, Tx, TxId, TxInput, TxOutputId, Value } from "@helios-lang/ledger"
+ * @import { Address, AssetClass, NetworkParams, SpendingCredential, Tx, TxId, TxInput, TxOutputId, Value } from "@helios-lang/ledger"
  * @import { CardanoClient, CardanoClientHelper, CardanoClientHelperOptions, CoinSelection, ReadonlyCardanoClient } from "../index.js"
  */
 
@@ -120,6 +120,39 @@ class CardanoClientHelperImpl {
                 )
             )
         })
+    }
+
+    /**
+     * @template {SpendingCredential} [SC=SpendingCredential]
+     * @param {Address<SC>} address
+     * @param {AssetClass} assetClass
+     * @returns {Promise<TxInput<SC>[]>}
+     */
+    async getUtxosWithAssetClass(address, assetClass) {
+        if (this.client.getUtxosWithAssetClass) {
+            const utxos = await this.client.getUtxosWithAssetClass(
+                address,
+                assetClass
+            )
+
+            return utxos.map((utxo) => {
+                return makeTxInput(
+                    utxo.id,
+                    makeTxOutput(
+                        address,
+                        utxo.value,
+                        utxo.datum,
+                        utxo.output.refScript
+                    )
+                )
+            })
+        } else {
+            const utxos = await this.getUtxos(address)
+
+            return utxos.filter((utxo) =>
+                utxo.value.assetClasses.some((ac) => ac.isEqual(assetClass))
+            )
+        }
     }
 
     /**
