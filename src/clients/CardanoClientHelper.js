@@ -9,10 +9,11 @@ import { selectSmallestFirst } from "../coinselection/index.js"
 /**
  * @template {ReadonlyCardanoClient} C
  * @param {C} client
+ * @param {CardanoClientHelperOptions} options
  * @returns {CardanoClientHelper<C>}
  */
-export function makeCardanoClientHelper(client) {
-    return new CardanoClientHelperImpl(client)
+export function makeCardanoClientHelper(client, options = {}) {
+    return new CardanoClientHelperImpl(client, options)
 }
 
 /**
