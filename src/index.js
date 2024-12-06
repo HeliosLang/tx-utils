@@ -1,6 +1,7 @@
 export {
     compareTxSummaries,
     isTxSummaryJsonSafe,
+    makeTxChain,
     makeTxChainBuilder,
     makeTxSummary,
     maskWallet,
