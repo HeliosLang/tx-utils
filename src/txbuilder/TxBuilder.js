@@ -2343,7 +2343,7 @@ class TxBuilderImpl {
                 logOptions.logError?.(
                     message,
                     profile.result.left.callSites.slice()?.pop()?.site
-                ) 
+                )
 
                 if (throwBuildPhaseScriptErrors) {
                     const scriptContext = args.at(-1)
@@ -2356,10 +2356,10 @@ class TxBuilderImpl {
                 } else {
                     // these would be redundant noise.  validate() phase will emit logs
                     // logOptions.logPrint?.(
-                        //     "warning: script errors during build() phase; see logs and exceptions in validate() phase below"
-                        // )
-                        // logOptions.flush?.()
-                        logOptions.reset?.("build")
+                    //     "warning: script errors during build() phase; see logs and exceptions in validate() phase below"
+                    // )
+                    // logOptions.flush?.()
+                    logOptions.reset?.("build")
                 }
             } else {
                 console.warn(
