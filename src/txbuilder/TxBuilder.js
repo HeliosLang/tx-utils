@@ -294,7 +294,11 @@ class TxBuilderImpl {
         })
 
         if (tx.hasValidationError) {
-            throw new Error(tx.hasValidationError)
+            if ("string" == typeof tx.hasValidationError) {
+                throw new Error(tx.hasValidationError)
+            }
+            // the only type that can be left here is a UplcRuntimeError
+            throw tx.hasValidationError
         }
 
         return tx
@@ -303,10 +307,10 @@ class TxBuilderImpl {
     /**
      * Builds and runs validation logic on the transaction
      * @remarks
-     * Always returns a built transaction that has been validation-checked.
+     * Always returns a built transaction that has been validation-checked
      *
-     * if the `throwBuildPhaseScriptErrors` option is true, then any script errors
-     * found during transaction-building will be thrown, and the full transaction
+     * ... unless the `throwBuildPhaseScriptErrors` option is true, then any script errors
+     * found during transaction-building phase will be thrown, and the full transaction
      * validation is not run.
      *
      * Caller should check {@link Tx.hasValidationError}, which will be
@@ -2313,30 +2317,50 @@ class TxBuilderImpl {
                     // all is consistent; we can return the profile of the optimized script
                     //   ... even though it failed; the built Tx can provide further diagnostics in validate()
                     if (throwBuildPhaseScriptErrors) {
+                        // ensure logs are emitted before throwing:
                         logOptions.flush?.()
+                        const scriptContext = args.at(-1)
+
                         throw new UplcRuntimeError(
                             `TxBuilder:build() failed: ${altProfile.result.left.error}`,
-                            altProfile.result.left.callSites
+                            altProfile.result.left.callSites,
+                            scriptContext
                         )
                     }
                     return profile
                 }
-                // this would be an exceptional scenario:
+
+                // this would be an exceptional scenario.  Note that logs NOT
+                // output above, having been reset, will still be emitted
+                // ... by the validation phase below
                 logOptions.logError?.(
                     `build: unoptimized script for ${summary} succeeded where optimized script failed`
                 )
+
                 const message =
                     `${summary}: in optimized script: ` +
                     profile.result.left.error
                 logOptions.logError?.(
                     message,
                     profile.result.left.callSites.slice()?.pop()?.site
-                ) // XXX: it might not make sense to log the error message in addition to throwing an error with the same message
-                logOptions.flush?.()
-                throw new UplcRuntimeError(
-                    message,
-                    profile.result.left.callSites
-                )
+                ) 
+
+                if (throwBuildPhaseScriptErrors) {
+                    const scriptContext = args.at(-1)
+                    logOptions.flush?.()
+                    throw new UplcRuntimeError(
+                        message,
+                        profile.result.left.callSites,
+                        scriptContext
+                    )
+                } else {
+                    // these would be redundant noise.  validate() phase will emit logs
+                    // logOptions.logPrint?.(
+                        //     "warning: script errors during build() phase; see logs and exceptions in validate() phase below"
+                        // )
+                        // logOptions.flush?.()
+                        logOptions.reset?.("build")
+                }
             } else {
                 console.warn(
                     `NOTE: ${summary}: no alt script attached; no script logs available.  See \`withAlt\` option in docs to enable logging`

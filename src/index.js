@@ -555,8 +555,9 @@ export {
  *   script: NativeScript
  * ) => TxBuilder} attachNativeScript
  * @prop {(
- *   program: UplcProgramV1
+ *   program: UplcProgramV1 | UplcProgramV2
  * ) => TxBuilder} attachUplcProgram
+ *
  * @prop {(
  *   hash: PubKeyHash,
  *   poolId: PubKeyHashLike
