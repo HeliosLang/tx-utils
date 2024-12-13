@@ -353,7 +353,19 @@ class TxBuilderImpl {
         // TODO: there is no check here to assure that there aren't any redundant scripts included, this is left up the validation of Tx itself
 
         // balance the non-ada assets, adding necessary change outputs
-        this.balanceAssets(changeAddress, config.maxAssetsPerChangeOutput ?? 1)
+        // maxAssetsPerChangeOutput,
+        let maxAssetsPerChangeOutput = config.maxAssetsPerChangeOutput
+        if (!maxAssetsPerChangeOutput) {
+            maxAssetsPerChangeOutput = this._inputs
+                .concat(spareUtxos)
+                .reduce(
+                    (prev, utxo) =>
+                        Math.max(prev, utxo.value.assets.countTokens()),
+                    1
+                )
+        }
+
+        this.balanceAssets(changeAddress, maxAssetsPerChangeOutput)
 
         // start with the max possible fee, minimize later
         const fee = helper.calcMaxConwayTxFee(

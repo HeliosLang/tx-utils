@@ -487,17 +487,20 @@ export {
  */
 
 /**
- * @typedef {{
- *   changeAddress: ShelleyAddressLike | Promise<ShelleyAddressLike>
- *   spareUtxos?: TxInput[] | Promise<TxInput[]>
- *   networkParams?: NetworkParams | Promise<NetworkParams>
- *   maxAssetsPerChangeOutput?: number
- *   allowDirtyChangeOutput?: boolean
- *   logOptions?: UplcLogger
- *   throwBuildPhaseScriptErrors?: boolean
- *   beforeValidate?: (tx: Tx) => any | Promise<any>
- *   modifyExBudget?: ExBudgetModifier
- * }} TxBuilderFinalConfig
+ * @typedef {object} TxBuilderFinalConfig
+ * @prop {ShelleyAddressLike | Promise<ShelleyAddressLike>} changeAddress
+ * @prop {TxInput[] | Promise<TxInput[]>} [spareUtxos]
+ * @prop {NetworkParams | Promise<NetworkParams>} [networkParams]
+ * @prop {number} [maxAssetsPerChangeOutput]
+ * Defaults to the largest number of assets in one of the inputs
+ *
+ * @prop {boolean} [allowDirtyChangeOutput]
+ * Defaults to false
+ *
+ * @prop {UplcLogger} [logOptions]
+ * @prop {boolean} [throwBuildPhaseScriptErrors]
+ * @prop {(tx: Tx) => (any | Promise<any>)} [beforeValidate]
+ * @prop {ExBudgetModifier} [modifyExBudget]
  */
 
 /**
