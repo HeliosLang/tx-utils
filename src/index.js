@@ -492,6 +492,7 @@ export {
  *   spareUtxos?: TxInput[] | Promise<TxInput[]>
  *   networkParams?: NetworkParams | Promise<NetworkParams>
  *   maxAssetsPerChangeOutput?: number
+ *   allowDirtyChangeOutput?: boolean
  *   logOptions?: UplcLogger
  *   throwBuildPhaseScriptErrors?: boolean
  *   beforeValidate?: (tx: Tx) => any | Promise<any>

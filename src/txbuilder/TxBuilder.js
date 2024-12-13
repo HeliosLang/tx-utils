@@ -376,7 +376,8 @@ class TxBuilderImpl {
             params,
             changeAddress,
             spareUtxos.slice(),
-            fee
+            fee,
+            config.allowDirtyChangeOutput ?? false
         )
 
         await this.grabRefScriptsFromRegistry()
@@ -1758,9 +1759,10 @@ class TxBuilderImpl {
      * @param {Address} changeAddress
      * @param {TxInput[]} spareUtxos - used when there are yet enough inputs to cover everything (eg. due to min output lovelace requirements, or fees)
      * @param {bigint} fee
+     * @param {boolean} allowDirtyChange - allow the change TxOutput to contain assets
      * @returns {TxOutput} - change output, will be corrected once the final fee is known
      */
-    balanceLovelace(params, changeAddress, spareUtxos, fee) {
+    balanceLovelace(params, changeAddress, spareUtxos, fee, allowDirtyChange) {
         // don't include the changeOutput in this value
         let nonChangeOutputValue = this.sumOutputValue()
 
@@ -1797,7 +1799,10 @@ class TxBuilderImpl {
         const spareAssetUTxOs = spareUtxos.some(
             (utxo) => !utxo.value.assets.isZero()
         )
-        spareUtxos = spareUtxos.filter((utxo) => utxo.value.assets.isZero())
+
+        if (!allowDirtyChange) {
+            spareUtxos = spareUtxos.filter((utxo) => utxo.value.assets.isZero())
+        }
 
         // use some spareUtxos if the inputValue doesn't cover the outputs and fees
         const totalOutputValue = nonChangeOutputValue.add(changeOutput.value)
@@ -1815,7 +1820,7 @@ class TxBuilderImpl {
                     inputValue = inputValue.add(spare.value)
                 }
             } else {
-                if (spareAssetUTxOs) {
+                if (!allowDirtyChange && spareAssetUTxOs) {
                     throw new Error(`UTxOs too fragmented`)
                 } else {
                     throw new Error(
@@ -1828,7 +1833,7 @@ class TxBuilderImpl {
         // use to the exact diff, which is >= minLovelace
         const diff = inputValue.subtract(nonChangeOutputValue)
 
-        if (!diff.assets.isZero()) {
+        if (!allowDirtyChange && !diff.assets.isZero()) {
             throw new Error("unexpected unbalanced assets")
         }
 
