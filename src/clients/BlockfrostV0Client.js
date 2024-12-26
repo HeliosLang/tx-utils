@@ -1,5 +1,6 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
 import {
+    makeAddress,
     makeInlineTxOutputDatum,
     makeTxId,
     makeTxInput,
@@ -552,6 +553,36 @@ class BlockfrostV0ClientImpl {
             console.error("unable to parse blockfrost utxo format:", results)
             throw e
         }
+    }
+
+    /**
+     * @param {AssetClass} assetClass
+     * @returns {Promise<{address: Address, quantity: bigint}[]>}
+     */
+    async getAddressesWithAssetClass(assetClass) {
+        const url = `https://cardano-mainnet.blockfrost.io/api/v0/assets/${assetClass.toString().replace(".", "")}/addresses`
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                project_id: this.projectId
+            }
+        })
+
+        const list = await response.json()
+
+        if (!Array.isArray(list)) {
+            throw new Error(
+                `expected array response in BlockfrostV0Client.getAddressesWithAssetClass, got '${await response.text()}`
+            )
+        }
+
+        return list.map((item) => {
+            return {
+                address: makeAddress(item.address),
+                quantity: BigInt(item.quantity)
+            }
+        })
     }
 
     /**

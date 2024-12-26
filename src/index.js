@@ -101,6 +101,11 @@ export {
  * Gets a complete list of UTxOs at a given `Address`.
  * Returns oldest UTxOs first, newest last.
  *
+ * @prop {(assetClass: AssetClass) => Promise<{address: Address, quantity: bigint}[]>} getAddressesWithAssetClass
+ * Returns a list of addresses containing the given asset class.
+ *
+ * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} getUtxosWithAssetClass
+ *
  * @prop {() => boolean} isMainnet
  *
  * @prop {(utxo: TxInput) => Promise<boolean>} hasUtxo
