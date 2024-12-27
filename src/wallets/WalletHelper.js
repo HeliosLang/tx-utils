@@ -1,5 +1,5 @@
 import { addValues } from "@helios-lang/ledger"
-import { expectDefined as expectDefined } from "@helios-lang/type-utils"
+import { expectDefined } from "@helios-lang/type-utils"
 import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 import { makeOfflineWallet } from "./OfflineWallet.js"
 
@@ -80,7 +80,7 @@ class WalletHelperImpl {
      */
     get baseAddress() {
         return this.allAddresses.then((addresses) =>
-            expectDefined(addresses[0])
+            expectDefined(addresses[0], "first address undefined")
         )
     }
 
@@ -127,7 +127,7 @@ class WalletHelperImpl {
             if (utxos.length == 0) {
                 return undefined
             } else {
-                return expectDefined(utxos[0])
+                return expectDefined(utxos[0], "first utxo undefined")
             }
         })
     }
@@ -286,7 +286,7 @@ class WalletHelperImpl {
 
         const [selected, _notSelected] = selectSingle(utxos, value)
 
-        return expectDefined(selected[0])
+        return expectDefined(selected[0], "unable to select single utxo")
     }
 
     /**

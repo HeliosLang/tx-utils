@@ -172,7 +172,7 @@ class KoiosV0ClientImpl {
                 )
             }
 
-            const utxoIdxs = expectDefined(txIds.get(rawTx.tx_hash))
+            const utxoIdxs = expectDefined(txIds.get(rawTx.tx_hash), `tx ${rawTx.tx_hash} not found in returned map`)
 
             for (let utxoIdx of utxoIdxs) {
                 const id = makeTxOutputId(makeTxId(rawTx.tx_hash), utxoIdx)
@@ -215,7 +215,7 @@ class KoiosV0ClientImpl {
                 )
 
                 const lovelace = BigInt(
-                    parseInt(expectDefined(rawOutput.value))
+                    parseInt(expectDefined(rawOutput.value, "output.value undefined"))
                 )
 
                 if (lovelace.toString() != rawOutput.value) {
@@ -273,7 +273,7 @@ class KoiosV0ClientImpl {
             }
         })
 
-        return ids.map((id) => expectDefined(result.get(id.toString())))
+        return ids.map((id) => expectDefined(result.get(id.toString()), `${id.toString()} not found in map`))
     }
 
     /**
@@ -281,7 +281,7 @@ class KoiosV0ClientImpl {
      * @returns {Promise<TxInput>}
      */
     async getUtxo(id) {
-        return expectDefined(await this.getUtxosInternal([id])[0])
+        return expectDefined(await this.getUtxosInternal([id])[0], `utxo ${id.toString()} not found in KoiosV0Client.getUtxo()`)
     }
 
     /**

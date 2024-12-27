@@ -1128,7 +1128,7 @@ class TxBuilderImpl {
             }
 
             if (datum.kind == "HashedTxOutputDatum") {
-                this.addDatum(expectDefined(datum.data))
+                this.addDatum(expectDefined(datum.data, "datum data of HashedTxOutputDatum undefined"))
             }
         } else if (spendingCredential.kind == "ValidatorHash") {
             // redeemerless spending from a validator is only possible if it is a native script
@@ -2103,11 +2103,11 @@ class TxBuilderImpl {
                     )
                 }
 
-                const vh = expectDefined(utxo.address.spendingCredential)
+                const vh = expectDefined(utxo.address.spendingCredential, "address spending credential undefined")
                 const script = this.getUplcScript(vh)
 
                 if (buildContext) {
-                    const datum = expectDefined(utxo.datum?.data)
+                    const datum = expectDefined(utxo.datum?.data, "utxo datum data undefined")
                     const r =
                         "kind" in redeemerDataOrFn
                             ? redeemerDataOrFn

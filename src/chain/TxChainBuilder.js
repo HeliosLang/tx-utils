@@ -71,7 +71,7 @@ class TxChainBuilderImpl {
             const tx = this.txs[i]
 
             if (tx.id().isEqual(id.txId)) {
-                const output = expectDefined(tx.body.outputs[id.index])
+                const output = expectDefined(tx.body.outputs[id.index], `UTxO with index ${id.index} not found in TxChainBuilder tx ${id.txId.toHex()}`)
 
                 return makeTxInput(id, output)
             }
