@@ -140,7 +140,10 @@ class RefScriptRegistryImpl {
             )
 
             if (input) {
-                const program = expectDefined(input.output.refScript, "refScript undefined")
+                const program = expectDefined(
+                    input.output.refScript,
+                    "refScript undefined"
+                )
 
                 if (program.plutusVersion != "PlutusScriptV2") {
                     throw new Error("unexpected plutus version")

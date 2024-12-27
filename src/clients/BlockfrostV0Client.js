@@ -199,7 +199,10 @@ export async function resolveBlockfrostV0Client(utxoOrWallet, projectIds) {
         if (await wallet.isMainnet()) {
             return new BlockfrostV0ClientImpl(
                 "mainnet",
-                expectDefined(projectIds["mainnet"], "mainnet project id undefined")
+                expectDefined(
+                    projectIds["mainnet"],
+                    "mainnet project id undefined"
+                )
             )
         } else {
             const refUtxo = (await wallet.utxos)[0]

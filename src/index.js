@@ -12,6 +12,7 @@ export {
     makeBlockfrostV0Client,
     makeCardanoClientHelper,
     makeKoiosV0Client,
+    makeReadonlyCardanoMultiClient,
     resolveBlockfrostV0Client,
     resolveKoiosV0Client
 } from "./clients/index.js"
