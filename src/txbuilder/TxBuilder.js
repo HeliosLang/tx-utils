@@ -353,7 +353,6 @@ class TxBuilderImpl {
         // TODO: there is no check here to assure that there aren't any redundant scripts included, this is left up the validation of Tx itself
 
         // balance the non-ada assets, adding necessary change outputs
-        // maxAssetsPerChangeOutput,
         let maxAssetsPerChangeOutput = config.maxAssetsPerChangeOutput
         if (!maxAssetsPerChangeOutput) {
             maxAssetsPerChangeOutput = this._inputs

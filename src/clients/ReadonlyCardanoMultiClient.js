@@ -33,6 +33,10 @@ class ReadonlyCardanoMultiClientImpl {
     constructor(clients) {
         this.clients = clients
 
+        if (clients.length == 0) {
+            throw new Error("expected at least one client")
+        }
+
         this.mainnet = this.clients.every((client) => client.isMainnet())
 
         if (
@@ -47,11 +51,17 @@ class ReadonlyCardanoMultiClientImpl {
      * @type {number}
      */
     get now() {
-        return tryClients(
-            this.clients,
-            (client) => client.now,
-            "ReadonlyCardanoMultiClient.now"
-        )
+        for (let client of this.clients) {
+            try {
+                const n = client.now
+
+                return n
+            } catch (e) {
+                continue
+            }
+        }
+
+        throw new Error("unable to get current network time")
     }
 
     /**
@@ -65,7 +75,7 @@ class ReadonlyCardanoMultiClientImpl {
      * @type {Promise<NetworkParams>}
      */
     get parameters() {
-        return tryClients(
+        return tryClientsAsync(
             this.clients,
             (client) => client.parameters,
             "ReadonlyCardanoMultiClient.parameters"
@@ -77,7 +87,7 @@ class ReadonlyCardanoMultiClientImpl {
      * @returns {Promise<TxInput>}
      */
     async getUtxo(id) {
-        return tryClients(
+        return tryClientsAsync(
             this.clients,
             (client) => {
                 return client.getUtxo(id)
@@ -91,7 +101,7 @@ class ReadonlyCardanoMultiClientImpl {
      * @returns {Promise<TxInput[]>}
      */
     async getUtxos(address) {
-        return tryClients(
+        return tryClientsAsync(
             this.clients,
             (client) => {
                 return client.getUtxos(address)
@@ -113,7 +123,7 @@ class ReadonlyCardanoMultiClientImpl {
 
         if (filteredClients.length > 0) {
             return (id) => {
-                return tryClients(
+                return tryClientsAsync(
                     filteredClients,
                     (client) => {
                         return client.getTx(id)
@@ -139,7 +149,7 @@ class ReadonlyCardanoMultiClientImpl {
 
         if (filteredClients.length > 0) {
             return (address, assetClass) => {
-                return tryClients(
+                return tryClientsAsync(
                     filteredClients,
                     (client) => {
                         return client.getUtxosWithAssetClass(
@@ -160,11 +170,11 @@ class ReadonlyCardanoMultiClientImpl {
  * @template {ReadonlyCardanoClient} C
  * @template T
  * @param {C[]} clients
- * @param {(client: C) => T} callback
+ * @param {(client: C) => Promise<T>} callback
  * @param {string} msg
- * @returns {T}
+ * @returns {Promise<T>}
  */
-function tryClients(clients, callback, msg) {
+async function tryClientsAsync(clients, callback, msg) {
     /**
      * @type {Error[]}
      */
@@ -172,27 +182,23 @@ function tryClients(clients, callback, msg) {
 
     for (let i = 0; i < clients.length; i++) {
         try {
-            const res = callback(clients[i])
+            const res = await callback(clients[i])
 
             return res
         } catch (e) {
-            if (e instanceof Error) {
-                if (i < clients.length - 1) {
-                    console.error(
-                        `Client ${i} failed in ${msg}, falling back to next client`
-                    )
-                }
-
-                errors.push(e)
-            } else {
-                throw e
+            if (i < clients.length - 1) {
+                console.error(
+                    `Client ${i} failed in ${msg}, falling back to next client`
+                )
             }
+
+            errors.push(/** @type {any} */ (e))
         }
     }
 
     if (errors.length == 0) {
         throw new Error(
-            "internal error, expeced at least one error caught before"
+            "internal error, expected at least one error caught before"
         )
     }
 

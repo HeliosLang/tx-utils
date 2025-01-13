@@ -6,13 +6,14 @@
     "types": "types/index.d.ts",
     "type": "module",
     "scripts": {
-        "build": "pnpm run prettify && pnpm run build:types && pnpm run test:suite",
+        "build": "pnpm run prettify && pnpm run build:types && pnpm run test:suite && pnpm run test:integ",
         "build:docs": "typedoc --tsconfig ./jsconfig.json",
         "build:types": "tsc -p jsconfig.json --noEmit false --emitDeclarationOnly",
         "lockfile:sync": "pnpm install --ignore-workspace",
         "prepack": "pnpm run build",
         "prettify": "prettier . --write",
-        "test": "pnpm run test:pretty && pnpm run test:types && pnpm run test:suite",
+        "test": "pnpm run test:pretty && pnpm run test:types && pnpm run test:suite && pnpm run test:integ",
+        "test:integ": "pnpm --prefix ./test/all-pure run test",
         "test:pretty": "prettier . --check",
         "test:suite": "node --test  --experimental-test-coverage",
         "test:types": "pnpm run build:types"
@@ -32,10 +33,10 @@
         "typescript": "^5.6.2"
     },
     "dependencies": {
-        "@helios-lang/codec-utils": "^0.3.3",
-        "@helios-lang/crypto": "^0.2.2",
-        "@helios-lang/ledger": "^0.6.13",
-        "@helios-lang/type-utils": "^0.2.8",
-        "@helios-lang/uplc": "^0.7.8"
+        "@helios-lang/codec-utils": "^0.3.4",
+        "@helios-lang/crypto": "^0.2.3",
+        "@helios-lang/ledger": "^0.6.14",
+        "@helios-lang/type-utils": "^0.2.9",
+        "@helios-lang/uplc": "^0.7.9"
     }
 }

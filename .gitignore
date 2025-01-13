@@ -6,3 +6,4 @@ log.*
 *.log
 types
 docs
+dist

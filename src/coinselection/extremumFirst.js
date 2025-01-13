@@ -6,9 +6,9 @@ import { InsufficientFundsError } from "./InsufficientFundsError.js"
  */
 
 /**
- * * Selects UTxOs from a list by iterating through the tokens in the given `Value` and picking the UTxOs containing the largest corresponding amount first.
+ * Selects UTxOs from a list by iterating through the tokens in the given `Value` and picking the UTxOs containing the largest corresponding amount first.
  * @param {object} props
- * @param {boolean} [props.dontTouchUninvolvedAssets]
+ * @param {boolean} [props.allowSelectingUninvolvedAssets]
  */
 export function selectLargestFirst(props = {}) {
     return selectExtremumFirst({ ...props, largestFirst: true })
@@ -26,11 +26,10 @@ export function selectSmallestFirst(props = {}) {
 
 /**
  * Loops through the policies and tokens of `amount`
- *   - if for a given asset there isn't enough already included, select the previously unselected utxos until the necessary quantity is filled (starting the extremum first)
+ *   - if for a given asset there isn't enough already included, select the previously unselected utxos until the necessary quantity is filled (starting with the extremum first)
  * @param {object} props
  * @param {boolean} props.largestFirst
  * @param {boolean} [props.allowSelectingUninvolvedAssets]
- *
  */
 function selectExtremumFirst({ largestFirst, allowSelectingUninvolvedAssets }) {
     /**

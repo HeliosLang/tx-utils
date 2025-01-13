@@ -9,3 +9,4 @@ log.*
 *.test.d.ts.map
 typedoc.json
 docs
+test
