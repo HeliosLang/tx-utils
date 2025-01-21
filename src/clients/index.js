@@ -1,7 +1,4 @@
-export {
-    UtxoAlreadySpentError,
-    UtxoNotFoundError
-} from "./errors.js"
+export { UtxoAlreadySpentError, UtxoNotFoundError } from "./errors.js"
 export {
     makeBlockfrostV0Client,
     resolveBlockfrostV0Client
