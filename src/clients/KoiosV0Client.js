@@ -15,6 +15,7 @@ import {
 } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
 import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
+import { UtxoNotFoundError } from "./errors.js"
 
 /**
  * @import { Address, AssetClass, NetworkParams, StakingAddress, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
@@ -278,12 +279,15 @@ class KoiosV0ClientImpl {
             }
         })
 
-        return ids.map((id) =>
-            expectDefined(
-                result.get(id.toString()),
-                `${id.toString()} not found in map`
-            )
-        )
+        return ids.map((id) => {
+            const input = result.get(id.toString())
+
+            if (!input) {
+                throw new UtxoNotFoundError(id)
+            } else {
+                return input
+            }
+        })
     }
 
     /**
@@ -291,6 +295,7 @@ class KoiosV0ClientImpl {
      * @returns {Promise<TxInput>}
      */
     async getUtxo(id) {
+        // TODO: create a KoiosV1Client in order to be able to use the new /utxo_info endpoint
         return expectDefined(
             await this.getUtxosInternal([id])[0],
             `utxo ${id.toString()} not found in KoiosV0Client.getUtxo()`

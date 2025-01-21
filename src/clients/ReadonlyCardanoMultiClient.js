@@ -1,5 +1,5 @@
 /**
- * @import { Address, AssetClass, NetworkParams, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
  * @import { ReadonlyCardanoClient, TxSummary } from "../index.js"
  */
 
@@ -111,11 +111,11 @@ class ReadonlyCardanoMultiClientImpl {
     }
 
     /**
-     * @returns {((id: TxId) => Promise<TxSummary>) | undefined}
+     * @returns {((id: TxId) => Promise<Tx>) | undefined}
      */
     get getTx() {
         /**
-         * @type {(ReadonlyCardanoClient & {getTx(id: TxId): Promise<TxSummary>})[]}
+         * @type {(ReadonlyCardanoClient & {getTx(id: TxId): Promise<Tx>})[]}
          */
         const filteredClients = /** @type {any} */ (
             this.clients.filter((c) => !!c.getTx)

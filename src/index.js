@@ -9,6 +9,8 @@ export {
     superimposeUtxosOnSummaries
 } from "./chain/index.js"
 export {
+    UtxoAlreadySpentError,
+    UtxoNotFoundError,
     makeBlockfrostV0Client,
     makeCardanoClientHelper,
     makeKoiosV0Client,
@@ -93,10 +95,11 @@ export {
  * @prop {() => Promise<void>} dumpMempool
  * Dumps the live Blockfrost mempool to console.
  *
- * @prop {(id: TxId) => Promise<TxSummary>} getTx
+ * @prop {(id: TxId) => Promise<Tx>} getTx
  *
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
- * If the UTxO isn't found an error is throw with the following message format: "UTxO <txId.utxoId> not found".
+ * If the UTxO isn't found a UtxoNotFoundError is thrown
+ * If the UTxO is already spent a UtxoAlreadySpentError is thrown
  *
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
  * Gets a complete list of UTxOs at a given `Address`.
@@ -109,7 +112,9 @@ export {
  *
  * @prop {() => boolean} isMainnet
  *
- * @prop {(utxo: TxInput) => Promise<boolean>} hasUtxo
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
+ *
+ * @prop {(txId: TxId) => Promise<boolean>} hasTx
  *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain.
@@ -210,8 +215,8 @@ export {
  * @prop {Promise<NetworkParams>} parameters
  * Returns the latest network parameters.
  *
- * @prop {(id: TxId) => Promise<TxSummary>} [getTx]
- * Optionally more efficient method of getting all the inputs and outputs of a transaction
+ * @prop {(id: TxId) => Promise<Tx>} [getTx]
+ * Optionally more efficient method of getting a whole Tx
  *
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * Returns a single TxInput (that might already have been spent).
@@ -236,8 +241,8 @@ export {
  * @prop {Promise<NetworkParams>} parameters
  * Returns the latest network parameters.
  *
- * @prop {(id: TxId) => Promise<TxSummary>} [getTx]
- * Optionally more efficient method of getting all the inputs and outputs of a transaction
+ * @prop {(id: TxId) => Promise<Tx>} [getTx]
+ * Optionally more efficient method of getting a whole Tx
  *
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * Returns a single TxInput (that might already have been spent).

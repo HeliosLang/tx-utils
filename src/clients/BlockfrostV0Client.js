@@ -1,5 +1,6 @@
 import { bytesToHex } from "@helios-lang/codec-utils"
 import {
+    decodeTx,
     makeAddress,
     makeInlineTxOutputDatum,
     makeTxId,
@@ -12,6 +13,7 @@ import {
 import { expectDefined } from "@helios-lang/type-utils"
 import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
 import { makeTxSummary } from "../chain/index.js"
+import { UtxoAlreadySpentError, UtxoNotFoundError } from "./errors.js"
 
 /**
  * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
@@ -160,7 +162,7 @@ export async function resolveBlockfrostV0Client(utxoOrWallet, projectIds) {
                 preprodProjectId
             )
 
-            if (await preprodNetwork.hasUtxo(refUtxo)) {
+            if (await preprodNetwork.hasUtxo(refUtxo.id)) {
                 return preprodNetwork
             }
         }
@@ -171,7 +173,7 @@ export async function resolveBlockfrostV0Client(utxoOrWallet, projectIds) {
                 previewProjectId
             )
 
-            if (await previewNetwork.hasUtxo(refUtxo)) {
+            if (await previewNetwork.hasUtxo(refUtxo.id)) {
                 return previewNetwork
             }
         }
@@ -182,7 +184,7 @@ export async function resolveBlockfrostV0Client(utxoOrWallet, projectIds) {
                 mainnetProjectId
             )
 
-            if (await mainnetNetwork.hasUtxo(refUtxo)) {
+            if (await mainnetNetwork.hasUtxo(refUtxo.id)) {
                 return mainnetNetwork
             }
         }
@@ -363,11 +365,12 @@ class BlockfrostV0ClientImpl {
     }
 
     /**
+     * The inputs in the returned Tx aren't restored (i.e. aren't full TxInputs)
      * @param {TxId} id
-     * @returns {Promise<TxSummary>}
+     * @returns {Promise<Tx>}
      */
     async getTx(id) {
-        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${id.toHex()}/utxos`
+        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${id.toHex()}/cbor`
 
         const response = await fetch(url, {
             method: "GET",
@@ -384,41 +387,19 @@ class BlockfrostV0ClientImpl {
 
         const responseObj = /** @type {any} */ (await response.json())
 
-        const inputs = responseObj.inputs
+        const cbor = responseObj.cbor
 
-        if (!inputs || !Array.isArray(inputs)) {
+        if (!cbor || typeof cbor != "string") {
             console.log(responseObj)
             throw new Error(`unexpected response from Blockfrost`)
         }
 
-        const outputs = responseObj.outputs
-
-        if (!outputs || !Array.isArray(outputs)) {
-            console.log(responseObj)
-            throw new Error(`unexpected response from Blockfrost`)
-        }
-
-        return makeTxSummary({
-            id: id,
-            timestamp: Date.now(),
-            inputs: await Promise.all(
-                inputs.map((input) => {
-                    return this.restoreTxInput(input)
-                })
-            ),
-            outputs: await Promise.all(
-                outputs.map((output) => {
-                    return this.restoreTxInput({
-                        ...output,
-                        tx_hash: id.toHex()
-                    })
-                })
-            )
-        })
+        return decodeTx(cbor)
     }
 
     /**
-     * If the UTxO isn't found an error is throw with the following message format: "UTxO <txId.utxoId> not found".
+     * If the UTxO isn't found a UtxoNotFoundError is thrown
+     * If The UTxO has already been spent a UtxoAlreadySpentError is thrown
      * @param {TxOutputId} id
      * @returns {Promise<TxInput>}
      */
@@ -435,7 +416,7 @@ class BlockfrostV0ClientImpl {
         })
 
         if (!response.ok) {
-            throw new Error(`UTxO ${id.toString()} not found`)
+            throw new UtxoNotFoundError(id)
         } else if (response.status != 200) {
             throw new Error(`Blockfrost error: ${await response.text()}`)
         }
@@ -449,17 +430,31 @@ class BlockfrostV0ClientImpl {
             throw new Error(`unexpected response from Blockfrost`)
         }
 
-        const obj = outputs[id.index]
+        const outputObj = outputs[id.index]
 
-        if (!obj) {
+        if (!outputObj) {
             console.log(responseObj)
-            throw new Error(`UTxO ${id.toString()} not found`)
+            throw new UtxoNotFoundError(id)
         }
 
-        obj["tx_hash"] = txId.toHex()
-        obj["output_index"] = Number(id.index)
+        outputObj["tx_hash"] = txId.toHex()
+        outputObj["output_index"] = Number(id.index)
 
-        return await this.restoreTxInput(obj)
+        const utxo = await this.restoreTxInput(outputObj)
+
+        if ("consumed_by_tx" in outputObj) {
+            if (typeof outputObj.consumed_by_tx == "string") {
+                const txId = makeTxId(outputObj.consumed_by_tx)
+
+                throw new UtxoAlreadySpentError(utxo, txId)
+            } else {
+                throw new Error(
+                    `in BlockfrostV0Client.getUtxo(): unexpected response from Blockfrost`
+                )
+            }
+        }
+
+        return utxo
     }
 
     /**
@@ -469,7 +464,7 @@ class BlockfrostV0ClientImpl {
      * @returns {Promise<TxInput[]>}
      */
     async getUtxos(address) {
-        return this.getUtxosInternal(address)
+        return this.getAddressUtxosWithOptionalAssetClass(address)
     }
 
     /**
@@ -478,7 +473,7 @@ class BlockfrostV0ClientImpl {
      * @returns {Promise<TxInput[]>}
      */
     async getUtxosWithAssetClass(address, assetClass) {
-        return this.getUtxosInternal(address, assetClass)
+        return this.getAddressUtxosWithOptionalAssetClass(address, assetClass)
     }
 
     /**
@@ -489,7 +484,10 @@ class BlockfrostV0ClientImpl {
      * @param {AssetClass} [assetClass]
      * @returns {Promise<TxInput[]>}
      */
-    async getUtxosInternal(address, assetClass = undefined) {
+    async getAddressUtxosWithOptionalAssetClass(
+        address,
+        assetClass = undefined
+    ) {
         const MAX = 100
         const assetClassStr = assetClass
             ? `/${assetClass.mph.toHex()}${bytesToHex(assetClass.tokenName)}`
@@ -597,12 +595,10 @@ class BlockfrostV0ClientImpl {
 
     /**
      * Used by `BlockfrostV0.resolve()`.
-     * @param {TxInput} utxo
+     * @param {TxId} txId
      * @returns {Promise<boolean>}
      */
-    async hasUtxo(utxo) {
-        const txId = utxo.id.txId
-
+    async hasTx(txId) {
         const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
 
         const response = await fetch(url, {
@@ -613,6 +609,46 @@ class BlockfrostV0ClientImpl {
         })
 
         return response.ok
+    }
+
+    /**
+     * Used by `BlockfrostV0.resolve()`.
+     * Returns false if the UTxO has already been spent
+     * @param {TxOutputId} utxoId
+     * @returns {Promise<boolean>}
+     */
+    async hasUtxo(utxoId) {
+        const txId = utxoId.txId
+
+        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
+
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                project_id: this.projectId
+            }
+        })
+
+        if (!response.ok) {
+            return false
+        }
+
+        const responseObj = /** @type {any} */ (await response.json())
+
+        const outputs = responseObj.outputs
+
+        if (!outputs || !Array.isArray(outputs)) {
+            console.log(responseObj)
+            throw new Error(`unexpected response from Blockfrost`)
+        }
+
+        const outputObj = outputs[utxoId.index]
+
+        if (outputObj) {
+            return !("consumed_by_tx" in outputObj)
+        } else {
+            return false
+        }
     }
 
     /**
