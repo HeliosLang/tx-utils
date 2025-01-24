@@ -512,6 +512,29 @@ export {
  * @prop {boolean} [throwBuildPhaseScriptErrors]
  * @prop {(tx: Tx) => (any | Promise<any>)} [beforeValidate]
  * @prop {ExBudgetModifier} [modifyExBudget]
+ * Increasing the execution budget of the redeemers to compensate for budget calculation errors made by the uplc library, or network parameter inconsistencies
+ *
+ * @prop {BabelFeeAgentOptions} [babelFeeAgent]
+ * Optional babel fee settings, using additional UTxOs containing pure lovelace to balance a transaction and pay for fees and min-deposit.
+ * The primary tx building agent pays the difference using another asset class at a predetermined price.
+ */
+
+/**
+ * @typedef {object} BabelFeeAgentOptions
+ * @prop {Address} address
+ * Address of the Babel fee agent. The assetclass tokens and any spare lovelace are returned to this address.
+ *
+ * @prop {TxInput[]} utxos
+ * UTxOs containing only ADA, which can be used to pay for network fees and min-deposit, and can be used as collateral
+ *
+ * @prop {number} price
+ * Price in lovelace per AssetClass (doesn't take into account decimal places)
+ *
+ * @prop {bigint} minimum
+ * Minimum number of AssetClass tokens per returned babel fee utxo.
+ *
+ * @prop {AssetClass} assetClass
+ * AssetClass which can be swapped out of lovelace
  */
 
 /**

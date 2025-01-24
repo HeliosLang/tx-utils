@@ -47,7 +47,7 @@ import { makeUplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @import { Address, AssetClass, AssetClassLike, Assets, DatumPaymentContext, DCert, MintingContext, MintingPolicyHash, MintingPolicyHashLike, NativeScript, NetworkParams, NetworkParamsHelper, PubKeyHash, PubKeyHashLike, ShelleyAddress, ShelleyAddressLike, SpendingContext, StakingAddress, StakingAddressLike, StakingCredential, StakingContext, StakingValidatorHash, TimeLike, TokenValue, Tx, TxBody, TxInfo, TxInput, TxMetadata, TxMetadataAttr, TxOutput, TxOutputDatum, TxOutputDatumCastable, TxRedeemer, ValidatorHash, Value, ValueLike } from "@helios-lang/ledger"
  * @import { Either } from "@helios-lang/type-utils"
  * @import { CekResult, Cost, UplcLogger, UplcData, UplcProgramV1, UplcProgramV2 } from "@helios-lang/uplc"
- * @import { ExBudgetModifier, LazyRedeemerData, TxBuilder, TxBuilderConfig, TxBuilderFinalConfig } from "../index.js"
+ * @import { BabelFeeAgentOptions, ExBudgetModifier, LazyRedeemerData, TxBuilder, TxBuilderConfig, TxBuilderFinalConfig } from "../index.js"
  */
 
 /**
@@ -339,6 +339,7 @@ class TxBuilderImpl {
                 ? await config.spareUtxos
                 : (config.spareUtxos ?? [])
         ).filter((utxo) => !this._inputs.some((input) => input.isEqual(utxo)))
+        const babelFeeAgent = config.babelFeeAgent
 
         // await the remaining pending applications
         for (let p of this.pending) {
@@ -364,7 +365,26 @@ class TxBuilderImpl {
                 )
         }
 
-        this.balanceAssets(changeAddress, maxAssetsPerChangeOutput)
+        // these assetChangeOutputs are used to balance babel fees
+        let assetChangeOutputs = this.balanceAssets(
+            changeAddress,
+            maxAssetsPerChangeOutput
+        )
+
+        // in the rare case that no asset change outputs are created, look for all UTxOs at the change address
+        // if none are found, explicitly create a single change output
+        if (babelFeeAgent && assetChangeOutputs.length == 0) {
+            assetChangeOutputs = this._outputs.filter((output) =>
+                output.address.isEqual(changeAddress)
+            )
+
+            if (assetChangeOutputs.length == 0) {
+                const output = makeTxOutput(changeAddress, 0)
+
+                this.addOutput(output)
+                assetChangeOutputs.push(output)
+            }
+        }
 
         // start with the max possible fee, minimize later
         const fee = helper.calcMaxConwayTxFee(
@@ -374,8 +394,8 @@ class TxBuilderImpl {
         // balance collateral (if collateral wasn't already set manually)
         const collateralChangeOutput = this.balanceCollateral(
             params,
-            changeAddress,
-            spareUtxos.slice(),
+            babelFeeAgent ? babelFeeAgent.address : changeAddress,
+            babelFeeAgent ? babelFeeAgent.utxos : spareUtxos.slice(),
             fee
         )
 
@@ -385,10 +405,19 @@ class TxBuilderImpl {
         // balance the lovelace using maxTxFee as the fee
         const changeOutput = this.balanceLovelace(
             params,
-            changeAddress,
-            spareUtxos.slice(),
+            babelFeeAgent ? babelFeeAgent.address : changeAddress,
+            babelFeeAgent ? babelFeeAgent.utxos : spareUtxos.slice(),
             fee,
             config.allowDirtyChangeOutput ?? false
+        )
+
+        // returns 0n if babelFeeAgent is undefined
+        const babelFeeTokens = this.balanceBabelFee(
+            babelFeeAgent,
+            changeOutput,
+            assetChangeOutputs,
+            spareUtxos,
+            params
         )
 
         await this.grabRefScriptsFromRegistry()
@@ -460,12 +489,21 @@ class TxBuilderImpl {
             const collateralInput = /** @type {Value} */ (
                 addValues(tx.body.collateral)
             ).lovelace
-            const currentCollateralValue =
-                collateralInput - collateralChangeOutput.value.lovelace
 
             collateralChangeOutput.value.lovelace =
                 collateralInput - minCollateral
         }
+
+        if (babelFeeAgent) {
+            this.correctBabelFee(
+                babelFeeAgent,
+                babelFeeTokens,
+                changeOutput,
+                assetChangeOutputs,
+                params
+            )
+        }
+
         if (config.beforeValidate) {
             await config.beforeValidate(tx)
         }
@@ -1610,6 +1648,7 @@ class TxBuilderImpl {
      * @private
      * @param {ShelleyAddress} changeAddress
      * @param {number} maxAssetsPerChangeOutput
+     * @returns {TxOutput[]}
      */
     balanceAssets(changeAddress, maxAssetsPerChangeOutput) {
         if (changeAddress.spendingCredential.kind == "ValidatorHash") {
@@ -1621,11 +1660,17 @@ class TxBuilderImpl {
         const outputAssets = this.sumOutputAssets()
 
         if (inputAssets.isEqual(outputAssets)) {
-            return
+            return []
         } else if (outputAssets.isGreaterThan(inputAssets)) {
             throw new Error("not enough input assets")
         } else {
             const diff = inputAssets.subtract(outputAssets)
+
+            /**
+             * Collect the change outputs so they can be used for balancing of babel fees
+             * @type {TxOutput[]}
+             */
+            let changeOutputs = []
 
             if (maxAssetsPerChangeOutput > 0) {
                 const maxAssetsPerOutput = maxAssetsPerChangeOutput
@@ -1643,12 +1688,14 @@ class TxBuilderImpl {
                         )
                         tokensAdded += 1
                         if (tokensAdded == maxAssetsPerOutput) {
-                            this.addOutput(
-                                makeTxOutput(
-                                    changeAddress,
-                                    makeValue(0n, changeAssets)
-                                )
+                            const output = makeTxOutput(
+                                changeAddress,
+                                makeValue(0n, changeAssets)
                             )
+
+                            changeOutputs.push(output)
+
+                            this.addOutput(output)
                             changeAssets = makeAssets()
                             tokensAdded = 0
                         }
@@ -1657,18 +1704,24 @@ class TxBuilderImpl {
 
                 // If we are here and have No assets, they we're done
                 if (!changeAssets.isZero()) {
-                    this.addOutput(
-                        makeTxOutput(changeAddress, makeValue(0n, changeAssets))
+                    const output = makeTxOutput(
+                        changeAddress,
+                        makeValue(0n, changeAssets)
                     )
+
+                    changeOutputs.push(output)
+
+                    this.addOutput(output)
                 }
             } else {
-                const changeOutput = makeTxOutput(
-                    changeAddress,
-                    makeValue(0n, diff)
-                )
+                const output = makeTxOutput(changeAddress, makeValue(0n, diff))
 
-                this.addOutput(changeOutput)
+                changeOutputs.push(output)
+
+                this.addOutput(output)
             }
+
+            return changeOutputs
         }
     }
 
@@ -2479,6 +2532,235 @@ class TxBuilderImpl {
             if (found) {
                 this.refer(found.input)
             }
+        }
+    }
+
+    /**
+     * Adds all lovelace in inputs taken from babelFeeAgent.utxos, and then subtracts lovelace in changeOutput
+     * Then the lovelace diff is converted to the number of required tokens
+     * @private
+     * @param {BabelFeeAgentOptions} babelFeeAgent
+     * @param {TxOutput} changeOutput
+     * @returns {bigint}
+     */
+    calcBabelFeeTokensRequired(babelFeeAgent, changeOutput) {
+        const lovelaceRequired =
+            this._inputs.reduce((prev, input) => {
+                if (babelFeeAgent.utxos.some((check) => check.isEqual(input))) {
+                    return prev + input.value.lovelace
+                } else {
+                    return prev
+                }
+            }, 0n) - changeOutput.value.lovelace
+
+        const tokensRequired = BigInt(
+            Math.ceil(Number(lovelaceRequired) / babelFeeAgent.price)
+        )
+
+        if (tokensRequired < babelFeeAgent.minimum) {
+            return babelFeeAgent.minimum
+        } else {
+            return tokensRequired
+        }
+    }
+
+    /**
+     * at this point we have all necessary outputs for further balancing
+     * whatever the babel fee agent loses in ADA, must be recouped in asset class tokens
+     * this will increase the siez of the changeOutput, but the fee at this point is still the max possible fee
+     * so correcting the changeOutput to include the asset class tokens doesn't yet require adjusting the fee
+     * we can still add inputs from the principal agents to cover the babel fee at this point
+     * @private
+     * @param {BabelFeeAgentOptions | undefined} babelFeeAgent
+     * @param {TxOutput} changeOutput
+     * @param {TxOutput[]} assetChangeOutputs
+     * @param {TxInput[]} spareUtxos
+     * @param {NetworkParams} params
+     * @returns {bigint}
+     */
+    balanceBabelFee(
+        babelFeeAgent,
+        changeOutput,
+        assetChangeOutputs,
+        spareUtxos,
+        params
+    ) {
+        if (!babelFeeAgent) {
+            return 0n
+        }
+
+        // number of tokens required to pay for the babel fee
+        const tokensRequired = this.calcBabelFeeTokensRequired(
+            babelFeeAgent,
+            changeOutput
+        )
+
+        // number of tokens available in current assetChangeOutputs
+        let tokensAvailable = assetChangeOutputs.reduce(
+            (prev, output) =>
+                prev +
+                output.value.assets.getAssetClassQuantity(
+                    babelFeeAgent.assetClass
+                ),
+            0n
+        )
+
+        // if the number of tokens available in the assetChangeOutputs is too low, add more inputs containing tokens, and increase the number of tokens in one of the assetChangeOutputs
+        while (tokensAvailable < tokensRequired) {
+            const spareUtxosWithTokens = spareUtxos.filter((utxo) => {
+                return (
+                    !this._inputs.some((check) => check.isEqual(utxo)) &&
+                    utxo.value.assets.getAssetClassQuantity(
+                        babelFeeAgent.assetClass
+                    ) > 0n
+                )
+            })
+
+            const utxoToBeAdded = spareUtxosWithTokens[0]
+
+            if (!utxoToBeAdded) {
+                throw new Error(
+                    `not enough ${babelFeeAgent.assetClass.toString()} tokens to cover babel fees`
+                )
+            }
+
+            this.addInput(utxoToBeAdded)
+
+            // pick the assetChangeOutput that contains the least number of assetClasses
+            const assetChangeOutput = assetChangeOutputs.reduce(
+                (prev, output) => {
+                    return output.value.assets.countTokens() <
+                        prev.value.assets.countTokens()
+                        ? output
+                        : prev
+                },
+                assetChangeOutputs[0]
+            )
+
+            assetChangeOutput.value = assetChangeOutput.value.add(
+                utxoToBeAdded.value
+            )
+        }
+
+        // once we know enough tokens are available, add them to the changeOutput, and subtract them from the assetChangeOutputs
+        // enough tokens are available in the assetChangeOutputs to cover the max possible babel fees
+        changeOutput.value = changeOutput.value.add(
+            makeValue(
+                0n,
+                makeAssets([[babelFeeAgent.assetClass, tokensRequired]])
+            )
+        )
+
+        // assume the changeOutput has enough lovelace to cover the required min-deposit after this change
+
+        let tokensToBeExtracted = tokensRequired
+        assetChangeOutputs.forEach((output) => {
+            if (tokensToBeExtracted > 0n) {
+                const nInOutput = output.value.assets.getAssetClassQuantity(
+                    babelFeeAgent.assetClass
+                )
+
+                if (nInOutput < tokensToBeExtracted) {
+                    output.value = output.value.subtract(
+                        makeValue(
+                            0n,
+                            makeAssets([[babelFeeAgent.assetClass, nInOutput]])
+                        )
+                    )
+                    tokensToBeExtracted -= nInOutput
+                } else {
+                    output.value = output.value.subtract(
+                        makeValue(
+                            0n,
+                            makeAssets([
+                                [babelFeeAgent.assetClass, tokensToBeExtracted]
+                            ])
+                        )
+                    )
+                    tokensToBeExtracted = 0n
+                }
+            }
+        })
+
+        if (tokensToBeExtracted > 0n) {
+            throw new Error("unexpected (should've thrown an error before)")
+        }
+
+        return tokensRequired
+    }
+
+    /**
+     * @private
+     * @param {BabelFeeAgentOptions} babelFeeAgent
+     * @param {bigint} currentBabelFeeTokens - number of babel fee tokens returned by this.balanceBabelFee(), which should be an over-estimation
+     * @param {TxOutput} changeOutput
+     * @param {TxOutput[]} assetChangeOutputs
+     * @param {NetworkParams} params
+     */
+    correctBabelFee(
+        babelFeeAgent,
+        currentBabelFeeTokens,
+        changeOutput,
+        assetChangeOutputs,
+        params
+    ) {
+        const tokensRequired = this.calcBabelFeeTokensRequired(
+            babelFeeAgent,
+            changeOutput
+        )
+
+        if (tokensRequired > currentBabelFeeTokens) {
+            throw new Error(
+                "unexpected: the number of babel fee tokens increased"
+            )
+        }
+
+        // add the difference to the assetChangeOutput which already has the most tokens (least amount of lovelace that must be added for correcting the min-deposit)
+        const assetChangeOutput = assetChangeOutputs.reduce((prev, output) => {
+            return output.value.assets.getAssetClassQuantity(
+                babelFeeAgent.assetClass
+            ) >
+                prev.value.assets.getAssetClassQuantity(
+                    babelFeeAgent.assetClass
+                )
+                ? output
+                : prev
+        }, assetChangeOutputs[0])
+
+        const oldChangeOutputValue = assetChangeOutput.value
+
+        let nDiffTokens = currentBabelFeeTokens - tokensRequired
+        let nDiffLovelace = 0n
+
+        while (nDiffTokens != 0n) {
+            assetChangeOutput.value = assetChangeOutput.value.add(
+                makeValue(
+                    0,
+                    makeAssets([[babelFeeAgent.assetClass, nDiffTokens]])
+                )
+            )
+            const prevLovelace = assetChangeOutput.value.lovelace
+            assetChangeOutput.correctLovelace(params)
+            nDiffLovelace = assetChangeOutput.value.lovelace - prevLovelace // if the amount of lovelace increased, the number of returned tokens decreases
+
+            nDiffTokens = -BigInt(
+                Math.ceil(Number(nDiffLovelace) / babelFeeAgent.price)
+            )
+        }
+
+        // whatever is added to the assetChangeOutput, must be subtracted from the changeOutput
+        const valueTakenFromBabelFeeChange =
+            assetChangeOutput.value.subtract(oldChangeOutputValue)
+
+        const oldDeposit = changeOutput.calcDeposit(params)
+        changeOutput.value = changeOutput.value.add(
+            valueTakenFromBabelFeeChange
+        )
+
+        if (oldDeposit < changeOutput.calcDeposit(params)) {
+            throw new Error(
+                "unexpected: min deposit increased for babel change output"
+            )
         }
     }
 }
