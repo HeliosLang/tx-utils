@@ -189,8 +189,8 @@ packages:
   '@helios-lang/era@0.1.4':
     resolution: {integrity: sha512-wBV/qDLvfSwSywaQlo1EdnVhMW7XBSS2AnaOFmpLS/RrA75arn7ngf+MbEsfjQ1qayIPOPdL96M6vzPtauttWA==}
 
-  '@helios-lang/ledger@0.6.14':
-    resolution: {integrity: sha512-pAHUN44nmR0vKrmezG4pTiHJv3lk1HgIDEjG3RO+4xwuoyIDSuwn8er7VIKMfeYA8CdJQ+Rd5L17D5aadwndDw==}
+  '@helios-lang/ledger@0.6.15':
+    resolution: {integrity: sha512-KcqwLxZu00Md5ge4L04fCEzLXF7k+kj61YKXS+teJDZFh5cpelszcKu52Y0lzyOKOA4MVzGd3rqOCTFY1OQlLw==}
 
   '@helios-lang/tx-utils@file:../..':
     resolution: {directory: ../.., type: directory}
@@ -467,7 +467,7 @@ snapshots:
 
   '@helios-lang/era@0.1.4': {}
 
-  '@helios-lang/ledger@0.6.14':
+  '@helios-lang/ledger@0.6.15':
     dependencies:
       '@helios-lang/cbor': 0.2.5
       '@helios-lang/codec-utils': 0.3.4
@@ -479,7 +479,7 @@ snapshots:
     dependencies:
       '@helios-lang/codec-utils': 0.3.4
       '@helios-lang/crypto': 0.2.3
-      '@helios-lang/ledger': 0.6.14
+      '@helios-lang/ledger': 0.6.15
       '@helios-lang/type-utils': 0.2.9
       '@helios-lang/uplc': 0.7.9
 

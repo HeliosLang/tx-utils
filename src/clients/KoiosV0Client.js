@@ -11,11 +11,11 @@ import {
     makeTxOutputId,
     makeValue,
     parseShelleyAddress,
-    parseStakingAddress
+    parseStakingAddress,
+    UtxoNotFoundError
 } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
 import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
-import { UtxoNotFoundError } from "./errors.js"
 
 /**
  * @import { Address, AssetClass, NetworkParams, StakingAddress, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"

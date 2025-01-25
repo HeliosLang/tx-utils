@@ -1,3 +1,4 @@
+export { UtxoAlreadySpentError, UtxoNotFoundError } from "@helios-lang/ledger" // TODO: get rid of this once minor verssion bump
 export {
     compareTxSummaries,
     isTxSummaryJsonSafe,
@@ -9,8 +10,6 @@ export {
     superimposeUtxosOnSummaries
 } from "./chain/index.js"
 export {
-    UtxoAlreadySpentError,
-    UtxoNotFoundError,
     makeBlockfrostV0Client,
     makeCardanoClientHelper,
     makeKoiosV0Client,
