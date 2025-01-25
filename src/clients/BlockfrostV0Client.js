@@ -442,16 +442,13 @@ class BlockfrostV0ClientImpl {
 
         const utxo = await this.restoreTxInput(outputObj)
 
-        if ("consumed_by_tx" in outputObj) {
-            if (typeof outputObj.consumed_by_tx == "string") {
-                const txId = makeTxId(outputObj.consumed_by_tx)
+        if (
+            "consumed_by_tx" in outputObj &&
+            typeof outputObj.consumed_by_tx == "string"
+        ) {
+            const txId = makeTxId(outputObj.consumed_by_tx)
 
-                throw new UtxoAlreadySpentError(utxo, txId)
-            } else {
-                throw new Error(
-                    `in BlockfrostV0Client.getUtxo(): unexpected response from Blockfrost`
-                )
-            }
+            throw new UtxoAlreadySpentError(utxo, txId)
         }
 
         return utxo
