@@ -245,6 +245,65 @@ class BlockfrostV0ClientImpl {
     constructor(networkName, projectId) {
         this.networkName = networkName
         this.projectId = projectId
+
+        this.burst = 0
+        this.lastRequest = 0
+    }
+
+    /**
+     * Rate limits:
+     *   - Bursts of 500 requests
+     *   - 10 requests per second steady rate
+     *   - After a burst 10 requests per second are "restored"
+     * There will always be a non-zero difference wrt. the lastRequest: `d`
+     *   - upon entry deduct d/100ms from the burst capacity (0 as minimum)
+     *   - then add 1 to burst capacity
+     *   - if burst usage is 500, wait at least 100ms
+     * @private
+     * @param {string} url
+     * @param {RequestInit} options
+     * @returns {Promise<Response>}
+     */
+    async fetchRateLimited(
+        url,
+        options = { method: "GET", headers: { project_id: this.projectId } }
+    ) {
+        const d = Date.now() - this.lastRequest
+        this.burst = Math.max(this.burst - d / 100, 0)
+        if (this.burst >= 500) {
+            await new Promise((resolve) =>
+                setTimeout(resolve, (this.burst - 499) * 100)
+            )
+        }
+        this.burst += 1
+
+        const tryFetch = async () => {
+            return await fetch(url, options)
+        }
+
+        let response = await tryFetch()
+
+        if (response.status == 429) {
+            let attempt = 1
+            while (attempt < 3) {
+                // wait 100 ms
+                await new Promise((resolve) => setTimeout(resolve, 100))
+
+                response = await tryFetch()
+
+                if (response.status != 429) {
+                    return response
+                }
+
+                attempt += 1
+            }
+
+            throw new Error(
+                `BlockfrostV0Client: rate limited, too many requests ${url}`
+            )
+        } else {
+            return response
+        }
     }
 
     /**
@@ -253,14 +312,8 @@ class BlockfrostV0ClientImpl {
      */
     get latestEpoch() {
         return (async () => {
-            const response = await fetch(
-                `https://cardano-${this.networkName}.blockfrost.io/api/v0/epochs/latest`,
-                {
-                    method: "GET",
-                    headers: {
-                        project_id: this.projectId
-                    }
-                }
+            const response = await this.fetchRateLimited(
+                `https://cardano-${this.networkName}.blockfrost.io/api/v0/epochs/latest`
             )
 
             return await response.json()
@@ -283,22 +336,14 @@ class BlockfrostV0ClientImpl {
     get parameters() {
         return (async () => {
             const bfTip = /** @type {BlockfrostTipResponse} */ (
-                await fetch(
-                    `https://cardano-${this.networkName}.blockfrost.io/api/v0/blocks/latest`,
-                    {
-                        method: "GET",
-                        headers: { project_id: this.projectId }
-                    }
+                await this.fetchRateLimited(
+                    `https://cardano-${this.networkName}.blockfrost.io/api/v0/blocks/latest`
                 ).then((r) => r.json())
             )
 
             const bfParams = /** @type {BlockfrostParamsResponse} */ (
-                await fetch(
-                    `https://cardano-${this.networkName}.blockfrost.io/api/v0/epochs/latest/parameters`,
-                    {
-                        method: "GET",
-                        headers: { project_id: this.projectId }
-                    }
+                await this.fetchRateLimited(
+                    `https://cardano-${this.networkName}.blockfrost.io/api/v0/epochs/latest/parameters`
                 ).then((r) => r.json())
             )
 
@@ -352,14 +397,9 @@ class BlockfrostV0ClientImpl {
      * @returns {Promise<void>} - prints to console instead of returning anything
      */
     async dumpMempool() {
-        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/mempool`
-
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                project_id: this.projectId
-            }
-        })
+        const response = await this.fetchRateLimited(
+            `https://cardano-${this.networkName}.blockfrost.io/api/v0/mempool`
+        )
 
         console.log(await response.text())
     }
@@ -370,19 +410,20 @@ class BlockfrostV0ClientImpl {
      * @returns {Promise<Tx>}
      */
     async getTx(id) {
-        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${id.toHex()}/cbor`
+        const response = await this.fetchRateLimited(
+            `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${id.toHex()}/cbor`
+        )
 
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                project_id: this.projectId
-            }
-        })
-
-        if (!response.ok) {
+        if (response.status == 404) {
             throw new Error(`Tx ${id.toString()} not found`)
+        } else if (!response.ok) {
+            throw new Error(
+                `Blockfrost error in getTx(): ${response.statusText}`
+            )
         } else if (response.status != 200) {
-            throw new Error(`Blockfrost error: ${await response.text()}`)
+            throw new Error(
+                `Blockfrost error in getTx(): ${await response.text()}`
+            )
         }
 
         const responseObj = /** @type {any} */ (await response.json())
@@ -400,25 +441,27 @@ class BlockfrostV0ClientImpl {
     /**
      * If the UTxO isn't found a UtxoNotFoundError is thrown
      * If The UTxO has already been spent a UtxoAlreadySpentError is thrown
+     * TODO: take into account rate-limiting
      * @param {TxOutputId} id
      * @returns {Promise<TxInput>}
      */
     async getUtxo(id) {
         const txId = id.txId
 
-        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
+        const response = await this.fetchRateLimited(
+            `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
+        )
 
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                project_id: this.projectId
-            }
-        })
-
-        if (!response.ok) {
+        if (response.status == 404) {
             throw new UtxoNotFoundError(id)
+        } else if (!response.ok) {
+            throw new Error(
+                `Blockfrost error in getUtxo(): ${response.statusText}`
+            )
         } else if (response.status != 200) {
-            throw new Error(`Blockfrost error: ${await response.text()}`)
+            throw new Error(
+                `Blockfrost error in getUtxo(): ${await response.text()}`
+            )
         }
 
         const responseObj = /** @type {any} */ (await response.json())
@@ -490,11 +533,6 @@ class BlockfrostV0ClientImpl {
             ? `/${assetClass.mph.toHex()}${bytesToHex(assetClass.tokenName)}`
             : ""
         const baseUrl = `https://cardano-${this.networkName}.blockfrost.io/api/v0/addresses/${address.toString()}/utxos/${assetClassStr}?count=${MAX}&order=asc`
-        const fetchOptions = {
-            headers: {
-                project_id: this.projectId
-            }
-        }
         let page = 1
         let hasMorePages = true
 
@@ -507,7 +545,7 @@ class BlockfrostV0ClientImpl {
         try {
             while (hasMorePages) {
                 const url = `${baseUrl}&page=${page}`
-                const response = await fetch(url, fetchOptions)
+                const response = await this.fetchRateLimited(url)
 
                 if (response.status == 404) {
                     return []
@@ -558,14 +596,9 @@ class BlockfrostV0ClientImpl {
      * @returns {Promise<{address: Address, quantity: bigint}[]>}
      */
     async getAddressesWithAssetClass(assetClass) {
-        const url = `https://cardano-mainnet.blockfrost.io/api/v0/assets/${assetClass.toString().replace(".", "")}/addresses`
-
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                project_id: this.projectId
-            }
-        })
+        const response = await this.fetchRateLimited(
+            `https://cardano-mainnet.blockfrost.io/api/v0/assets/${assetClass.toString().replace(".", "")}/addresses`
+        )
 
         const list = await response.json()
 
@@ -596,16 +629,19 @@ class BlockfrostV0ClientImpl {
      * @returns {Promise<boolean>}
      */
     async hasTx(txId) {
-        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
+        const response = await this.fetchRateLimited(
+            `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
+        )
 
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                project_id: this.projectId
-            }
-        })
-
-        return response.ok
+        if (response.status == 404) {
+            return false
+        } else if (!response.ok) {
+            throw new Error(
+                `Blockfrost error in hasTx(): ${response.statusText}`
+            )
+        } else {
+            return true
+        }
     }
 
     /**
@@ -617,17 +653,16 @@ class BlockfrostV0ClientImpl {
     async hasUtxo(utxoId) {
         const txId = utxoId.txId
 
-        const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
+        const response = await this.fetchRateLimited(
+            `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
+        )
 
-        const response = await fetch(url, {
-            method: "GET",
-            headers: {
-                project_id: this.projectId
-            }
-        })
-
-        if (!response.ok) {
+        if (response.status == 404) {
             return false
+        } else if (!response.ok) {
+            throw new Error(
+                `Blockfrost error in hasUtxo(): ${response.statusText}`
+            )
         }
 
         const responseObj = /** @type {any} */ (await response.json())
@@ -657,7 +692,7 @@ class BlockfrostV0ClientImpl {
         const data = new Uint8Array(tx.toCbor())
         const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/tx/submit`
 
-        const response = await fetch(url, {
+        const response = await this.fetchRateLimited(url, {
             method: "POST",
             headers: {
                 "content-type": "application/cbor",
@@ -701,7 +736,7 @@ class BlockfrostV0ClientImpl {
         if (obj.reference_script_hash !== null) {
             const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/scripts/${obj.reference_script_hash}/cbor`
 
-            const response = await fetch(url, {
+            const response = await this.fetchRateLimited(url, {
                 method: "GET",
                 headers: {
                     project_id: this.projectId
