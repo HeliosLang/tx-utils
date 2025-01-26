@@ -435,7 +435,14 @@ class BlockfrostV0ClientImpl {
             throw new Error(`unexpected response from Blockfrost`)
         }
 
-        return decodeTx(cbor)
+        // ensure that serializing the tx again results in the same txId
+        const tx = decodeTx(cbor)
+
+        if (!tx.id().isEqual(id)) {
+            throw new Error("Tx serialization mismatch")
+        }
+
+        return tx
     }
 
     /**
