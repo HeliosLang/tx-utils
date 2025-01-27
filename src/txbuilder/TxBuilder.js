@@ -395,7 +395,7 @@ class TxBuilderImpl {
         const collateralChangeOutput = this.balanceCollateral(
             params,
             babelFeeAgent ? babelFeeAgent.address : changeAddress,
-            babelFeeAgent ? babelFeeAgent.utxos : spareUtxos.slice(),
+            babelFeeAgent ? babelFeeAgent.utxos.slice() : spareUtxos.slice(),
             fee
         )
 
@@ -406,7 +406,7 @@ class TxBuilderImpl {
         const changeOutput = this.balanceLovelace(
             params,
             babelFeeAgent ? babelFeeAgent.address : changeAddress,
-            babelFeeAgent ? babelFeeAgent.utxos : spareUtxos.slice(),
+            babelFeeAgent ? babelFeeAgent.utxos.slice() : spareUtxos.slice(),
             fee,
             config.allowDirtyChangeOutput ?? false
         )
@@ -2753,7 +2753,7 @@ class TxBuilderImpl {
             assetChangeOutput.value.subtract(oldChangeOutputValue)
 
         const oldDeposit = changeOutput.calcDeposit(params)
-        changeOutput.value = changeOutput.value.add(
+        changeOutput.value = changeOutput.value.subtract(
             valueTakenFromBabelFeeChange
         )
 
