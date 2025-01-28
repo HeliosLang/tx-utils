@@ -412,7 +412,7 @@ class TxBuilderImpl {
         )
 
         // returns 0n if babelFeeAgent is undefined
-        const babelFeeTokens = this.balanceBabelFee(
+        let babelFeeTokens = this.balanceBabelFee(
             babelFeeAgent,
             changeOutput,
             assetChangeOutputs,
@@ -478,30 +478,51 @@ class TxBuilderImpl {
             )
         }
 
-        // correct the change outputs
         tx.body.fee = finalFee
         changeOutput.value.lovelace += feeDiff // return part of the fee by adding
 
-        if (collateralChangeOutput) {
-            // console.log(" -- recomputing collateral")
-            const minCollateral = tx.calcMinCollateral(params)
+        //
+        let iter = 0
+        while (true) {
+            if (iter >= 5) {
+                throw new Error(
+                    "failed to converge during babel (and collateral) fee correction"
+                )
+            }
 
-            const collateralInput = /** @type {Value} */ (
-                addValues(tx.body.collateral)
-            ).lovelace
+            if (collateralChangeOutput) {
+                // console.log(" -- recomputing collateral")
+                const minCollateral = tx.calcMinCollateral(params)
 
-            collateralChangeOutput.value.lovelace =
-                collateralInput - minCollateral
-        }
+                const collateralInput = /** @type {Value} */ (
+                    addValues(tx.body.collateral)
+                ).lovelace
 
-        if (babelFeeAgent) {
-            this.correctBabelFee(
-                babelFeeAgent,
-                babelFeeTokens,
-                changeOutput,
-                assetChangeOutputs,
-                params
-            )
+                collateralChangeOutput.value.lovelace =
+                    collateralInput - minCollateral
+            }
+
+            if (babelFeeAgent) {
+                babelFeeTokens = this.correctBabelFee(
+                    babelFeeAgent,
+                    babelFeeTokens,
+                    changeOutput,
+                    assetChangeOutputs,
+                    params
+                )
+            }
+
+            const finalFee = tx.calcMinFee(params)
+            if (finalFee > tx.body.fee) {
+                // only keep correcting if more fee is needed
+                const feeDiff = finalFee - tx.body.fee
+                tx.body.fee = finalFee
+                changeOutput.value.lovelace -= feeDiff // subtract fee from changeOutput
+            } else {
+                break
+            }
+
+            iter += 1
         }
 
         if (config.beforeValidate) {
@@ -2692,14 +2713,15 @@ class TxBuilderImpl {
     /**
      * @private
      * @param {BabelFeeAgentOptions} babelFeeAgent
-     * @param {bigint} currentBabelFeeTokens - number of babel fee tokens returned by this.balanceBabelFee(), which should be an over-estimation
+     * @param {bigint} babelFeeTokens - number of babel fee tokens returned by this.balanceBabelFee(), which should be an over-estimation
      * @param {TxOutput} changeOutput
      * @param {TxOutput[]} assetChangeOutputs
      * @param {NetworkParams} params
+     * @returns {bigint} - corrected babel fee tokens
      */
     correctBabelFee(
         babelFeeAgent,
-        currentBabelFeeTokens,
+        babelFeeTokens,
         changeOutput,
         assetChangeOutputs,
         params
@@ -2708,12 +2730,6 @@ class TxBuilderImpl {
             babelFeeAgent,
             changeOutput
         )
-
-        if (tokensRequired > currentBabelFeeTokens) {
-            throw new Error(
-                "unexpected: the number of babel fee tokens increased"
-            )
-        }
 
         // add the difference to the assetChangeOutput which already has the most tokens (least amount of lovelace that must be added for correcting the min-deposit)
         const assetChangeOutput = assetChangeOutputs.reduce((prev, output) => {
@@ -2729,7 +2745,7 @@ class TxBuilderImpl {
 
         const oldChangeOutputValue = assetChangeOutput.value
 
-        let nDiffTokens = currentBabelFeeTokens - tokensRequired
+        let nDiffTokens = babelFeeTokens - tokensRequired
         let nDiffLovelace = 0n
 
         while (nDiffTokens != 0n) {
@@ -2762,6 +2778,8 @@ class TxBuilderImpl {
                 "unexpected: min deposit increased for babel change output"
             )
         }
+
+        return tokensRequired
     }
 }
 
