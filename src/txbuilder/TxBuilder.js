@@ -2671,6 +2671,7 @@ class TxBuilderImpl {
                 makeAssets([[babelFeeAgent.assetClass, tokensRequired]])
             )
         )
+        changeOutput.value.assets.sort()
 
         // assume the changeOutput has enough lovelace to cover the required min-deposit after this change
 
@@ -2700,6 +2701,8 @@ class TxBuilderImpl {
                     )
                     tokensToBeExtracted = 0n
                 }
+
+                output.value.assets.sort()
             }
         })
 
@@ -2772,12 +2775,15 @@ class TxBuilderImpl {
         changeOutput.value = changeOutput.value.subtract(
             valueTakenFromBabelFeeChange
         )
+        changeOutput.value.assets.sort()
 
         if (oldDeposit < changeOutput.calcDeposit(params)) {
             throw new Error(
                 "unexpected: min deposit increased for babel change output"
             )
         }
+
+        assetChangeOutput.value.assets.sort()
 
         return tokensRequired
     }
