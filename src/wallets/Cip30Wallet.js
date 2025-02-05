@@ -1,16 +1,17 @@
-import { bytesToHex } from "@helios-lang/codec-utils"
+import { bytesToHex, toBytes } from "@helios-lang/codec-utils"
 import {
     decodeTxInput,
     decodeTxWitnesses,
     makeShelleyAddress,
-    makeSignature,
     makeStakingAddress,
     makeTxId
 } from "@helios-lang/ledger"
+import { decodeCip30CosePubKey, decodeCip30CoseSign1 } from "../keys/index.js"
 
 /**
- * @import { Address, PubKeyHash, ShelleyAddress, Signature, StakingAddress, Tx, TxId, TxInput } from "@helios-lang/ledger"
- * @import { Cip30FullHandle, Cip30Wallet } from "../index.js"
+ * @import { BytesLike } from "@helios-lang/codec-utils"
+ * @import { Address, PubKey, PubKeyHash, ShelleyAddress, Signature, StakingAddress, Tx, TxId, TxInput } from "@helios-lang/ledger"
+ * @import { Cip30CoseSign1, Cip30FullHandle, Cip30Wallet } from "../index.js"
  */
 
 /**
@@ -133,16 +134,18 @@ class Cip30WalletImpl {
     /**
      * Sign a data payload with the users wallet.
      *
-     * @param {Address} addr - A Cardano address object
-     * @param {number[]} data - The message to sign
-     * @return {Promise<Signature>}
+     * @param {ShelleyAddress<PubKeyHash>} addr - A Cardano address object
+     * @param {BytesLike} data - The message to sign
+     * @return {Promise<{signature: Cip30CoseSign1, key: PubKey}>}
      */
     async signData(addr, data) {
+        const dataBytes = toBytes(data)
+
         if (addr.kind != "Address" || addr.era != "Shelley") {
             throw new Error(
                 `The value in the addr parameter is not a Cardano Shelley-era Address object.`
             )
-        } else if (data.length == 0) {
+        } else if (dataBytes.length == 0) {
             throw new Error(`The data argument is empty. Must be non-empty`)
         }
 
@@ -151,10 +154,13 @@ class Cip30WalletImpl {
 
         const { signature, key } = await this.handle.signData(
             addr.toHex(),
-            bytesToHex(data)
+            bytesToHex(dataBytes)
         )
 
-        return makeSignature(key, signature)
+        return {
+            signature: decodeCip30CoseSign1(signature),
+            key: decodeCip30CosePubKey(key)
+        }
     }
 
     /**

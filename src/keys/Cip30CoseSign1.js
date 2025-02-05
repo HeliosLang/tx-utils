@@ -21,7 +21,7 @@ import { decodeShelleyAddress } from "@helios-lang/ledger"
 /**
  * @import { BytesLike } from "@helios-lang/codec-utils"
  * @import { PubKey, PubKeyHash, ShelleyAddress } from "@helios-lang/ledger"
- * @import { Cip30CoseSign1 } from "../index.js"
+ * @import { Bip32PrivateKey, Cip30CoseSign1 } from "../index.js"
  */
 
 /**
@@ -32,6 +32,24 @@ import { decodeShelleyAddress } from "@helios-lang/ledger"
  */
 export function makeCip30CoseSign1(address, payload, bytes) {
     return new Cip30CoseSign1Impl(address, toBytes(payload), toBytes(bytes))
+}
+
+/**
+ * Low-level signing method for creating a valid Cip30CoseSign1 data-structure
+ * Doesn't check that the address actually corresponds to the given privateKey
+ * @param {ShelleyAddress<PubKeyHash>} address
+ * @param {Bip32PrivateKey} privateKey
+ * @param {BytesLike} payload
+ * @returns {Cip30CoseSign1}
+ */
+export function signCip30CoseData(address, privateKey, payload) {
+    const payloadBytes = toBytes(payload)
+
+    const wrappedPayload = wrapPayloadForSigning(address, payloadBytes)
+
+    const signature = privateKey.sign(wrappedPayload)
+
+    return new Cip30CoseSign1Impl(address, payloadBytes, signature.bytes)
 }
 
 /**
@@ -145,7 +163,7 @@ class Cip30CoseSign1Impl {
      * @returns {number[]}
      */
     toCbor() {
-        const protectedHeader = this.encodeProtectedHeader()
+        const protectedHeader = encodeProtectedHeader(this.address)
 
         const unprotectedHeader = encodeMap([
             [encodeString("hashed"), encodeBool(false)]
@@ -166,32 +184,33 @@ class Cip30CoseSign1Impl {
      */
     verify(pubKey) {
         const signature = makeSignature(pubKey, this.bytes)
-        const wrappedPayload = this.wrapPayloadForSigning()
+        const wrappedPayload = wrapPayloadForSigning(this.address, this.payload)
 
         signature.verify(wrappedPayload)
     }
+}
 
-    /**
-     * @private
-     * @returns {number[]}
-     */
-    encodeProtectedHeader() {
-        return encodeMap([
-            [encodeInt(1), encodeInt(-8)],
-            [encodeString("address"), encodeBytes(this.address.bytes)]
-        ])
-    }
+/**
+ * @param {ShelleyAddress<PubKeyHash>} address
+ * @returns {number[]}
+ */
+function encodeProtectedHeader(address) {
+    return encodeMap([
+        [encodeInt(1), encodeInt(-8)],
+        [encodeString("address"), encodeBytes(address.bytes)]
+    ])
+}
 
-    /**
-     * @private
-     * @returns {number[]}
-     */
-    wrapPayloadForSigning() {
-        return encodeTuple([
-            encodeString("Signature1"),
-            encodeBytes(this.encodeProtectedHeader()),
-            encodeBytes([]), // this is the external_aad field in the CIP-8 spec and in RFC-8152. According to CIP-30 this is empty
-            encodeBytes(this.payload)
-        ])
-    }
+/**
+ * @param {ShelleyAddress<PubKeyHash>} address
+ * @param {number[]} payload
+ * @returns {number[]}
+ */
+function wrapPayloadForSigning(address, payload) {
+    return encodeTuple([
+        encodeString("Signature1"),
+        encodeBytes(encodeProtectedHeader(address)),
+        encodeBytes([]), // this is the external_aad field in the CIP-8 spec and in RFC-8152. According to CIP-30 this is empty
+        encodeBytes(payload)
+    ])
 }

@@ -39,12 +39,17 @@ export {
 } from "./emulator/index.js"
 export {
     BIP39_DICT_EN,
+    decodeCip30CosePubKey,
+    decodeCip30CoseSign1,
+    encodeCip30CosePubKey,
     makeBip32PrivateKey,
     makeBip32PrivateKeyWithBip39Entropy,
+    makeCip30CoseSign1,
     makeRandomBip32PrivateKey,
     makeRandomRootPrivateKey,
     makeRootPrivateKey,
-    restoreRootPrivateKey
+    restoreRootPrivateKey,
+    signCip30CoseData
 } from "./keys/index.js"
 export {
     makeCachedRefScriptRegistry,
@@ -195,7 +200,7 @@ export {
  *
  * @prop {Promise<TxInput<PubKeyHash>[]>} collateral
  *
- * @prop {(addr: Address, data: number[]) => Promise<Signature>} signData
+ * @prop {(addr: ShelleyAddress<PubKeyHash>, data: BytesLike) => Promise<{signature: Cip30CoseSign1, key: PubKey}>} signData
  * Sign a data payload with the users wallet.
  *
  * @prop {(tx: Tx) => Promise<Signature[]>} signTx
@@ -492,7 +497,9 @@ export {
  * @prop {Promise<TxInput<PubKeyHash>[]>} utxos
  * @prop {() => Promise<boolean>} isMainnet
  *
- * @prop {(addr: Address, data: number[]) => Promise<Signature>} signData
+ * @prop {(addr: ShelleyAddress<PubKeyHash>, data: BytesLike) => Promise<{signature: Cip30CoseSign1, key: PubKey}>} signData
+ * This method has the same interface as the Cip30Wallet.signData() method, using either the spendingCredential pubKey or the stakingCredential pubKey depending on which address is given.
+ *
  * @prop {(tx: Tx) => Promise<Signature[]>} signTx
  * Simply assumes the tx needs to by signed by this wallet without checking.
  *
@@ -872,8 +879,8 @@ export {
  * @prop {Promise<StakingAddress[]>} stakingAddresses
  * Returns a list of the reward addresses.
  *
- * @prop {(addr: Address, data: number[]) => Promise<Signature>} signData
- * Signs a message, returning an object containing the Signature that can be used to verify/authenticate the message later.
+ * @prop {(addr: ShelleyAddress<PubKeyHash>, data: BytesLike) => Promise<{signature: Cip30CoseSign1, key: PubKey}>} signData
+ * Signs a message, returning an object containing the Signature and PubKey that can be used to verify/authenticate the message later.
  *
  * @prop {(tx: Tx) => Promise<Signature[]>} signTx
  * Signs a transaction, returning a list of signatures needed for submitting a valid transaction.
@@ -946,7 +953,7 @@ export {
  *
  * @prop {() => Promise<OfflineWallet>} toOfflineWallet
  *
- * @prop {W extends Wallet ? (addr: Address, data: number[]) => Promise<Signature> : never} signData
+ * @prop {W extends Wallet ? (addr: ShelleyAddress<PubKeyHash>, data: BytesLike) => Promise<{signature: Cip30CoseSign1, key: PubKey}> : never} signData
  * Signs a message, returning an object containing the Signature that can be used to verify/authenticate the message later.
  * Only available if the underlying wallet isn't a ReadonlyWallet
  *

@@ -3,13 +3,16 @@ import { makeAddress, makeStakingAddress } from "@helios-lang/ledger"
 import {
     BIP39_DICT_EN,
     restoreRootPrivateKey,
-    makeRandomRootPrivateKey
+    makeRandomRootPrivateKey,
+    signCip30CoseData
 } from "../keys/index.js"
+import { expectDefined } from "@helios-lang/type-utils"
 
 /**
+ * @import { BytesLike } from "@helios-lang/codec-utils"
  * @import { NumberGenerator } from "@helios-lang/crypto"
- * @import { Address, PubKey, PubKeyHash, ShelleyAddress, Signature, StakingAddress, Tx, TxId, TxInput } from "@helios-lang/ledger"
- * @import { Bip32PrivateKey, CardanoClient, RootPrivateKey, SimpleWallet } from "../index.js"
+ * @import { PubKey, PubKeyHash, ShelleyAddress, Signature, StakingAddress, Tx, TxId, TxInput } from "@helios-lang/ledger"
+ * @import { Bip32PrivateKey, CardanoClient, Cip30CoseSign1, RootPrivateKey, SimpleWallet } from "../index.js"
  */
 
 /**
@@ -226,13 +229,44 @@ class SimpleWalletImpl {
     }
 
     /**
-     * Not yet implemented.
-     * @param {Address} addr
-     * @param {number[]} data
-     * @return {Promise<Signature>}
+     * @param {ShelleyAddress<PubKeyHash>} addr
+     * @param {BytesLike} data
+     * @return {Promise<{signature: Cip30CoseSign1, key: PubKey}>}
      */
     async signData(addr, data) {
-        throw new Error("not yet implemented")
+        const spendingCredential = addr.spendingCredential
+        const stakingCredential = addr.stakingCredential
+
+        if (stakingCredential) {
+            if (!addr.isEqual(this.address)) {
+                throw new Error(
+                    "givend address doesn't correspond to SimpleWallet's address"
+                )
+            }
+
+            const pubKey = expectDefined(this.stakingPubKey)
+            const privateKey = expectDefined(this.stakingPrivateKey)
+
+            return {
+                signature: signCip30CoseData(addr, privateKey, data),
+                key: pubKey
+            }
+        } else {
+            if (!spendingCredential.isEqual(this.address.spendingCredential)) {
+                throw new Error(
+                    "given address.spendingCredential doesn't correspond to SimpleWallet's spending credential"
+                )
+            }
+
+            return {
+                signature: signCip30CoseData(
+                    addr,
+                    this.spendingPrivateKey,
+                    data
+                ),
+                key: this.spendingPubKey
+            }
+        }
     }
 
     /**

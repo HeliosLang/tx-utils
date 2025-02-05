@@ -4,8 +4,9 @@ import { selectSingle, selectSmallestFirst } from "../coinselection/index.js"
 import { makeOfflineWallet } from "./OfflineWallet.js"
 
 /**
- * @import { Address, PubKeyHash, Signature, StakingAddress, Tx, TxId, TxInput, Value } from "@helios-lang/ledger"
- * @import { CoinSelection, OfflineWallet, OfflineWalletJsonSafe, ReadonlyCardanoClient, ReadonlyWallet, Wallet, WalletHelper } from "../index.js"
+ * @import { BytesLike } from "@helios-lang/codec-utils"
+ * @import { Address, PubKey, PubKeyHash, ShelleyAddress, Signature, StakingAddress, Tx, TxId, TxInput, Value } from "@helios-lang/ledger"
+ * @import { Cip30CoseSign1, CoinSelection, OfflineWallet, OfflineWalletJsonSafe, ReadonlyCardanoClient, ReadonlyWallet, Wallet, WalletHelper } from "../index.js"
  */
 
 /**
@@ -339,16 +340,16 @@ class WalletHelperImpl {
     }
 
     /**
-     * @type {W extends Wallet ? (addr: Address, data: number[]) => Promise<Signature> : never}
+     * @type {W extends Wallet ? (addr: ShelleyAddress<PubKeyHash>, data: BytesLike) => Promise<{signature: Cip30CoseSign1, key: PubKey}> : never}
      */
     get signData() {
         const w = this.wallet
 
         if (isWallet(w)) {
             /**
-             * @param {Address} addr
-             * @param {number[]} data
-             * @returns {Promise<Signature>}
+             * @param {ShelleyAddress<PubKeyHash>} addr
+             * @param {BytesLike} data
+             * @returns {Promise<{signature: Cip30CoseSign1, key: PubKey}>}
              */
             const fn = async (addr, data) => {
                 return w.signData(addr, data)

@@ -1,6 +1,7 @@
 /**
- * @import { Address, Signature, SpendingCredential, Tx, TxId, TxInput } from "@helios-lang/ledger"
- * @import { CardanoClient, Wallet } from "../index.js"
+ * @import { BytesLike } from "@helios-lang/codec-utils"
+ * @import { PubKey, PubKeyHash, Signature, ShelleyAddress, SpendingCredential, Tx, TxId, TxInput } from "@helios-lang/ledger"
+ * @import { CardanoClient, Cip30CoseSign1, Wallet } from "../index.js"
  */
 
 /**
@@ -82,9 +83,9 @@ class MaskedWallet {
     }
 
     /**
-     * @param {Address<SpendingCredential>} addr
-     * @param {number[]} data
-     * @returns {Promise<Signature>}
+     * @param {ShelleyAddress<PubKeyHash>} addr
+     * @param {BytesLike} data
+     * @returns {Promise<{signature: Cip30CoseSign1, key: PubKey}>}
      */
     async signData(addr, data) {
         return this.baseWallet.signData(addr, data)
