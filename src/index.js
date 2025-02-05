@@ -120,6 +120,20 @@ export {
  */
 
 /**
+ * Cip30-specific COSE single signature data-structure
+ * Note: doesn't contain PubKey information (only PubKeyHash information through the address in the header)
+ * @typedef {object} Cip30CoseSign1
+ * @prop {ShelleyAddress<PubKeyHash>} address
+ * @prop {number[]} payload
+ * @prop {number[]} bytes
+ *
+ * @prop {() => number[]} toCbor
+ *
+ * @prop {(pubKey: PubKey) => void} verify
+ * Throws an error if the signature isn't valid
+ */
+
+/**
  * @typedef {object} Cip30Handle
  * Convenience type for browser plugin wallets supporting the CIP 30 dApp connector standard (eg. Eternl, Nami, ...).
  *
