@@ -62,4 +62,16 @@ describe("Cip30CoseSign1", () => {
 
         sign1.verify(pubKey)
     })
+
+    it("verifies key with kid correctly", () => {
+        const pubKey = makePubKey(
+            "00be5015be5904d9777115ed7f71664b290bde6031e60847b909e1dcf3158542"
+        )
+
+        const sign1 = decodeCip30CoseSign1(
+            "84584aa3012704581d61883c5cd1fdbf9d2b2fbd30982e9fb974cf07201bd55e6871e4294f836761646472657373581d61883c5cd1fdbf9d2b2fbd30982e9fb974cf07201bd55e6871e4294f83a166686173686564f4491b00000194dc3e7f9a5840ce0bd7157b541a401f968ed801731f97e9b0dc8dd2a037dab3c7f4dcbf105419f5c904ec42ec603a8f4a3727d8cd59a23a1537bc8fab5b99080a403088af0200"
+        )
+
+        sign1.verify(pubKey)
+    })
 })
