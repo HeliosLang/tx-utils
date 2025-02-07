@@ -16,6 +16,7 @@
         "test:integ": "pnpm --prefix ./test/all-pure run test",
         "test:pretty": "prettier . --check",
         "test:suite": "node --test  --experimental-test-coverage",
+        "test:debug": "node --inspect-brk --test  --experimental-test-coverage",
         "test:types": "pnpm run build:types"
     },
     "author": "Christian Schmitz",
