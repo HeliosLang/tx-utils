@@ -10,6 +10,7 @@ export {
     superimposeUtxosOnSummaries
 } from "./chain/index.js"
 export {
+    getAssetClassInfo,
     makeBlockfrostV0Client,
     makeCardanoClientHelper,
     makeKoiosV0Client,

@@ -3,5 +3,6 @@ export {
     resolveBlockfrostV0Client
 } from "./BlockfrostV0Client.js"
 export { makeCardanoClientHelper } from "./CardanoClientHelper.js"
+export { getAssetClassInfo } from "./getAssetClassInfo.js"
 export { makeKoiosV0Client, resolveKoiosV0Client } from "./KoiosV0Client.js"
 export { makeReadonlyCardanoMultiClient } from "./ReadonlyCardanoMultiClient.js"
