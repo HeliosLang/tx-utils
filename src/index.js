@@ -120,6 +120,9 @@ export {
  *
  * @prop {(txId: TxId) => Promise<boolean>} hasTx
  *
+ * @prop {(address: Address) => Promise<{id: TxId, blockTime: number, blockHeight: number, indexInBlock: number}[]>} getAddressTxs
+ * Returns all transactions which spend inputs from, or return UTxOs to, the given `address`
+ *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain.
  */

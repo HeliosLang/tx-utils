@@ -1,6 +1,7 @@
 import { describe, it } from "node:test"
 import { makeBlockfrostV0Client } from "./BlockfrostV0Client.js"
-import { makeTxId } from "@helios-lang/ledger"
+import { makeTxId, parseShelleyAddress } from "@helios-lang/ledger"
+import { strict, strictEqual } from "assert"
 
 const networkName = "preprod"
 const apiKey = "preprodYjh2RkMv6xqgWNKOBhuQ6hoazm0s0iFp"
@@ -13,5 +14,31 @@ describe("BlockfrostV0Client", async () => {
             "51819b162fc12523e3e80240f86c52e3a0a3fcca686790f6d616e275617a18c4"
 
         await client.getTx(makeTxId(txId))
+    })
+
+    await it("getAddressTxs() returns at least one tx", async () => {
+        const address = parseShelleyAddress(
+            "addr_test1vz34ylm8ucm0xgq0a72n0r3w7yhgdudxxekvsae5j3w5d5sje670h"
+        )
+
+        const txs = await client.getAddressTxs(address)
+
+        /**
+         * @type {string[]}
+         */
+        const knownTxs = [
+            "5aaebfaa4994891e62f480f4105e4d8c148e2954a66501a637a851e2a6134f5c",
+            "c146c3ac7716b489cee41f84a2a6daab72d29366a7d65123ce1e7d3d0821b905",
+            "0d5722d3486c3ca7a482aa4c7653954c8133a9fb3efbe0b6c77cdb96e2439a2a"
+        ]
+
+        strictEqual(txs.length > 400, true)
+        strictEqual(
+            knownTxs.every((knownTx) => {
+                const knownTxId = makeTxId(knownTx)
+                return txs.some((tx) => tx.id.isEqual(knownTxId))
+            }),
+            true
+        )
     })
 })

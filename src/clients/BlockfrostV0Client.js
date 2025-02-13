@@ -483,7 +483,6 @@ class BlockfrostV0ClientImpl {
         const outputObj = outputs[id.index]
 
         if (!outputObj) {
-            console.log(responseObj)
             throw new UtxoNotFoundError(id)
         }
 
@@ -535,11 +534,11 @@ class BlockfrostV0ClientImpl {
         address,
         assetClass = undefined
     ) {
-        const MAX = 100
+        const MAX_UTXOS_PER_PAGE = 100
         const assetClassStr = assetClass
             ? `/${assetClass.mph.toHex()}${bytesToHex(assetClass.tokenName)}`
             : ""
-        const baseUrl = `https://cardano-${this.networkName}.blockfrost.io/api/v0/addresses/${address.toString()}/utxos/${assetClassStr}?count=${MAX}&order=asc`
+        const baseUrl = `https://cardano-${this.networkName}.blockfrost.io/api/v0/addresses/${address.toString()}/utxos/${assetClassStr}?count=${MAX_UTXOS_PER_PAGE}&order=asc`
         let page = 1
         let hasMorePages = true
 
@@ -572,7 +571,7 @@ class BlockfrostV0ClientImpl {
 
                     results = results.concat(obj)
 
-                    hasMorePages = obj.length == MAX
+                    hasMorePages = obj.length == MAX_UTXOS_PER_PAGE
                 }
                 page += 1
             }
@@ -649,6 +648,105 @@ class BlockfrostV0ClientImpl {
         } else {
             return true
         }
+    }
+
+    /**
+     * @param {Address} address
+     * @returns {Promise<{id: TxId, blockHeight: number, blockTime: number, indexInBlock: number}[]>}
+     */
+    async getAddressTxs(address) {
+        const MAX_ITEMS_PER_PAGE = 100
+        const baseUrl = `https://cardano-${this.networkName}.blockfrost.io/api/v0/addresses/${address.toString()}/transactions?count=${MAX_ITEMS_PER_PAGE}&order=asc`
+        let page = 1
+        let hasMorePages = true
+
+        /**
+         * @type {{tx_hash: string, block_height: number, block_time: number, tx_index: number}[]}
+         */
+        let results = []
+
+        try {
+            while (hasMorePages) {
+                const url = `${baseUrl}&page=${page}`
+
+                const response = await this.fetchRateLimited(url)
+
+                if (response.status == 404) {
+                    return []
+                } else if (!response.ok) {
+                    throw new Error(
+                        `Blockfrost error in getAddressTxs(): ${response.statusText}`
+                    )
+                }
+
+                /**
+                 * @type {any}
+                 */
+                const obj = await response.json()
+
+                if (obj?.status_code >= 300) {
+                    hasMorePages = false
+                } else {
+                    if (!Array.isArray(obj)) {
+                        throw new Error("expected")
+                    }
+
+                    results = results.concat(obj)
+
+                    hasMorePages = obj.length == MAX_ITEMS_PER_PAGE
+                }
+                page += 1
+            }
+        } catch (e) {
+            if (
+                e.message.includes("The requested component has not been found")
+            ) {
+                return []
+            } else {
+                throw e
+            }
+        }
+
+        return results.map((rawItem, i) => {
+            const rawTxId = rawItem["tx_hash"]
+
+            if (!rawTxId || typeof rawTxId != "string") {
+                throw new Error(
+                    `Invalid response tx_hash format for entry ${i} in array, got ${JSON.stringify(results)}`
+                )
+            }
+
+            const indexInBlock = rawItem["tx_index"]
+
+            if (indexInBlock === undefined || typeof indexInBlock != "number") {
+                throw new Error(
+                    `Invalid response tx_index format for entry ${i} in array, got ${JSON.stringify(results)}`
+                )
+            }
+
+            const blockHeight = rawItem["block_height"]
+
+            if (blockHeight === undefined || typeof blockHeight != "number") {
+                throw new Error(
+                    `Invalid response block_height format for entry ${i} in array, got ${JSON.stringify(results)}`
+                )
+            }
+
+            const blockTime = rawItem["block_time"]
+
+            if (blockTime === undefined || typeof blockTime != "number") {
+                throw new Error(
+                    `Invalid response block_time format for entry ${i} in array, got ${JSON.stringify(results)}`
+                )
+            }
+
+            return {
+                id: makeTxId(rawTxId),
+                indexInBlock,
+                blockHeight,
+                blockTime
+            }
+        })
     }
 
     /**
