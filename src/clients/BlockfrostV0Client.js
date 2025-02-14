@@ -285,9 +285,12 @@ class BlockfrostV0ClientImpl {
 
         if (response.status == 429) {
             let attempt = 1
-            while (attempt < 3) {
-                // wait 100 ms
-                await new Promise((resolve) => setTimeout(resolve, 100))
+            const MAX_ATTEMPTS = 7
+            while (attempt <= MAX_ATTEMPTS) {
+                // wait 100 ms, 200 ms, 400 ms, 800 ms, 1600 ms, 3200 ms, 6400 ms (at most 12700 ms in total)
+                await new Promise((resolve) =>
+                    setTimeout(resolve, Math.pow(2, attempt - 1) * 100)
+                )
 
                 response = await tryFetch()
 
