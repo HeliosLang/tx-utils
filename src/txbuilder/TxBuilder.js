@@ -440,6 +440,7 @@ class TxBuilderImpl {
 
         const tx = makeTx(
             makeTxBody({
+                encodingConfig: config.bodyEncodingConfig,
                 inputs: this._inputs,
                 outputs: this._outputs,
                 refInputs: this._refInputs,
@@ -456,6 +457,7 @@ class TxBuilderImpl {
                 scriptDataHash
             }),
             makeTxWitnesses({
+                encodingConfig: config.witnessesEncodingConfig,
                 signatures: [],
                 datums: this.datums,
                 redeemers,

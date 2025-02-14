@@ -16,6 +16,15 @@ describe("BlockfrostV0Client", async () => {
         await client.getTx(makeTxId(txId))
     })
 
+    await it("getTx() works for txs with using set encoding for signatures and inputs", async () => {
+        const txId =
+            "2b5395c8417739ecf6a8ce447c28f4a027951673ca8fbf6b8b9d77d99715b4a6"
+
+        const tx = await client.getTx(makeTxId(txId))
+
+        strictEqual(tx.id().toHex(), txId)
+    })
+
     await it("getAddressTxs() returns at least one tx", async () => {
         const address = parseShelleyAddress(
             "addr_test1vz34ylm8ucm0xgq0a72n0r3w7yhgdudxxekvsae5j3w5d5sje670h"

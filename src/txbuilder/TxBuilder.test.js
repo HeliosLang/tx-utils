@@ -29,7 +29,11 @@ describe("basic TxBuilder", () => {
         const tx = await makeTxBuilder({ isMainnet: false })
             .spendUnsafe(input1)
             .payUnsafe(wallet2, 10_000_000n)
-            .build({ changeAddress: wallet1 })
+            .build({
+                changeAddress: wallet1,
+                bodyEncodingConfig: { inputsAsSet: false },
+                witnessesEncodingConfig: { signaturesAsSet: false }
+            })
 
         strictEqual(tx.body.fee <= signedRef.body.fee, true)
 

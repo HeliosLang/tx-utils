@@ -72,7 +72,7 @@ export {
 
 /**
  * @import { BytesLike, IntLike } from "@helios-lang/codec-utils"
- * @import { Address, AssetClass, Assets, DatumPaymentContext, DCert, MintingContext, MintingPolicyHash, MintingPolicyHashLike, NativeScript, NetworkParams, PubKey, PubKeyHash, PubKeyHashLike, ShelleyAddress, ShelleyAddressLike, Signature, SpendingContext, SpendingCredential, StakingAddress, StakingAddressLike, StakingContext, StakingValidatorHash, TimeLike, TokenValue, Tx, TxId, TxInfo, TxInput, TxMetadataAttr, TxOutput, TxOutputId, TxOutputDatum, TxOutputDatumCastable, ValidatorHash, Value, ValueLike } from "@helios-lang/ledger"
+ * @import { Address, AssetClass, Assets, DatumPaymentContext, DCert, MintingContext, MintingPolicyHash, MintingPolicyHashLike, NativeScript, NetworkParams, PubKey, PubKeyHash, PubKeyHashLike, ShelleyAddress, ShelleyAddressLike, Signature, SpendingContext, SpendingCredential, StakingAddress, StakingAddressLike, StakingContext, StakingValidatorHash, TimeLike, TokenValue, Tx, TxBodyEncodingConfig, TxId, TxInfo, TxInput, TxMetadataAttr, TxOutput, TxOutputId, TxOutputDatum, TxOutputDatumCastable, TxWitnessesEncodingConfig, ValidatorHash, Value, ValueLike } from "@helios-lang/ledger"
  * @import { Cost, UplcData, UplcLogger, UplcProgramV1, UplcProgramV2 } from "@helios-lang/uplc"
  */
 
@@ -541,6 +541,12 @@ export {
  * @prop {BabelFeeAgentOptions} [babelFeeAgent]
  * Optional babel fee settings, using additional UTxOs containing pure lovelace to balance a transaction and pay for fees and min-deposit.
  * The primary tx building agent pays the difference using another asset class at a predetermined price.
+ *
+ * @prop {TxBodyEncodingConfig} [bodyEncodingConfig]
+ * Optional encoding config for TxBody
+ *
+ * @prop {TxWitnessesEncodingConfig} [witnessesEncodingConfig]
+ * Optional encoding confg for TxWitnesses
  */
 
 /**
