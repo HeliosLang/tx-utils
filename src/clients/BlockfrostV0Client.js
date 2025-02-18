@@ -606,14 +606,14 @@ class BlockfrostV0ClientImpl {
      */
     async getAddressesWithAssetClass(assetClass) {
         const response = await this.fetchRateLimited(
-            `https://cardano-mainnet.blockfrost.io/api/v0/assets/${assetClass.toString().replace(".", "")}/addresses`
+            `https://cardano-${this.networkName}.blockfrost.io/api/v0/assets/${assetClass.toString().replace(".", "")}/addresses`
         )
 
         const list = await response.json()
 
         if (!Array.isArray(list)) {
             throw new Error(
-                `expected array response in BlockfrostV0Client.getAddressesWithAssetClass, got '${await response.text()}`
+                `expected array response in BlockfrostV0Client.getAddressesWithAssetClass, got '${JSON.stringify(list)}`
             )
         }
 

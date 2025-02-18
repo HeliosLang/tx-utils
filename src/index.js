@@ -11,6 +11,8 @@ export {
 } from "./chain/index.js"
 export {
     getAssetClassInfo,
+    getCip26AssetClassInfo,
+    getCip68AssetClassInfo,
     makeBlockfrostV0Client,
     makeCardanoClientHelper,
     makeKoiosV0Client,
@@ -126,6 +128,13 @@ export {
  *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain.
+ */
+
+/**
+ * Returns by `getAssetClassInfo()`
+ * @typedef {object} AssetClassInfo
+ * @prop {string} ticker
+ * @prop {number} decimals
  */
 
 /**

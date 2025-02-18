@@ -174,9 +174,6 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@helios-lang/cbor@0.2.6':
-    resolution: {integrity: sha512-u0L2+M9nxg/n6GodVloiM/LN8BqnUjqZUqNzkoh6d1NR6bXVXJ6a7Gb+U2k8IHMrmOOJ5RAQu1yB3qvWx1PsQQ==}
-
   '@helios-lang/cbor@0.3.0':
     resolution: {integrity: sha512-+HA54uJWIFV/EYaKTyS1EVw9GqpIYCtWDVwxDhSwWnL67KZTrieRt1/yjgj2FsmnRvZM8fUYfnkFnU/chS117A==}
 
@@ -200,9 +197,6 @@ packages:
 
   '@helios-lang/type-utils@0.2.9':
     resolution: {integrity: sha512-79/aGqD9ZXNXUypDHf+tSSg4PBacovX5Q4U2GXKVcaH5a194PVZJ+Dsz2J5vLREUeSwSM7HLTEysqasyadbtEQ==}
-
-  '@helios-lang/uplc@0.7.10':
-    resolution: {integrity: sha512-AP0/Z5lcVVgooJHdt2vCPYpYm9WU0cBvCPHA9AkAqnPkmM1ErIlY4WTi3TJqOFHCuWtlCbDr/swbtxYgQU0noQ==}
 
   '@helios-lang/uplc@0.7.11':
     resolution: {integrity: sha512-exrxM51jf1NdmT0OzcpDQL3wmcHa/aq4KqI2QuCrBaki62Fd1/wf8k4O3ZTeTpGu0vjd6agNSebVVOUIK1CenQ==}
@@ -455,10 +449,6 @@ snapshots:
   '@esbuild/win32-x64@0.24.2':
     optional: true
 
-  '@helios-lang/cbor@0.2.6':
-    dependencies:
-      '@helios-lang/codec-utils': 0.3.4
-
   '@helios-lang/cbor@0.3.0':
     dependencies:
       '@helios-lang/codec-utils': 0.3.4
@@ -492,18 +482,9 @@ snapshots:
       '@helios-lang/crypto': 0.2.3
       '@helios-lang/ledger': 0.7.1
       '@helios-lang/type-utils': 0.2.9
-      '@helios-lang/uplc': 0.7.10
+      '@helios-lang/uplc': 0.7.11
 
   '@helios-lang/type-utils@0.2.9': {}
-
-  '@helios-lang/uplc@0.7.10':
-    dependencies:
-      '@helios-lang/cbor': 0.2.6
-      '@helios-lang/codec-utils': 0.3.4
-      '@helios-lang/compiler-utils': 0.5.3
-      '@helios-lang/crypto': 0.2.3
-      '@helios-lang/era': 0.1.4
-      '@helios-lang/type-utils': 0.2.9
 
   '@helios-lang/uplc@0.7.11':
     dependencies:
