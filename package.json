@@ -1,6 +1,6 @@
 {
     "name": "@helios-lang/tx-utils",
-    "version": "0.6.1",
+    "version": "0.6.2",
     "description": "Coinselection, Cardano query layer clients, emulator, wallets",
     "main": "src/index.js",
     "types": "types/index.d.ts",
