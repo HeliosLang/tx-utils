@@ -16,9 +16,9 @@ import { expectDefined } from "@helios-lang/type-utils"
 import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
 
 /**
- * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
+ * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInfo, TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
  * @import { UplcProgramV2 } from "@helios-lang/uplc"
- * @import { BlockfrostV0Client, NetworkName, ReadonlyWallet, TxSummary } from "../index.js"
+ * @import { BlockfrostV0Client, ExtendedTxInfo, NetworkName, ReadonlyWallet, TxBlockInfo, TxSummary } from "../index.js"
  */
 
 /**
@@ -105,6 +105,35 @@ import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
  *   time: number
  *   slot: number
  * }} BlockfrostTipResponse
+ */
+
+/**
+ * @typedef {{unit: string, quantity: string}[]} BlockfrostValue
+ */
+
+/**
+ * @typedef {{
+ *   address: string
+ *   amount: BlockfrostValue
+ *   output_index: number
+ *   data_hash: string | null
+ *   inline_datum: string | null
+ *   reference_script_hash: string | null
+ *   collateral: boolean
+ * }} BlockfrostUtxo
+ */
+
+/**
+ * @typedef {BlockfrostUtxo & {
+ *   tx_hash: string
+ *   reference: boolean
+ * }} BlockfrostInput
+ */
+
+/**
+ * @typedef {BlockfrostUtxo & {
+ *   consumed_by_tx?: string | null
+ * }} BlockfrostOutput
  */
 
 /**
@@ -449,6 +478,151 @@ class BlockfrostV0ClientImpl {
     }
 
     /**
+     * @param {TxId} id
+     * @returns {Promise<ExtendedTxInfo>}
+     */
+    async getTxInfo(id) {
+        const internalInfo = await this.getTxInfoInternal(id)
+        const utxosInfo = await this.getTxUtxos(id)
+
+        /**
+         * @type {TxInput[]}
+         */
+        const inputs = []
+
+        /**
+         * @type {TxInput[]}
+         */
+        const refInputs = []
+
+        for (let rawInput of utxosInfo.inputs) {
+            if (rawInput.collateral) {
+                continue
+            }
+
+            if (rawInput.reference) {
+                refInputs.push(await this.restoreTxInput(rawInput))
+            } else {
+                inputs.push(await this.restoreTxInput(rawInput))
+            }
+        }
+
+        /**
+         * @type {TxOutput[]}
+         */
+        const outputs = []
+
+        for (let rawOutput of utxosInfo.outputs) {
+            outputs.push(
+                (
+                    await this.restoreTxInput({
+                        ...rawOutput,
+                        tx_hash: internalInfo.hash,
+                        reference: false
+                    })
+                ).output
+            )
+        }
+
+        return {
+            inputs,
+            refInputs,
+            outputs,
+            id: id,
+            blockHeight: internalInfo.block_height,
+            blockTime: internalInfo.block_time,
+            indexInBlock: internalInfo.index
+        }
+    }
+
+    /**
+     * @typedef {{
+     *   hash: string
+     *   block: string
+     *   block_height: number
+     *   block_time: number
+     *   slot: number
+     *   index: number
+     *   output_amount: BlockfrostValue
+     *   fees: string
+     *   deposit: string
+     *   size: number
+     *   invalid_before: number | null
+     *   invalid_hereafter: number | null
+     *   utxo_count: number
+     *   withdrawal_count: number
+     *   mir_cert_count: number
+     *   delegation_count: number
+     *   stake_cert_count: number
+     *   pool_update_count: number
+     *   pool_retire_count: number
+     *   asset_mint_or_burn_count: number
+     *   redeemer_count: number
+     *   valid_contract: boolean
+     * }} BlockfrostTxInfoInternalResponse
+     */
+
+    /**
+     * @private
+     * @param {TxId} id
+     * @returns {Promise<BlockfrostTxInfoInternalResponse>}
+     */
+    async getTxInfoInternal(id) {
+        const response = await this.fetchRateLimited(
+            `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${id.toHex()}`
+        )
+
+        if (response.status == 404) {
+            throw new Error(`Tx ${id.toString()} not found`)
+        } else if (!response.ok) {
+            throw new Error(
+                `Blockfrost error in getTxInfoInternal(): ${response.statusText}`
+            )
+        } else if (response.status != 200) {
+            throw new Error(
+                `Blockfrost error in getTxInfoInternal(): ${await response.text()}`
+            )
+        }
+
+        return /** @type {BlockfrostTxInfoInternalResponse} */ (
+            await response.json()
+        )
+    }
+
+    /**
+     * @typedef {{
+     *   hash: string
+     *   inputs: BlockfrostInput[]
+     *   outputs: BlockfrostOutput[]
+     * }} BlockfrostTxUtxosResponse
+     */
+
+    /**
+     * @private
+     * @param {TxId} id
+     * @returns {Promise<BlockfrostTxUtxosResponse>}
+     */
+    async getTxUtxos(id) {
+        const response = await this.fetchRateLimited(
+            `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${id.toHex()}/utxos`
+        )
+
+        if (response.status == 404) {
+            throw new Error(`Tx ${id.toString()} not found`)
+        } else if (!response.ok) {
+            throw new Error(
+                `Blockfrost error in getTxInfoUtxos(): ${response.statusText}`
+            )
+        } else if (response.status != 200) {
+            throw new Error(
+                `Blockfrost error in getTxInfoUtxos(): ${await response.text()}`
+            )
+        }
+
+        return /** @type {BlockfrostTxUtxosResponse} */ (await response.json())
+    }
+
+    /**
      * If the UTxO isn't found a UtxoNotFoundError is thrown
      * If The UTxO has already been spent a UtxoAlreadySpentError is thrown
      * TODO: take into account rate-limiting
@@ -458,28 +632,12 @@ class BlockfrostV0ClientImpl {
     async getUtxo(id) {
         const txId = id.txId
 
-        const response = await this.fetchRateLimited(
-            `https://cardano-${this.networkName}.blockfrost.io/api/v0/txs/${txId.toHex()}/utxos`
-        )
+        const utxosInfo = await this.getTxUtxos(txId)
 
-        if (response.status == 404) {
-            throw new UtxoNotFoundError(id)
-        } else if (!response.ok) {
-            throw new Error(
-                `Blockfrost error in getUtxo(): ${response.statusText}`
-            )
-        } else if (response.status != 200) {
-            throw new Error(
-                `Blockfrost error in getUtxo(): ${await response.text()}`
-            )
-        }
-
-        const responseObj = /** @type {any} */ (await response.json())
-
-        const outputs = responseObj.outputs
+        const outputs = utxosInfo.outputs
 
         if (!outputs) {
-            console.log(responseObj)
+            console.log(utxosInfo)
             throw new Error(`unexpected response from Blockfrost`)
         }
 
@@ -489,10 +647,12 @@ class BlockfrostV0ClientImpl {
             throw new UtxoNotFoundError(id)
         }
 
-        outputObj["tx_hash"] = txId.toHex()
-        outputObj["output_index"] = Number(id.index)
-
-        const utxo = await this.restoreTxInput(outputObj)
+        const utxo = await this.restoreTxInput({
+            ...outputObj,
+            tx_hash: txId.toHex(),
+            output_index: Number(id.index),
+            reference: false
+        })
 
         if (
             "consumed_by_tx" in outputObj &&
@@ -655,7 +815,7 @@ class BlockfrostV0ClientImpl {
 
     /**
      * @param {Address} address
-     * @returns {Promise<{id: TxId, blockHeight: number, blockTime: number, indexInBlock: number}[]>}
+     * @returns {Promise<TxBlockInfo[]>}
      */
     async getAddressTxs(address) {
         const MAX_ITEMS_PER_PAGE = 100
@@ -785,7 +945,10 @@ class BlockfrostV0ClientImpl {
         const outputObj = outputs[utxoId.index]
 
         if (outputObj) {
-            return !("consumed_by_tx" in outputObj)
+            return (
+                !("consumed_by_tx" in outputObj) ||
+                outputObj.consumed_by_tx === null
+            )
         } else {
             return false
         }
@@ -824,25 +987,16 @@ class BlockfrostV0ClientImpl {
 
     /**
      * @private
-     * @param {{
-     *   address: string
-     *   tx_hash: string
-     *   output_index: number
-     *   amount: {unit: string, quantity: string}[]
-     *   inline_datum: null | string
-     *   data_hash: null | string
-     *   collateral: boolean
-     *   reference_script_hash: null | string
-     * }} obj
+     * @param {BlockfrostInput} rawInput
      */
-    async restoreTxInput(obj) {
+    async restoreTxInput(rawInput) {
         /**
          * @type {UplcProgramV2 | undefined}
          */
         let refScript = undefined
 
-        if (obj.reference_script_hash !== null) {
-            const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/scripts/${obj.reference_script_hash}/cbor`
+        if (rawInput.reference_script_hash !== null) {
+            const url = `https://cardano-${this.networkName}.blockfrost.io/api/v0/scripts/${rawInput.reference_script_hash}/cbor`
 
             const response = await this.fetchRateLimited(url, {
                 method: "GET",
@@ -868,12 +1022,14 @@ class BlockfrostV0ClientImpl {
         }
 
         return makeTxInput(
-            makeTxOutputId(makeTxId(obj.tx_hash), obj.output_index),
+            makeTxOutputId(makeTxId(rawInput.tx_hash), rawInput.output_index),
             makeTxOutput(
-                parseShelleyAddress(obj.address),
-                parseBlockfrostValue(obj.amount),
-                obj.inline_datum
-                    ? makeInlineTxOutputDatum(decodeUplcData(obj.inline_datum))
+                parseShelleyAddress(rawInput.address),
+                parseBlockfrostValue(rawInput.amount),
+                rawInput.inline_datum
+                    ? makeInlineTxOutputDatum(
+                          decodeUplcData(rawInput.inline_datum)
+                      )
                     : undefined,
                 refScript
             )

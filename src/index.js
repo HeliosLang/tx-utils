@@ -88,6 +88,23 @@ export {
  */
 
 /**
+ * @typedef {{
+ *   id: TxId
+ *   blockTime: number
+ *   blockHeight: number
+ *   indexInBlock: number
+ * }} TxBlockInfo
+ */
+
+/**
+ * @typedef {TxInfo & {
+ *   blockTime: number
+ *   blockHeight: number
+ *   indexInBlock: number
+ * }} ExtendedTxInfo
+ */
+
+/**
  * @typedef {object} BlockfrostV0Client
  * @prop {NetworkName} networkName
  * @prop {string} projectId
@@ -103,6 +120,7 @@ export {
  * Dumps the live Blockfrost mempool to console.
  *
  * @prop {(id: TxId) => Promise<Tx>} getTx
+ * Note: only works for Conway era onward. If you need to get Txs from previous eras use getTxInfo() instead
  *
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * If the UTxO isn't found a UtxoNotFoundError is thrown
@@ -123,8 +141,11 @@ export {
  *
  * @prop {(txId: TxId) => Promise<boolean>} hasTx
  *
- * @prop {(address: Address) => Promise<{id: TxId, blockTime: number, blockHeight: number, indexInBlock: number}[]>} getAddressTxs
+ * @prop {(address: Address) => Promise<TxBlockInfo[]>} getAddressTxs
  * Returns all transactions which spend inputs from, or return UTxOs to, the given `address`
+ *
+ * @prop {(txId: TxId) => Promise<ExtendedTxInfo>} getTxInfo
+ * Simplified version of getTx() that works for all eras
  *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain.

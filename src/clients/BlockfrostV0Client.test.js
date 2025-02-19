@@ -32,6 +32,13 @@ describe("BlockfrostV0Client", async () => {
         await client.getTx(makeTxId(txId))
     })
 
+    await it("getTxInfo() works for ebdf1c4596917e12c295ca66c349d69af1d09878a39320c46c3e62b5184d9054", async () => {
+        const txId =
+            "ebdf1c4596917e12c295ca66c349d69af1d09878a39320c46c3e62b5184d9054"
+
+        await client.getTxInfo(makeTxId(txId))
+    })
+
     await it("getAddressTxs() returns at least one tx", async () => {
         const address = parseShelleyAddress(
             "addr_test1vz34ylm8ucm0xgq0a72n0r3w7yhgdudxxekvsae5j3w5d5sje670h"
