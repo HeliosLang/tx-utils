@@ -497,6 +497,7 @@ class BlockfrostV0ClientImpl {
 
         for (let rawInput of utxosInfo.inputs) {
             if (rawInput.collateral) {
+                // ignore collateral inputs
                 continue
             }
 
@@ -513,6 +514,11 @@ class BlockfrostV0ClientImpl {
         const outputs = []
 
         for (let rawOutput of utxosInfo.outputs) {
+            if (rawOutput.collateral) {
+                // ignore collateral change
+                continue
+            }
+
             outputs.push(
                 (
                     await this.restoreTxInput({
