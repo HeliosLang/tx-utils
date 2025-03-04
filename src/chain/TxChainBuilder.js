@@ -18,25 +18,25 @@ export function makeTxChainBuilder(source) {
 }
 
 const proxyStateUnused = {}
-const chainBuilderProxyImpl = new Proxy(proxyStateUnused, {
-    get(_proxyState, clientPropName, chainBuilder) {
-        if (clientPropName == "toString") return undefined
-        if (clientPropName == Symbol.toPrimitive) return undefined
-        if (clientPropName == Symbol.toStringTag) return undefined
+const chainBuilderProxyImpl = /* @__PURE__ */ new Proxy(proxyStateUnused, {
+        get(_proxyState, clientPropName, chainBuilder) {
+            if (clientPropName == "toString") return undefined
+            if (clientPropName == Symbol.toPrimitive) return undefined
+            if (clientPropName == Symbol.toStringTag) return undefined
 
-        const result = Reflect.get(
-            chainBuilder.source,
-            clientPropName,
-            chainBuilder.source
-        )
-        if ("function" == typeof result) {
-            return result.bind(chainBuilder.source)
+            const result = Reflect.get(
+                chainBuilder.source,
+                clientPropName,
+                chainBuilder.source
+            )
+            if ("function" == typeof result) {
+                return result.bind(chainBuilder.source)
+            }
+            return result
         }
-        return result
-    }
-})
+    })
 
-const chainBuilderProxyShim = (() => {
+const chainBuilderProxyShim = /* @__PURE__ */ (() => {
     const t = function () {}
     t.prototype = chainBuilderProxyImpl
     return t
