@@ -84,6 +84,14 @@ class TxChainBuilderImpl {
     }
 
     /**
+     * @param {TxOutputId} id
+     * @returns {Promise<boolean>}
+     */
+    async hasUtxo(id) {
+        return !!(await this.getUtxo(id))
+    }
+
+    /**
      * @param {Address} addr
      * @returns {Promise<TxInput[]>}
      */
