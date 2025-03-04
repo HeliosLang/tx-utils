@@ -1,6 +1,6 @@
 /**
  * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInput, TxOutputId } from "@helios-lang/ledger"
- * @import { ReadonlyCardanoClient, TxSummary } from "../index.js"
+ * @import { CardanoTxSubmitter, ReadonlyCardanoClient, TxSummary } from "../index.js"
  */
 
 /**
@@ -167,14 +167,14 @@ class ReadonlyCardanoMultiClientImpl {
 }
 
 /**
- * @template {ReadonlyCardanoClient} C
+ * @template {ReadonlyCardanoClient | CardanoTxSubmitter } C
  * @template T
  * @param {C[]} clients
  * @param {(client: C) => Promise<T>} callback
  * @param {string} msg
  * @returns {Promise<T>}
  */
-async function tryClientsAsync(clients, callback, msg) {
+export async function tryClientsAsync(clients, callback, msg) {
     /**
      * @type {Error[]}
      */
