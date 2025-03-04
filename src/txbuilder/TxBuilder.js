@@ -66,8 +66,14 @@ import { makeUplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  */
 
 /**
+ * creates a TxBuilder object
  * @param {TxBuilderConfig} config
  * @returns {TxBuilder}
+ * @remarks
+ * The `config` object is used to configure the transaction builder.
+ *
+ * If config.additionalFee is specified, the calculated fees for the transaction will be increased
+ * by this amount (though not exceeding the maximum tx fee).
  */
 export function makeTxBuilder(config) {
     return new TxBuilderImpl(config)
@@ -387,7 +393,7 @@ class TxBuilderImpl {
         }
 
         // start with the max possible fee, minimize later
-        const fee = helper.calcMaxConwayTxFee(
+        const maxPossibleFee = helper.calcMaxConwayTxFee(
             calcRefScriptsSize(this._inputs, this._refInputs)
         )
 
@@ -396,7 +402,7 @@ class TxBuilderImpl {
             params,
             babelFeeAgent ? babelFeeAgent.address : changeAddress,
             babelFeeAgent ? babelFeeAgent.utxos.slice() : spareUtxos.slice(),
-            fee
+            maxPossibleFee
         )
 
         // make sure that each output contains the necessary minimum amount of lovelace
@@ -407,7 +413,7 @@ class TxBuilderImpl {
             params,
             babelFeeAgent ? babelFeeAgent.address : changeAddress,
             babelFeeAgent ? babelFeeAgent.utxos.slice() : spareUtxos.slice(),
-            fee,
+            maxPossibleFee,
             config.allowDirtyChangeOutput ?? false
         )
 
@@ -422,11 +428,11 @@ class TxBuilderImpl {
 
         await this.grabRefScriptsFromRegistry()
 
-        // the final fee will never be higher than the current `fee`, so the inputs and outputs won't change, and we will get redeemers with the right indices
+        // the final fee will never be higher than the current `maxPossibleFee`, so the inputs and outputs won't change, and we will get redeemers with the right indices
         // the scripts executed at this point will not see the correct txHash nor the correct fee
         const redeemers = await this.buildRedeemers({
             networkParams: params,
-            fee,
+            fee: maxPossibleFee,
             firstValidSlot,
             lastValidSlot,
             throwBuildPhaseScriptErrors,
@@ -448,7 +454,7 @@ class TxBuilderImpl {
                 collateralReturn: this.collateralReturn,
                 minted: this._mintedTokens,
                 withdrawals: this.withdrawals,
-                fee,
+                fee: maxPossibleFee,
                 firstValidSlot,
                 lastValidSlot,
                 signers: this._signers,
@@ -471,8 +477,15 @@ class TxBuilderImpl {
         )
 
         // calculate the min fee
-        const finalFee = tx.calcMinFee(params)
-        const feeDiff = fee - finalFee
+        const computedFee = tx.calcMinFee(params)
+        const addlFee = this.config.additionalFee || 0n
+        if (addlFee > 0n) {
+            console.log(`   -- including ${addlFee} additional fee`)
+        }
+        const patchedFee = computedFee + addlFee
+        const finalFee =
+            patchedFee <= maxPossibleFee ? patchedFee : maxPossibleFee
+        const feeDiff = maxPossibleFee - finalFee
 
         if (feeDiff < 0n) {
             throw new Error(
@@ -481,7 +494,8 @@ class TxBuilderImpl {
         }
 
         tx.body.fee = finalFee
-        changeOutput.value.lovelace += feeDiff // return part of the fee by adding
+        // return part of the fee by adding to the change output
+        changeOutput.value.lovelace += feeDiff
 
         //
         let iter = 0
@@ -514,7 +528,7 @@ class TxBuilderImpl {
                 )
             }
 
-            const finalFee = tx.calcMinFee(params)
+            const finalFee = tx.calcMinFee(params) + addlFee
             if (finalFee > tx.body.fee) {
                 // only keep correcting if more fee is needed
                 const feeDiff = finalFee - tx.body.fee
