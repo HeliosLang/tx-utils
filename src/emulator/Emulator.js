@@ -197,6 +197,20 @@ class EmulatorImpl {
     }
 
     /**
+     * @param {TxId} id
+     * @returns {Promise<Tx>}
+     */
+    async getTx(id) {
+        const found = this.mempool.find((tx) => tx.id() === id)
+
+        if (!found) {
+            throw new Error(`Tx ${id.toString()} not found`)
+        }
+
+        return /** @type {any} */ (found)
+    }
+
+    /**
      * Throws an error if the UTxO isn't found
      * @param {TxOutputId} id
      * @returns {Promise<TxInput>}
@@ -294,6 +308,26 @@ class EmulatorImpl {
         this.mempool.push(makeEmulatorRegularTx(tx))
 
         return tx.id()
+    }
+
+    /**
+     * @param {Error} e
+     * @returns {boolean}
+     */
+    isUnknownUtxoError(e) {
+        return (
+            e.message.includes("some inputs don't exist") ||
+            e.message.includes("some ref inputs don't exist") ||
+            e.message.includes("input already consumed before")
+        )
+    }
+
+    /**
+     * @param {Error} e
+     * @returns {boolean}
+     */
+    isSubmissionExpiryError(e) {
+        return e.message.includes("slot out of range")
     }
 
     /**
