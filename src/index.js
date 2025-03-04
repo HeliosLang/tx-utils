@@ -544,6 +544,7 @@ export {
  * @typedef {{
  *   isMainnet: boolean
  *   refScriptRegistry?: ReadonlyRefScriptRegistry
+ *   additionalFee?: bigint
  * }} TxBuilderConfig
  */
 
