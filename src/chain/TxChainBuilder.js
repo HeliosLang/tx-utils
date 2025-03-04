@@ -20,6 +20,10 @@ export function makeTxChainBuilder(source) {
 const proxyStateUnused = {}
 const chainBuilderProxyImpl = new Proxy(proxyStateUnused, {
     get(_proxyState, clientPropName, chainBuilder) {
+        if (clientPropName == "toString") return undefined
+        if (clientPropName == Symbol.toPrimitive) return undefined
+        if (clientPropName == Symbol.toStringTag) return undefined
+
         const result = Reflect.get(
             chainBuilder.source,
             clientPropName,
@@ -69,6 +73,12 @@ class TxChainBuilderImpl extends chainBuilderProxy {
     constructor(source) {
         super()
         this.source = source
+        Object.defineProperty(this, "source", {
+            value: source,
+            writable: false,
+            enumerable: false,
+            configurable: false
+        })
         this.txs = []
     }
 
@@ -130,7 +140,7 @@ class TxChainBuilderImpl extends chainBuilderProxy {
         const chainInputs = chain.collectInputs(false, false)
         const chainOutputs = chain.collectOutputs()
 
-        // keep the utxos that haven't been spent by the chai yet
+        // keep the utxos that haven't been spent by the chain yet
         utxos = utxos.filter(
             (utxo) => !chainInputs.some((ci) => ci.isEqual(utxo))
         )
