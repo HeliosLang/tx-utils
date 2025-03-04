@@ -213,6 +213,18 @@ class EmulatorImpl {
         }
     }
 
+    /*
+     * @param {TxOutputId} id
+     * @returns {Promise<TxInput>}
+     */
+    async hasUtxo(id) {
+        try {
+            return !!(await this.getUtxo(id))
+        } catch (e) {
+            return false
+        }
+    }
+
     /**
      * @param {Address} address
      * @returns {Promise<TxInput[]>}

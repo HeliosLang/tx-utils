@@ -992,6 +992,85 @@ class BlockfrostV0ClientImpl {
     }
 
     /**
+     * checks if the error indicates the transaction having utxos not yet known to blockfrost
+     * (or if they have already been spent)
+     * @param {Error} e
+     * @returns {boolean}
+     */
+    isUnknownUtxoError(e) {
+        if (e.message.match(/:3117[,}]/)) return true
+        if (e.message.match(/unknown UTxO/)) return true
+        try {
+            const t = JSON.parse(e.message)
+            const { code, message, data, ...otherFields } = t
+            if (t.code == 3117) {
+                console.log(
+                    "isUnknownUtxoError(): Blockfrost error code 3117 AFTER parsing"
+                )
+                return true
+            }
+            console.log(
+                "unknown error structure in JSON response from Blockfrost (debugging breakpoint available)"
+            )
+            console.log("returning false for isUnknownUtxoError()")
+            debugger
+            return false
+        } catch (e) {
+            console.log(
+                "unknown error response from Blockfrost (debugging breakpoint available)"
+            )
+            console.log("returning false for isUnknownUtxoError()")
+            debugger
+            return false
+        }
+    }
+
+    /**
+     * Indicates if the error
+     * (or if they have already been spent)
+     * @param {Error} err
+     * @returns {boolean}
+     */
+    isSubmissionExpiryError(err) {
+        if (err.message.match(/:3118[,}]/)) {
+            try {
+                console.log("    --- hurray, code 3118")
+                // if ogmios error code is 3118:
+                //   - data.currentSlot shows where the chain is now
+                //    - data.validityInterval shows the detected validity interval of the tx
+                const { data, message, code, ...otherFields } = JSON.parse(
+                    err.message
+                )
+                if (code === 3118) {
+                    const { currentSlot, validityInterval } = data
+                    console.log(
+                        "not sure how to handle this (debugging breakpoint available)",
+                        {
+                            currentSlot,
+                            validityInterval
+                        }
+                    )
+                    debugger
+                    throw new Error("how to handle validity feedback?")
+                }
+                return false
+            } catch (e) {
+                console.log(
+                    "unparseable error from Blockfrost; treating as expired due to pattern match (debugging breakpoint available)"
+                )
+                debugger
+                return true
+            }
+        } else {
+            console.log(
+                "  -- unknown error format from blockfrost; treating as not-expired (debugging breakpoint available)"
+            )
+            debugger
+            return false
+        }
+    }
+
+    /**
      * @private
      * @param {BlockfrostInput} rawInput
      */

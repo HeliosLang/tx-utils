@@ -149,6 +149,11 @@ export {
  *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain.
+ * @prop {(e: Error) => boolean} isUnknownUtxoError
+ * Checks a submit error to see if it indicates the presence of a UTxO not yet found.
+ *
+ * @prop {(e: Error) => boolean} isSubmissionExpiryError
+ * Checks a submit error to see if it indicates that the transaction is too old to be accepted.
  */
 
 /**
@@ -302,6 +307,9 @@ export {
  * @prop {(address: Address) => Promise<TxInput[]>} getUtxos
  * Returns a complete list of UTxOs at a given address.
  *
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo;
+ * indicates whether the underlying network is known to have the UTxO
+ *
  * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} [getUtxosWithAssetClass]
  * Optionally more efficient method to get a complete list of UTxOs at a given address, filtered to contain a given AssetClass
  *
@@ -341,6 +349,18 @@ export {
  */
 
 /**
+ * @typedef {Pick<
+ *      CardanoClient,
+ *      "isMainnet" | "submitTx" | "getTx" | "hasUtxo"
+ * > & {
+ *   isUnknownUtxoError: (e: Error) => boolean
+ *   isSubmissionExpiryError (e: Error): boolean
+ * }} CardanoTxSubmitter
+ * Conforms to a minimal subset of the Cardano network-client type
+ * needed to submit transactions and get feedback on the submission status.
+ */
+
+/**
  * @typedef {object} Emulator
  * A simple emulated Network.
  * This can be used to do integration tests of whole dApps.
@@ -375,6 +395,9 @@ export {
  * Throws an error if the UTxO isn't found
  *
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
+ *
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo;
+ * true if the utxo is in the known set
  *
  * @prop {(utxo: TxInput) => boolean} isConsumed
  *
@@ -432,7 +455,7 @@ export {
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
  * @prop {() => boolean} isMainnet
- * @prop {(utxo: TxInput) => Promise<boolean>} hasUtxo
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  */
 
@@ -848,6 +871,7 @@ export {
  * @prop {() => TxChain} build
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo;
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * @prop {() => boolean} isMainnet
  */
