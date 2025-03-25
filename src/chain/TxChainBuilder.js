@@ -8,22 +8,55 @@ import { makeTxChain } from "./TxChain.js"
  */
 
 /**
- *
- * @param {ReadonlyCardanoClient} source
- * @returns {TxChainBuilder}
+ * has a type-parameter for the source network type
+ * @template {ReadonlyCardanoClient} SpecificSourceType
+ * @param {SpecificSourceType} source
+ * @returns {TxChainBuilder & SpecificSourceType}
  */
 export function makeTxChainBuilder(source) {
-    return new TxChainBuilderImpl(source)
+    return /** @type{any} */ (new TxChainBuilderImpl(source))
 }
 
+const proxyStateUnused = {}
+const chainBuilderProxyImpl = /* @__PURE__ */ new Proxy(proxyStateUnused, {
+        get(_proxyState, clientPropName, chainBuilder) {
+            if (clientPropName == "toString") return undefined
+            if (clientPropName == Symbol.toPrimitive) return undefined
+            if (clientPropName == Symbol.toStringTag) return undefined
+
+            const result = Reflect.get(
+                chainBuilder.source,
+                clientPropName,
+                chainBuilder.source
+            )
+            if ("function" == typeof result) {
+                return result.bind(chainBuilder.source)
+            }
+            return result
+        }
+    })
+
+const chainBuilderProxyShim = /* @__PURE__ */ (() => {
+    const t = function () {}
+    t.prototype = chainBuilderProxyImpl
+    return t
+})()
 /**
+ * @template {ReadonlyCardanoClient} SpecificSourceType
+ * @implements {SpecificSourceType}
+ */
+//@ts-expect-error because it doesn't APPEAR to implement the SpecificSourceType interface
+class chainBuilderProxy extends chainBuilderProxyShim {}
+
+/**
+ * @template {ReadonlyCardanoClient} SpecificSourceType
  * @implements {TxChainBuilder}
  */
-class TxChainBuilderImpl {
+class TxChainBuilderImpl extends chainBuilderProxy {
     /**
      * @private
      * @readonly
-     * @type {ReadonlyCardanoClient}
+     * @type {SpecificSourceType}
      */
     source
 
@@ -35,10 +68,17 @@ class TxChainBuilderImpl {
     txs
 
     /**
-     * @param {ReadonlyCardanoClient} source
+     * @param {SpecificSourceType} source
      */
     constructor(source) {
+        super()
         this.source = source
+        Object.defineProperty(this, "source", {
+            value: source,
+            writable: false,
+            enumerable: false,
+            configurable: false
+        })
         this.txs = []
     }
 
@@ -47,12 +87,17 @@ class TxChainBuilderImpl {
      */
     get now() {
         return this.source.now
+        // todo: allow the base proxy to take the responsibility for this getter
+        //   ... keeping for now because with() doesn't want to believe `this` is a TxChainBuilder without it.
     }
+
     /**
      * @type {Promise<NetworkParams>}
      */
     get parameters() {
         return this.source.parameters
+        // todo: allow the base proxy to take the responsibility for this getter
+        //   ... keeping for now because with() doesn't want to believe `this` is a TxChainBuilder without it.
     }
 
     /**
@@ -95,7 +140,7 @@ class TxChainBuilderImpl {
         const chainInputs = chain.collectInputs(false, false)
         const chainOutputs = chain.collectOutputs()
 
-        // keep the utxos that haven't been spent by the chai yet
+        // keep the utxos that haven't been spent by the chain yet
         utxos = utxos.filter(
             (utxo) => !chainInputs.some((ci) => ci.isEqual(utxo))
         )
@@ -121,6 +166,8 @@ class TxChainBuilderImpl {
      */
     isMainnet() {
         return this.source.isMainnet()
+        // todo: allow the base proxy to take the responsibility for this method;
+        //   ... keeping for now because with() doesn't want to believe `this` is a TxChainBuilder without it.
     }
 
     /**
