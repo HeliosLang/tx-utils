@@ -19,22 +19,22 @@ export function makeTxChainBuilder(source) {
 
 const proxyStateUnused = {}
 const chainBuilderProxyImpl = /* @__PURE__ */ new Proxy(proxyStateUnused, {
-        get(_proxyState, clientPropName, chainBuilder) {
-            if (clientPropName == "toString") return undefined
-            if (clientPropName == Symbol.toPrimitive) return undefined
-            if (clientPropName == Symbol.toStringTag) return undefined
+    get(_proxyState, clientPropName, chainBuilder) {
+        if (clientPropName == "toString") return undefined
+        if (clientPropName == Symbol.toPrimitive) return undefined
+        if (clientPropName == Symbol.toStringTag) return undefined
 
-            const result = Reflect.get(
-                chainBuilder.source,
-                clientPropName,
-                chainBuilder.source
-            )
-            if ("function" == typeof result) {
-                return result.bind(chainBuilder.source)
-            }
-            return result
+        const result = Reflect.get(
+            chainBuilder.source,
+            clientPropName,
+            chainBuilder.source
+        )
+        if ("function" == typeof result) {
+            return result.bind(chainBuilder.source)
         }
-    })
+        return result
+    }
+})
 
 const chainBuilderProxyShim = /* @__PURE__ */ (() => {
     const t = function () {}
@@ -52,7 +52,9 @@ class chainBuilderProxy extends chainBuilderProxyShim {}
  * @template {ReadonlyCardanoClient} SpecificSourceType
  * @implements {TxChainBuilder}
  */
-class TxChainBuilderImpl extends chainBuilderProxy {
+class TxChainBuilderImpl
+    extends /* @type {chainBuilderProxy<SpecificSourceType>} */ chainBuilderProxy
+{
     /**
      * @private
      * @readonly
@@ -86,18 +88,16 @@ class TxChainBuilderImpl extends chainBuilderProxy {
      * @type {number}
      */
     get now() {
+        // it's provided by the proxy base, but is kept here to satisfy the type-system
         return this.source.now
-        // todo: allow the base proxy to take the responsibility for this getter
-        //   ... keeping for now because with() doesn't want to believe `this` is a TxChainBuilder without it.
     }
 
     /**
      * @type {Promise<NetworkParams>}
      */
     get parameters() {
+        // it's provided by the proxy base, but is kept here to satisfy the type-system
         return this.source.parameters
-        // todo: allow the base proxy to take the responsibility for this getter
-        //   ... keeping for now because with() doesn't want to believe `this` is a TxChainBuilder without it.
     }
 
     /**
@@ -165,9 +165,8 @@ class TxChainBuilderImpl extends chainBuilderProxy {
      * @returns {boolean}
      */
     isMainnet() {
+        // it's provided by the proxy base, but is kept here to satisfy the type-system
         return this.source.isMainnet()
-        // todo: allow the base proxy to take the responsibility for this method;
-        //   ... keeping for now because with() doesn't want to believe `this` is a TxChainBuilder without it.
     }
 
     /**
