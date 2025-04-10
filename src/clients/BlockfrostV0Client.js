@@ -992,6 +992,32 @@ class BlockfrostV0ClientImpl {
     }
 
     /**
+     * checks if the error indicates the transaction having utxos not yet known to blockfrost
+     * (or if they have already been spent).  The error detection does not distinguish between
+     * utxos that are not yet known and utxos that have already been spent.
+     * @param {Error} e
+     * @returns {boolean}
+     */
+    isUnknownUtxoError(e) {
+        // the error should have JSON in it, but this text matching should be sufficient
+        if (e.message.match(/:3117[,}]/)) return true
+        if (e.message.match(/UtxoFailure/)) return true
+
+        return false
+    }
+
+    /**
+     * Detects if the tx is not submittable due to validity interval.
+     * Expired txs are not currently distinguished from txs that are not yet valid.
+     * @param {Error} err
+     * @returns {boolean}
+     */
+    isSubmissionExpiryError(err) {
+        if (err.message.match(/OutsideValidityIntervalUTxO/)) return true
+        return false
+    }
+
+    /**
      * @private
      * @param {BlockfrostInput} rawInput
      */

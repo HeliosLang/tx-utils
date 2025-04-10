@@ -37,19 +37,19 @@ export function makeKoiosV0Client(networkName) {
 export async function resolveKoiosV0Client(refUtxo) {
     const preprodNetwork = new KoiosV0ClientImpl("preprod")
 
-    if (await preprodNetwork.hasUtxo(refUtxo)) {
+    if (await preprodNetwork.hasUtxo(refUtxo.id)) {
         return preprodNetwork
     }
 
     const previewNetwork = new KoiosV0ClientImpl("preview")
 
-    if (await previewNetwork.hasUtxo(refUtxo)) {
+    if (await previewNetwork.hasUtxo(refUtxo.id)) {
         return previewNetwork
     }
 
     const mainnetNetwork = new KoiosV0ClientImpl("mainnet")
 
-    if (await mainnetNetwork.hasUtxo(refUtxo)) {
+    if (await mainnetNetwork.hasUtxo(refUtxo.id)) {
         return mainnetNetwork
     }
 
@@ -358,10 +358,10 @@ class KoiosV0ClientImpl {
 
     /**
      * Used by `KoiosV0.resolveUsingUtxo()`.
-     * @param {TxInput} utxo
+     * @param {TxOutputId} utxoId
      * @returns {Promise<boolean>}
      */
-    async hasUtxo(utxo) {
+    async hasUtxo(utxoId) {
         const url = `${this.rootUrl}/api/v0/tx_info`
 
         const response = await fetch(url, {
@@ -371,7 +371,7 @@ class KoiosV0ClientImpl {
                 "content-type": "application/json"
             },
             body: JSON.stringify({
-                _tx_hashes: [utxo.id.txId.toHex()]
+                _tx_hashes: [utxoId.txId.toHex()]
             })
         })
 
