@@ -14,6 +14,7 @@ import {
 } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
 import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
+import { SubmissionExpiryError, SubmissionUtxoError } from "./errors.js"
 
 /**
  * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInfo, TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
@@ -631,7 +632,6 @@ class BlockfrostV0ClientImpl {
     /**
      * If the UTxO isn't found a UtxoNotFoundError is thrown
      * If The UTxO has already been spent a UtxoAlreadySpentError is thrown
-     * TODO: take into account rate-limiting
      * @param {TxOutputId} id
      * @returns {Promise<TxInput>}
      */
@@ -984,37 +984,18 @@ class BlockfrostV0ClientImpl {
         const responseText = await response.text()
 
         if (response.status != 200) {
-            // analyze error and throw a different error if it was detected that an input UTxO might not exist
-            throw new Error(responseText)
+            if (responseText.match(/OutsideValidityIntervalUTxO/)) {
+                // Note:  Expired txs are not currently distinguished from txs that are not yet valid,
+                //   in Blockfrost's API responses.
+                throw new SubmissionExpiryError(responseText)
+            } else if (responseText.match(/UtxoFailure/)) {
+                throw new SubmissionUtxoError(responseText)
+            } else {
+                throw new Error(responseText)
+            }
         } else {
             return makeTxId(JSON.parse(responseText))
         }
-    }
-
-    /**
-     * checks if the error indicates the transaction having utxos not yet known to blockfrost
-     * (or if they have already been spent).  The error detection does not distinguish between
-     * utxos that are not yet known and utxos that have already been spent.
-     * @param {Error} e
-     * @returns {boolean}
-     */
-    isUnknownUtxoError(e) {
-        // the error should have JSON in it, but this text matching should be sufficient
-        if (e.message.match(/:3117[,}]/)) return true
-        if (e.message.match(/UtxoFailure/)) return true
-
-        return false
-    }
-
-    /**
-     * Detects if the tx is not submittable due to validity interval.
-     * Expired txs are not currently distinguished from txs that are not yet valid.
-     * @param {Error} err
-     * @returns {boolean}
-     */
-    isSubmissionExpiryError(err) {
-        if (err.message.match(/OutsideValidityIntervalUTxO/)) return true
-        return false
     }
 
     /**

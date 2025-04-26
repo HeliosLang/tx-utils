@@ -9,6 +9,10 @@ import { makeRootPrivateKey } from "../keys/index.js"
 import { makeSimpleWallet } from "../wallets/index.js"
 import { makeEmulatorGenesisTx } from "./EmulatorGenesisTx.js"
 import { makeEmulatorRegularTx } from "./EmulatorRegularTx.js"
+import {
+    SubmissionExpiryError,
+    SubmissionUtxoError
+} from "../clients/errors.js"
 
 /**
  * @import { IntLike } from "@helios-lang/codec-utils"
@@ -277,57 +281,46 @@ class EmulatorImpl {
         this.warnMempool()
 
         if (!tx.isValidSlot(BigInt(this.currentSlot))) {
-            throw new Error(
+            // TODO: add isExpired or isPremature, when other preferred clients also have positive detection
+            //  of these details
+            throw new SubmissionExpiryError(
                 `tx invalid (slot out of range, ${this.currentSlot} not in ${tx.body.getValidityTimeRange(this.parametersSync).toString()})`
             )
         }
 
         // make sure that each input exists
-        if (
-            !tx.body.inputs.every(
-                (input) => input.id.toString() in this._allUtxos
-            )
-        ) {
-            throw new Error("some inputs don't exist")
+        for (const input of tx.body.inputs) {
+            if (!(input.id.toString() in this._allUtxos)) {
+                throw new SubmissionUtxoError(
+                    "some inputs don't exist",
+                    input.id
+                )
+            }
         }
 
         // make sure that each ref input exists
-        if (
-            !tx.body.refInputs.every(
-                (input) => input.id.toString() in this._allUtxos
-            )
-        ) {
-            throw new Error("some ref inputs don't exist")
+        for (const input of tx.body.refInputs) {
+            if (!(input.id.toString() in this._allUtxos)) {
+                throw new SubmissionUtxoError(
+                    "some ref inputs don't exist",
+                    input.id
+                )
+            }
         }
 
         // make sure that none of the inputs have been consumed before
-        if (tx.body.inputs.some((input) => this.isConsumed(input))) {
-            throw new Error("input already consumed before")
+        for (const input of tx.body.inputs) {
+            if (this.isConsumed(input)) {
+                throw new SubmissionUtxoError(
+                    "input already consumed before",
+                    input.id
+                )
+            }
         }
 
         this.mempool.push(makeEmulatorRegularTx(tx))
 
         return tx.id()
-    }
-
-    /**
-     * @param {Error} e
-     * @returns {boolean}
-     */
-    isUnknownUtxoError(e) {
-        return (
-            e.message.includes("some inputs don't exist") ||
-            e.message.includes("some ref inputs don't exist") ||
-            e.message.includes("input already consumed before")
-        )
-    }
-
-    /**
-     * @param {Error} e
-     * @returns {boolean}
-     */
-    isSubmissionExpiryError(e) {
-        return e.message.includes("slot out of range")
     }
 
     /**

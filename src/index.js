@@ -18,7 +18,9 @@ export {
     makeKoiosV0Client,
     makeReadonlyCardanoMultiClient,
     resolveBlockfrostV0Client,
-    resolveKoiosV0Client
+    resolveKoiosV0Client,
+    SubmissionExpiryError,
+    SubmissionUtxoError
 } from "./clients/index.js"
 export {
     consolidate,
@@ -149,11 +151,6 @@ export {
  *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain.
- * @prop {(e: Error) => boolean} isUnknownUtxoError
- * Checks a submit error to see if it indicates the presence of a UTxO not yet found.
- *
- * @prop {(e: Error) => boolean} isSubmissionExpiryError
- * Checks a submit error to see if it indicates that the transaction is too old to be accepted.
  */
 
 /**
@@ -352,10 +349,7 @@ export {
  * @typedef {Pick<
  *      CardanoClient,
  *      "isMainnet" | "submitTx" | "getTx" | "hasUtxo"
- * > & {
- *   isUnknownUtxoError: (e: Error) => boolean
- *   isSubmissionExpiryError (e: Error): boolean
- * }} CardanoTxSubmitter
+ * >} CardanoTxSubmitter
  * Conforms to a minimal subset of the Cardano network-client type
  * needed to submit transactions and get feedback on the submission status.
  */
