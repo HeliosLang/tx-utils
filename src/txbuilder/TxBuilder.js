@@ -40,7 +40,7 @@ import {
     isRight,
     isUndefined
 } from "@helios-lang/type-utils"
-import { makeUplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
+import { makeUplcDataValue, makeUplcRuntimeError } from "@helios-lang/uplc"
 
 /**
  * @import { BytesLike, IntLike } from "@helios-lang/codec-utils"
@@ -2424,7 +2424,7 @@ class TxBuilderImpl {
                         logOptions.flush?.()
                         const scriptContext = args.at(-1)
 
-                        throw new UplcRuntimeError(
+                        throw makeUplcRuntimeError(
                             `TxBuilder:build() failed: ${altProfile.result.left.error}`,
                             altProfile.result.left.callSites,
                             scriptContext
@@ -2451,7 +2451,7 @@ class TxBuilderImpl {
                 if (throwBuildPhaseScriptErrors) {
                     const scriptContext = args.at(-1)
                     logOptions.flush?.()
-                    throw new UplcRuntimeError(
+                    throw makeUplcRuntimeError(
                         message,
                         profile.result.left.callSites,
                         scriptContext
