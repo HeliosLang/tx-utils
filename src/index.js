@@ -80,6 +80,10 @@ export {
 
 /**
  * @typedef {object} Bip32PrivateKey
+ * Instantiate a `Bip32PrivateKey` with {@link makeBip32PrivateKey}.
+ *
+ * Create a new random `Bip32PrivateKey` with {@link makeRandomBip32PrivateKey}.
+ *
  * @prop {number[]} bytes
  * @prop {(i: number) => Bip32PrivateKey} derive
  * @prop {(path: number[]) => Bip32PrivateKey} derivePath
