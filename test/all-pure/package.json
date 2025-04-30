@@ -1,7 +1,7 @@
 {
     "type": "module",
     "scripts": {
-        "test": "pnpm install && node esbuild.js && node rollup.js"
+        "test": "pnpm install --ignore-workspace && node esbuild.js && node rollup.js"
     },
     "dependencies": {
         "@helios-lang/tx-utils": "file:../../"
