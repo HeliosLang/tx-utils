@@ -174,14 +174,14 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@helios-lang/cbor@0.3.0':
-    resolution: {integrity: sha512-+HA54uJWIFV/EYaKTyS1EVw9GqpIYCtWDVwxDhSwWnL67KZTrieRt1/yjgj2FsmnRvZM8fUYfnkFnU/chS117A==}
+  '@helios-lang/cbor@0.3.1':
+    resolution: {integrity: sha512-BFUA4TKYJ/pOT/L0nXRcuwpKwTUjTvFBXvvpdgQevfyVM7hHOXXJfkO5s5FYjnjs4TFkO2XxuF3YZl9d8k/UVQ==}
 
   '@helios-lang/codec-utils@0.3.4':
     resolution: {integrity: sha512-YiYwBwkbRmu9/4tqHNGIk/haVb0+MLrwXZc+6/KMwGT5WKzypZSkDgH+aZEdHtdTmYhVyIj9ojBljAhMxi8ezg==}
 
-  '@helios-lang/compiler-utils@0.5.13':
-    resolution: {integrity: sha512-gUq/2ihwFeeJdokYr+iHOhi5xpL7GEk93x178825jDoDe7dzBgpNvA5THU7dLF+IRAEK+mk5g+KcHUrJZq/1qg==}
+  '@helios-lang/compiler-utils@0.5.15':
+    resolution: {integrity: sha512-tPI92av0d4eOR4a2U1ORNeT2Sanc9AvvoNQn9aZHSSn10rW1AvDnqd7L4Zj0cjc9uT6BD4wFv0jVdr3gECODVQ==}
 
   '@helios-lang/crypto@0.2.3':
     resolution: {integrity: sha512-Vyauv8fSrev2BFVn5RrHvMtgHzClogWFnX9CPm8024NEzlEL6jrXYiF8VAoegWX46GGZQE2ZEZxZciiKClaR3A==}
@@ -189,8 +189,8 @@ packages:
   '@helios-lang/era@0.1.4':
     resolution: {integrity: sha512-wBV/qDLvfSwSywaQlo1EdnVhMW7XBSS2AnaOFmpLS/RrA75arn7ngf+MbEsfjQ1qayIPOPdL96M6vzPtauttWA==}
 
-  '@helios-lang/ledger@0.7.4':
-    resolution: {integrity: sha512-YGzXzaGQ4fXSW3/I0mrSBtH5poMcEInBgIxuHzGkgUTuZpV31zJ/qphkSJbw6AeT+DsiuJ/gtJ8CcCfzjnxE4w==}
+  '@helios-lang/ledger@0.7.8':
+    resolution: {integrity: sha512-+WsFB/0wdpEguDo6/eMh45amh78VM9xk3+eBOZ7MZBj8LosTwVx+LYzEC+jShldDg5A5mTAr+N+C75WcbzVmkg==}
 
   '@helios-lang/tx-utils@file:../..':
     resolution: {directory: ../.., type: directory}
@@ -198,8 +198,11 @@ packages:
   '@helios-lang/type-utils@0.2.9':
     resolution: {integrity: sha512-79/aGqD9ZXNXUypDHf+tSSg4PBacovX5Q4U2GXKVcaH5a194PVZJ+Dsz2J5vLREUeSwSM7HLTEysqasyadbtEQ==}
 
-  '@helios-lang/uplc@0.7.14':
-    resolution: {integrity: sha512-aTwCP4xnJP4CuPu03tV0+AnaTQxCH+4Srpb9Il4teS1SDMWOkQlR+GgyX5ohg3OjxV9lPPEoPPAiAT0+bGestA==}
+  '@helios-lang/type-utils@0.3.0':
+    resolution: {integrity: sha512-7iEzd/6Qw7srA5ye2gveUcNlRA5jpZZ2YGeCOZc93irpFwpZaJl8P35yQfRXTRfX77W5t57Hc+Zmg/I2eGbq2Q==}
+
+  '@helios-lang/uplc@0.7.15':
+    resolution: {integrity: sha512-GAzsIJXtlA6B9wz5avA+cFIe1wLmzztIfUHfWPanp1q9FjYBPbA/Bv25CdGJC6pAGG/tq9uVAixGHQKBIToFDw==}
 
   '@rollup/plugin-node-resolve@16.0.0':
     resolution: {integrity: sha512-0FPvAeVUT/zdWoO0jnb/V5BlBsUSNfkIOtFHzMO4H9MOklrmQFY6FduVHKucNb/aTFxvnGhj4MNj/T1oNdDfNg==}
@@ -449,13 +452,13 @@ snapshots:
   '@esbuild/win32-x64@0.24.2':
     optional: true
 
-  '@helios-lang/cbor@0.3.0':
+  '@helios-lang/cbor@0.3.1':
     dependencies:
       '@helios-lang/codec-utils': 0.3.4
 
   '@helios-lang/codec-utils@0.3.4': {}
 
-  '@helios-lang/compiler-utils@0.5.13':
+  '@helios-lang/compiler-utils@0.5.15':
     dependencies:
       '@helios-lang/codec-utils': 0.3.4
       '@helios-lang/type-utils': 0.2.9
@@ -467,30 +470,32 @@ snapshots:
 
   '@helios-lang/era@0.1.4': {}
 
-  '@helios-lang/ledger@0.7.4':
+  '@helios-lang/ledger@0.7.8':
     dependencies:
-      '@helios-lang/cbor': 0.3.0
+      '@helios-lang/cbor': 0.3.1
       '@helios-lang/codec-utils': 0.3.4
       '@helios-lang/crypto': 0.2.3
       '@helios-lang/type-utils': 0.2.9
-      '@helios-lang/uplc': 0.7.14
+      '@helios-lang/uplc': 0.7.15
 
   '@helios-lang/tx-utils@file:../..':
     dependencies:
-      '@helios-lang/cbor': 0.3.0
+      '@helios-lang/cbor': 0.3.1
       '@helios-lang/codec-utils': 0.3.4
       '@helios-lang/crypto': 0.2.3
-      '@helios-lang/ledger': 0.7.4
-      '@helios-lang/type-utils': 0.2.9
-      '@helios-lang/uplc': 0.7.14
+      '@helios-lang/ledger': 0.7.8
+      '@helios-lang/type-utils': 0.3.0
+      '@helios-lang/uplc': 0.7.15
 
   '@helios-lang/type-utils@0.2.9': {}
 
-  '@helios-lang/uplc@0.7.14':
+  '@helios-lang/type-utils@0.3.0': {}
+
+  '@helios-lang/uplc@0.7.15':
     dependencies:
-      '@helios-lang/cbor': 0.3.0
+      '@helios-lang/cbor': 0.3.1
       '@helios-lang/codec-utils': 0.3.4
-      '@helios-lang/compiler-utils': 0.5.13
+      '@helios-lang/compiler-utils': 0.5.15
       '@helios-lang/crypto': 0.2.3
       '@helios-lang/era': 0.1.4
       '@helios-lang/type-utils': 0.2.9
