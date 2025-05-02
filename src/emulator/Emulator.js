@@ -231,18 +231,6 @@ class EmulatorImpl {
         }
     }
 
-    /*
-     * @param {TxOutputId} id
-     * @returns {Promise<TxInput>}
-     */
-    async hasUtxo(id) {
-        try {
-            return !!(await this.getUtxo(id))
-        } catch (e) {
-            return false
-        }
-    }
-
     /**
      * @param {Address} address
      * @returns {Promise<TxInput[]>}
@@ -251,6 +239,14 @@ class EmulatorImpl {
         this.warnMempool()
 
         return this._addressUtxos[address.toString()] ?? []
+    }
+
+    /*
+     * @param {TxOutputId} id
+     * @returns {Promise<TxInput>}
+     */
+    async hasUtxo(id) {
+        return id.toString() in this._allUtxos
     }
 
     /**
@@ -290,7 +286,7 @@ class EmulatorImpl {
 
         // make sure that each input exists
         for (const input of tx.body.inputs) {
-            if (!(input.id.toString() in this._allUtxos)) {
+            if (!this.hasUtxo(input.id)) {
                 throw new SubmissionUtxoError(
                     "some inputs don't exist",
                     input.id
@@ -300,7 +296,7 @@ class EmulatorImpl {
 
         // make sure that each ref input exists
         for (const input of tx.body.refInputs) {
-            if (!(input.id.toString() in this._allUtxos)) {
+            if (!this.hasUtxo(input.id)) {
                 throw new SubmissionUtxoError(
                     "some ref inputs don't exist",
                     input.id

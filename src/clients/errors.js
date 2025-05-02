@@ -4,13 +4,12 @@
 
 /**
  * @typedef {Object} ExpiryDetails
- * @property {true} isExpired
- * @property {true} isPremature
+ * @property {boolean} isExpired
+ * @property {boolean} isPremature
  */
 
 /**
  * Detects if the tx is not submittable due to validity interval.
- * @param {string} message
  * @remarks
  * Note that different clients may not be able to distinguish between
  * expired txs and txs that are not yet valid.
@@ -44,13 +43,15 @@ export class SubmissionExpiryError extends Error {
     isIndeterminate
 
     /**
-     * @argument {string} message
-     * @argument {ExpiryDetails} [options]
+     * @param {string} message
+     * @param {object} [props]
+     * @param {true} [props.isExpired]
+     * @param {true} [props.isPremature]
      */
-    constructor(message, options) {
+    constructor(message, props) {
         super(message)
-        if (options) {
-            const { isExpired, isPremature } = options
+        if (props) {
+            const { isExpired, isPremature } = props
             this.isExpired = isExpired
             this.isPremature = isPremature
             if (isExpired && isPremature) {
@@ -100,9 +101,9 @@ export class SubmissionUtxoError extends Error {
     jsonError
 
     /**
-     * @argument {string} message
-     * @argument {TxOutputId} [utxoId]
-     * @argument {Object} [jsonError]
+     * @param {string} message
+     * @param {TxOutputId} [utxoId]
+     * @param {Object} [jsonError]
      */
     constructor(message, utxoId, jsonError) {
         super(message)

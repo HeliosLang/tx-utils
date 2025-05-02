@@ -133,7 +133,14 @@ class TxChainBuilderImpl
      * @returns {Promise<boolean>}
      */
     async hasUtxo(id) {
-        return !!(await this.getUtxo(id))
+        for (let i = 0; i < this.txs.length; i++) {
+            const tx = this.txs[i]
+            if (tx.id().isEqual(id.txId)) {
+                return id.index < tx.body.outputs.length
+            }
+        }
+
+        return this.source.hasUtxo(id)
     }
 
     /**

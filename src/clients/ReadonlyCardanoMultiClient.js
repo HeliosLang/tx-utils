@@ -164,6 +164,20 @@ class ReadonlyCardanoMultiClientImpl {
             return undefined
         }
     }
+
+    /**
+     * @param {TxOutputId} id
+     * @returns {Promise<boolean>}
+     */
+    async hasUtxo(id) {
+        return tryClientsAsync(
+            this.clients,
+            (client) => {
+                return client.hasUtxo(id)
+            },
+            `ReadonlyCardanoMultiClient.hasUtxo(${id.toString()})`
+        )
+    }
 }
 
 /**

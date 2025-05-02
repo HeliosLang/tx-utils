@@ -280,6 +280,9 @@ export {
  *
  * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} [getUtxosWithAssetClass]
  * Optionally more efficient method to get a complete list of UTxOs at a given address, filtered to contain a given AssetClass
+ *
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
+ * Indicates whether the network is known to have the UTxO
  */
 
 /**
@@ -304,14 +307,14 @@ export {
  * @prop {(address: Address) => Promise<TxInput[]>} getUtxos
  * Returns a complete list of UTxOs at a given address.
  *
- * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo;
- * indicates whether the underlying network is known to have the UTxO
- *
  * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} [getUtxosWithAssetClass]
  * Optionally more efficient method to get a complete list of UTxOs at a given address, filtered to contain a given AssetClass
  *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain and returns the id of that transaction upon success.
+ *
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
+ * indicates whether the underlying network is known to have the UTxO
  */
 
 /**
@@ -332,6 +335,7 @@ export {
  * @prop {<SC extends SpendingCredential=SpendingCredential>(id: TxOutputId, addr?: Address<SC> | undefined) => Promise<TxInput<SC>>} getUtxo
  * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>) => Promise<TxInput<SC>[]>} getUtxos
  * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>, assetClass: AssetClass) => Promise<TxInput<SC>[]>} getUtxosWithAssetClass
+ * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo
  *
  * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>, value: Value) => Promise<TxInput<SC>>} selectUtxo
  * This method is used to select very specific UTxOs that contain known tokens/NFTs
@@ -390,7 +394,7 @@ export {
  *
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
  *
- * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo;
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
  * true if the utxo is in the known set
  *
  * @prop {(utxo: TxInput) => boolean} isConsumed
@@ -448,8 +452,8 @@ export {
  *
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
- * @prop {() => boolean} isMainnet
  * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
+ * @prop {() => boolean} isMainnet
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  */
 
@@ -865,7 +869,7 @@ export {
  * @prop {() => TxChain} build
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
- * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo;
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * @prop {() => boolean} isMainnet
  */
