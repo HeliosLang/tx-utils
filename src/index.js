@@ -18,7 +18,9 @@ export {
     makeKoiosV0Client,
     makeReadonlyCardanoMultiClient,
     resolveBlockfrostV0Client,
-    resolveKoiosV0Client
+    resolveKoiosV0Client,
+    SubmissionExpiryError,
+    SubmissionUtxoError
 } from "./clients/index.js"
 export {
     consolidate,
@@ -282,6 +284,9 @@ export {
  *
  * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} [getUtxosWithAssetClass]
  * Optionally more efficient method to get a complete list of UTxOs at a given address, filtered to contain a given AssetClass
+ *
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
+ * Indicates whether the network is known to have the UTxO
  */
 
 /**
@@ -311,6 +316,9 @@ export {
  *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * Submits a transaction to the blockchain and returns the id of that transaction upon success.
+ *
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
+ * indicates whether the underlying network is known to have the UTxO
  */
 
 /**
@@ -331,6 +339,7 @@ export {
  * @prop {<SC extends SpendingCredential=SpendingCredential>(id: TxOutputId, addr?: Address<SC> | undefined) => Promise<TxInput<SC>>} getUtxo
  * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>) => Promise<TxInput<SC>[]>} getUtxos
  * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>, assetClass: AssetClass) => Promise<TxInput<SC>[]>} getUtxosWithAssetClass
+ * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo
  *
  * @prop {<SC extends SpendingCredential=SpendingCredential>(addr: Address<SC>, value: Value) => Promise<TxInput<SC>>} selectUtxo
  * This method is used to select very specific UTxOs that contain known tokens/NFTs
@@ -342,6 +351,15 @@ export {
  *
  * @prop {C extends CardanoClient ? (tx: Tx) => Promise<TxId> : never} submitTx
  * Only available if the underlying client isn't a ReadonlyCardanoClient
+ */
+
+/**
+ * @typedef {Pick<
+ *      CardanoClient,
+ *      "isMainnet" | "submitTx" | "getTx" | "hasUtxo"
+ * >} CardanoTxSubmitter
+ * Conforms to a minimal subset of the Cardano network-client type
+ * needed to submit transactions and get feedback on the submission status.
  */
 
 /**
@@ -379,6 +397,9 @@ export {
  * Throws an error if the UTxO isn't found
  *
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
+ *
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
+ * true if the utxo is in the known set
  *
  * @prop {(utxo: TxInput) => boolean} isConsumed
  *
@@ -435,8 +456,8 @@ export {
  *
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
  * @prop {() => boolean} isMainnet
- * @prop {(utxo: TxInput) => Promise<boolean>} hasUtxo
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  */
 
@@ -852,6 +873,7 @@ export {
  * @prop {() => TxChain} build
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
+ * @prop {(utxoId: TxOutputId) => Promise<boolean>} hasUtxo
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  * @prop {() => boolean} isMainnet
  */

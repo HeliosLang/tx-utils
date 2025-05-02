@@ -156,6 +156,14 @@ class CardanoClientHelperImpl {
     }
 
     /**
+     * @param {TxOutputId} id
+     * @returns {Promise<boolean>}
+     */
+    async hasUtxo(id) {
+        return this.client.hasUtxo(id)
+    }
+
+    /**
      * This method is used to select very specific UTxOs that contain known tokens/NFTs
      * If the UTxO isn't found that usually means something is wrong with the network synchronization
      * The onSelectUtxoFail callback can be used to trigger a synchronization action if the UTxO isn' found

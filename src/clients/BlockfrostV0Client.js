@@ -14,6 +14,7 @@ import {
 } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
 import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
+import { SubmissionExpiryError, SubmissionUtxoError } from "./errors.js"
 
 /**
  * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInfo, TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
@@ -631,7 +632,6 @@ class BlockfrostV0ClientImpl {
     /**
      * If the UTxO isn't found a UtxoNotFoundError is thrown
      * If The UTxO has already been spent a UtxoAlreadySpentError is thrown
-     * TODO: take into account rate-limiting
      * @param {TxOutputId} id
      * @returns {Promise<TxInput>}
      */
@@ -984,8 +984,15 @@ class BlockfrostV0ClientImpl {
         const responseText = await response.text()
 
         if (response.status != 200) {
-            // analyze error and throw a different error if it was detected that an input UTxO might not exist
-            throw new Error(responseText)
+            if (responseText.match(/OutsideValidityIntervalUTxO/)) {
+                // Note:  Expired txs are not currently distinguished from txs that are not yet valid,
+                //   in Blockfrost's API responses.
+                throw new SubmissionExpiryError(responseText)
+            } else if (responseText.match(/UtxoFailure/)) {
+                throw new SubmissionUtxoError(responseText)
+            } else {
+                throw new Error(responseText)
+            }
         } else {
             return makeTxId(JSON.parse(responseText))
         }

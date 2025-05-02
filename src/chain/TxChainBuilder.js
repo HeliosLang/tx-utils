@@ -129,6 +129,21 @@ class TxChainBuilderImpl
     }
 
     /**
+     * @param {TxOutputId} id
+     * @returns {Promise<boolean>}
+     */
+    async hasUtxo(id) {
+        for (let i = 0; i < this.txs.length; i++) {
+            const tx = this.txs[i]
+            if (tx.id().isEqual(id.txId)) {
+                return id.index < tx.body.outputs.length
+            }
+        }
+
+        return this.source.hasUtxo(id)
+    }
+
+    /**
      * @param {Address} addr
      * @returns {Promise<TxInput[]>}
      */
