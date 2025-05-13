@@ -8,6 +8,7 @@ export {
     getCip26AssetClassInfo,
     getCip68AssetClassInfo
 } from "./getAssetClassInfo.js"
+export { makeHydraClient } from "./HydraClient.js"
 export { makeKoiosV0Client, resolveKoiosV0Client } from "./KoiosV0Client.js"
 export { makeReadonlyCardanoMultiClient } from "./ReadonlyCardanoMultiClient.js"
 export { SubmissionExpiryError, SubmissionUtxoError } from "./errors.js"
