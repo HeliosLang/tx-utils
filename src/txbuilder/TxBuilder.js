@@ -464,7 +464,9 @@ class TxBuilderImpl {
                 nativeScripts: this.nativeScripts,
                 v1Scripts: this.v1Scripts,
                 v2Scripts: this.v2Scripts,
-                v2RefScripts: this.v2RefScripts
+                v2RefScripts: this.v2RefScripts,
+                v3Scripts: [],
+                v3RefScripts: []
             }),
             true,
             metadata
