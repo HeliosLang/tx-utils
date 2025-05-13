@@ -241,9 +241,9 @@ class EmulatorImpl {
         return this._addressUtxos[address.toString()] ?? []
     }
 
-    /*
+    /**
      * @param {TxOutputId} id
-     * @returns {Promise<TxInput>}
+     * @returns {Promise<boolean>}
      */
     async hasUtxo(id) {
         return id.toString() in this._allUtxos
