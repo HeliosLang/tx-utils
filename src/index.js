@@ -15,6 +15,7 @@ export {
     getCip68AssetClassInfo,
     makeBlockfrostV0Client,
     makeCardanoClientHelper,
+    makeHydraClient,
     makeKoiosV0Client,
     makeReadonlyCardanoMultiClient,
     resolveBlockfrostV0Client,
@@ -440,6 +441,498 @@ export {
  */
 
 /**
+ * @typedef {{
+ *   type: "Tx ConwayEra" | "Unwitnessed Tx ConwayEra" | "Witnessed Tx ConwayEra"
+ *   description: string
+ *   cborHex: string
+ *   txId?: string
+ * }} HydraTx
+ */
+
+/**
+ * @typedef {{
+ *   scriptLanguage: string
+ *   script:  {
+ *     cborHex: string
+ *     description: string
+ *     type: "SimpleScript" | "PlutusScriptV1" | "PlutusScriptV2" | "PlutusScriptV3"
+ *   }
+ * }} HydraRefScript
+ */
+
+/**
+ * @typedef {{
+ *   address: string
+ *   value: {
+ *     lovelace: number
+ *   } & Record<string, number>
+ *   referenceScript: HydraRefScript | null
+ *   datumHash: string | null
+ *   inlineDatum: object | null
+ *   inlineDatumHash: string | null
+ *   inlineDatumRaw: string | null
+ *   datum: string | null
+ * }} HydraTxOutput
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Greetings"
+ *   me: {
+ *     vkey: string
+ *   }
+ *   headStatus: "Idle" | "Initializing" | "Open" | "Closed" | "FanoutPossible" | "Final"
+ *   hydraHeadId?: string
+ *   snapshotUtxo?: Record<string, HydraTxOutput>
+ *   timestamp?: string
+ *   hydraNodeVersion: string
+ * }} HydraGreetingMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "CommandFailed"
+ *   clientInput: {
+ *     tag: "Init"
+ *   } | {
+ *     tag: "Abort"
+ *   } | {
+ *     tag: "NewTx"
+ *     transaction: HydraTx
+ *   } | {
+ *     tag: "Decommit"
+ *     decommitTx: HydraTx
+ *   } | {
+ *     tag: "Recover"
+ *     recoverTxId: string
+ *   } | {
+ *     tag: "Close"
+ *   } | {
+ *     tag: "Contest"
+ *   } | {
+ *     tag: "Fanout"
+ *   } | {
+ *     "SideLoadSnapshot"
+ *   }
+ * }} HydraCommandFailedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "PostTxOnChainFailed"
+ * }} HydraPostTxOnChainFailedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "PeerConnected"
+ * }} HydraPeerConnectedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "PeerDisconnected"
+ * }} HydraPeerDisconnectedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "NetworkConnected"
+ *   seq: number
+ *   timestamp: string
+ * }} HydraNetworkConnectedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "NetworkDisconnected"
+ *   seq: number
+ *   timestamp: string
+ * }} HydraNetworkDisconnectedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "NetworkVersionMismatch"
+ *   ourVersion: number
+ *   theirVersion: number | null
+ *   seq: number
+ *   timestamp: string
+ * }} HydraNetworkVersionMismatchMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "HeadsInitializing"
+ *   headId: string
+ *   parties: {
+ *     vkey: string
+ *   }[]
+ *   seq: number
+ *   timestamp: string
+ * }} HydraHeadsInitializingMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Committed"
+ *   party: {
+ *     vkey: string
+ *   }
+ *   seq: number
+ *   timestamp: string
+ * }} HydraCommittedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "HeadIsOpen"
+ *   headId: string
+ *   utxo: Record<string, HydraTxOutput>
+ *   seq: number
+ *   timestamp: string
+ * }} HydraHeadIsOpenMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "HeadIsClosed"
+ *   headId: string
+ *   snapshotNumber: number
+ *   contestationDeadline: string
+ *   seq: number
+ *   timestamp: string
+ * }} HydraHeadIsClosedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "HeadIsContested"
+ *   headId: string
+ *   snapshotNumber: number
+ *   contestationDeadline: string
+ *   seq: number
+ *   timestamp: string
+ * }} HydraHeadIsContestedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "ReadToFanout"
+ *   headId: string
+ *   seq: number
+ *   timestamp: string
+ * }} HydraReadyToFanoutMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "HeadIsAborted"
+ *   headId: string
+ *   utxo: Record<string, HydraTxOutput>
+ *   seq: number
+ *   timestamp: string
+ * }} HydraHeadIsAbortedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "HeadIsFinalized"
+ *   headId: string
+ *   utxo: Record<string, HydraTxOutput>
+ *   seq: number
+ *   timestamp: string
+ * }} HydraHeadIsFinalizedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "TxValid"
+ *   headId: string
+ *   transactionId: string
+ *   seq: number
+ *   timestamp: string
+ * }} HydraTxValidMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: string
+ *   headId: string
+ *   utxo: Record<string, HydraTxOutput>
+ *   transaction: HydraTx
+ *   validationError: {
+ *     reason: string
+ *   }
+ *   seq: number
+ *   timestamp: string
+ * }} HydraTxInvalidMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "SnapshotConfirmed"
+ *   headId: string
+ *   snapshot: {
+ *     headId: string
+ *     version: number
+ *     number: number
+ *     confirmed: HydraTx[]
+ *     utxo: Record<string, HydraTxOutput>
+ *     utxoToCommit: Record<string, HydraTxOutput> | null
+ *     utxoToDecommit: Record<string, HydraTxOutput> | null
+ *   }
+ *   seq: number
+ *   timestamp: string
+ * }} HydraSnapshotConfirmedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "InvalidInput"
+ *   reason: string
+ *   input: string
+ * }} HydraInvalidInputMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "IgnoredHeadInitializing"
+ *   headId: string
+ *   contestationPeriod: number
+ *   parties: {vkey: string}[]
+ *   participants: string[]
+ *   seq: number
+ *   timestamp: string
+ * }} HydraIgnoredHeadInitializingMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "DecommitInvalid"
+ *   headId: string
+ *   decommitTx: HydraTx
+ *   decommitInvalidReason: {
+ *     tag: "DecommitTxInvalid"
+ *     localUtxo: Record<string, HydraTxOutput>
+ *     validationError: {
+ *       reason: string
+ *     }
+ *   } | {
+ *     tag: "DecommitAlreadyInFlight"
+ *     otherDecommitTxId: string
+ *   }
+ * }} HydraDecommitInvalidMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "DecommitRequested"
+ *   headId: string
+ *   decommitTx: HydraTx
+ *   utxoToDecommit: Record<string, HydraTxOutput>
+ *   seq: number
+ *   timestamp: string
+ * }} HydraDecommitRequestedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "DecommitApproved"
+ *   headId: string
+ *   decommitTxId: string
+ *   utxoToDecommit: Record<string, HydraTxOutput>
+ *   seq: number
+ *   timestamp: string
+ * }} HydraDecommiteApprovedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "DecommitFinalized"
+ *   headId: string
+ *   distributedUTxO: Record<string, HydraTxOutput>
+ *   seq: number
+ *   timestamp: string
+ * }} HydraDecommitFinalizedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "CommitRecorded"
+ *   headId: string
+ *   utxoToCommit: Record<string, HydraTxOutput>
+ *   pendingDeposit: string
+ *   deadline: string
+ *   seq: number
+ *   timestamp: string
+ * }} HydraCommitRecordedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "CommitApproved"
+ *   headId: string
+ *   utxoToCommit: Record<string, HydraTxOutput>
+ *   seq: number
+ *   timestamp: string
+ * }} HydraCommitApprovedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "CommitFinalized"
+ *   headId: string
+ *   depositTxId: string
+ *   seq: number
+ *   timestamp: string
+ * }} HydraCommitFinalizedMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "CommitRecovered"
+ *   headId: string
+ *   recoveredUTxO: Record<string, HydraTxOutput>
+ *   recoveredTxId: string
+ *   seq: number
+ *   timestamp: string
+ * }} HydraCommitRecoveredMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "SnapshotSideLoaded"
+ *   headId: string
+ *   snapshotNumber: number
+ *   seq: number
+ *   timestamp: string
+ * }} HydraSnapshotSideLoadedMessage
+ */
+
+/**
+ * @typedef {(
+ *   HydraGreetingMessage
+ *   | HydraCommandFailedMessage
+ *   | HydraPostTxOnChainFailedMessage
+ *   | HydraPeerConnectedMessage
+ *   | HydraPeerDisconnectedMessage
+ *   | HydraNetworkConnectedMessage
+ *   | HydraNetworkDisconnectedMessage
+ *   | HydraNetworkVersionMismatchMessage
+ *   | HydraHeadsInitializingMessage
+ *   | HydraCommittedMessage
+ *   | HydraHeadIsOpenMessage
+ *   | HydraHeadIsClosedMessage
+ *   | HydraHeadIsContestedMessage
+ *   | HydraReadyToFanoutMessage
+ *   | HydraHeadIsAbortedMessage
+ *   | HydraHeadIsFinalizedMessage
+ *   | HydraTxValidMessage
+ *   | HydraTxInvalidMessage
+ *   | HydraSnapshotConfirmedMessage
+ *   | HydraInvalidInputMessage
+ *   | HydraIgnoredHeadInitializingMessage
+ *   | HydraDecommitInvalidMessage
+ *   | HydraDecommitRequestedMessage
+ *   | HydraDecommiteApprovedMessage
+ *   | HydraDecommitFinalizedMessage
+ *   | HydraCommitRecordedMessage
+ *   | HydraCommitApprovedMessage
+ *   | HydraCommitFinalizedMessage
+ *   | HydraCommitRecoveredMessage
+ *   | HydraSnapshotSideLoadedMessage
+ * )} HydraSubMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Init"
+ * }} HydraInitMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Abort"
+ * }} HydraAbortMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "NewTx"
+ *   transaction: HydraTx
+ * }} HydraNewTxMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Recover"
+ *   recoverTxId: string
+ * }} HydraRecoverMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Decommit"
+ *   decommitTx: HydraTx
+ * }} HydraDecommitMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Close"
+ * }} HydraCloseMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Contest"
+ * }} HydraContestMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "Fanout"
+ * }} HydraFanoutMessage
+ */
+
+/**
+ * @typedef {{
+ *   tag: "SideLoadSnapshot"
+ * }} HydraSideLoadSnapshotMessage
+ */
+
+/**
+ * @typedef {(
+ *   HydraInitMessage
+ *   | HydraAbortMessage
+ *   | HydraNewTxMessage
+ *   | HydraRecoverMessage
+ *   | HydraDecommitMessage
+ *   | HydraCloseMessage
+ *   | HydraContestMessage
+ *   | HydraFanoutMessage
+ *   | HydraSideLoadSnapshotMessage
+ * )} HydraPubMessage
+ */
+
+/**
+ * @typedef {{
+ *   onReceive?: (message: HydraSubMessage) => void
+ * }} HydraClientOptions
+ */
+
+/**
+ * @typedef {object} HydraClient
+ * @prop {HydraClientOptions} options
+ * @prop {number} now
+ * @prop {(message: HydraPubMessage) => void} sendMessage
+ * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
+ * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
+ * @prop {(tx: Tx, description?: string) => Promise<TxId>} submitTx
+ */
+
+/**
  * @typedef {object} KoiosV0Client
  * Koios network interface.
  *
@@ -502,6 +995,29 @@ export {
 /**
  * @typedef {object} ReadonlyRefScriptRegistry
  * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgramV2} | undefined>} find
+ */
+
+/**
+ * @typedef {object} ReadonlyWallet
+ * An interface type for a readonly wallet that manages a user's UTxOs and addresses.
+ *
+ * @prop {() => Promise<boolean>} isMainnet
+ * Returns `true` if the wallet is connected to the mainnet.
+ *
+ * @prop {Promise<Address[]>} usedAddresses
+ * Returns a list of addresses which already contain UTxOs.
+ *
+ * @prop {Promise<Address[]>} unusedAddresses
+ * Returns a list of unique unused addresses which can be used to send UTxOs to with increased anonimity.
+ *
+ * @prop {Promise<TxInput[]>} utxos
+ * Returns a list of all the utxos controlled by the wallet.
+ *
+ * @prop {Promise<TxInput[]>} collateral
+ * Returns a list of utxos suitable for use as collateral
+ *
+ * @prop {Promise<StakingAddress[]>} stakingAddresses
+ * Returns a list of the reward addresses.
  */
 
 /**
@@ -897,29 +1413,6 @@ export {
  */
 
 /**
- * @typedef {object} ReadonlyWallet
- * An interface type for a readonly wallet that manages a user's UTxOs and addresses.
- *
- * @prop {() => Promise<boolean>} isMainnet
- * Returns `true` if the wallet is connected to the mainnet.
- *
- * @prop {Promise<Address[]>} usedAddresses
- * Returns a list of addresses which already contain UTxOs.
- *
- * @prop {Promise<Address[]>} unusedAddresses
- * Returns a list of unique unused addresses which can be used to send UTxOs to with increased anonimity.
- *
- * @prop {Promise<TxInput[]>} utxos
- * Returns a list of all the utxos controlled by the wallet.
- *
- * @prop {Promise<TxInput[]>} collateral
- * Returns a list of utxos suitable for use as collateral
- *
- * @prop {Promise<StakingAddress[]>} stakingAddresses
- * Returns a list of the reward addresses.
- */
-
-/**
  * @typedef {object} Wallet
  * An interface type for a wallet that manages a user's UTxOs and addresses.
  *
@@ -1026,4 +1519,20 @@ export {
  * @prop {W extends Wallet ? (tx: Tx) => Promise<TxId> : never} submitTx
  * Submits a transaction to the blockchain and returns the id of that transaction upon success.
  * Only available if the underlying wallet isn't a ReadonlyWallet
+ */
+
+/**
+ * @typedef {{
+ *   addEventListener(kind: "open" | "error", callback: (event: Event) => void): void
+ *   addEventListener(kind: "message", callback: (event: MessageEvent) => void): void
+ *   send(msg: string): void
+ * }} WebSocketI
+ * Interface for the builtin NodeJS and builtin Browser WebSocket instances
+ */
+
+/**
+ * @typedef {{
+ *   new(url: string): WebSocketI
+ * }} WebSocketConstructor
+ * Interface for the builtin NodeJS and builtin Browser WebSocket classes
  */
