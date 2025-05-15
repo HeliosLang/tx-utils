@@ -53,10 +53,7 @@ const defaultOptions = {
  * @param {HydraClientOptions} [options]
  * @returns {HydraClient}
  */
-export function makeHydraClient(
-    ws,
-    options = defaultOptions
-) {
+export function makeHydraClient(ws, options = defaultOptions) {
     return new HydraClientImpl(ws, options)
 }
 
@@ -85,7 +82,7 @@ class HydraClientImpl {
 
     /**
      * @type {Promise<import("@helios-lang/ledger").NetworkParams>}
-     * 
+     *
      * TODO: might need to do async parameters fetch during init, somewhere
      */
     parameters

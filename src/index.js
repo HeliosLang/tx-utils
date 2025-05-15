@@ -916,7 +916,6 @@ export {
  * )} HydraPubMessage
  */
 
-
 /**
  * @typedef {{
  *   isForMainnet: boolean,
