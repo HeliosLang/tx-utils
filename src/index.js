@@ -744,7 +744,7 @@ export {
  *   utxoToDecommit: Record<string, HydraTxOutput>
  *   seq: number
  *   timestamp: string
- * }} HydraDecommiteApprovedMessage
+ * }} HydraDecommitApprovedMessage
  */
 
 /**
@@ -835,7 +835,7 @@ export {
  *   | HydraIgnoredHeadInitializingMessage
  *   | HydraDecommitInvalidMessage
  *   | HydraDecommitRequestedMessage
- *   | HydraDecommiteApprovedMessage
+ *   | HydraDecommitApprovedMessage
  *   | HydraDecommitFinalizedMessage
  *   | HydraCommitRecordedMessage
  *   | HydraCommitApprovedMessage
@@ -916,9 +916,15 @@ export {
  * )} HydraPubMessage
  */
 
+
 /**
  * @typedef {{
+ *   isForMainnet: boolean,
  *   onReceive?: (message: HydraSubMessage) => void
+ *   hostname?: string,
+ *   httpPort?: number,
+ *   wsPort?: number,
+ *   secure?: boolean
  * }} HydraClientOptions
  */
 
@@ -930,6 +936,9 @@ export {
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
  * @prop {(tx: Tx, description?: string) => Promise<TxId>} submitTx
+ * @prop {() => boolean} isMainnet
+ * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo
+ * @prop {Promise<NetworkParams>} parameters
  */
 
 /**
