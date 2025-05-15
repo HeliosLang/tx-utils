@@ -31,7 +31,7 @@ import {
  *   HydraSubMessage,
  *   HydraTxOutput,
  *   WebSocketI,
- *   WebSocketConstructor
+ *   WebSocketConstructor,
  * } from "../index.js"
  */
 
@@ -39,12 +39,24 @@ const DEFAULT_WS_PORT = 4001
 const DEFAULT_HTTP_PORT = 4001
 const LOCALHOST = "127.0.0.1"
 
+/** @type {HydraClientOptions} */
+const defaultOptions = {
+    isForMainnet: false,
+    hostname: LOCALHOST,
+    httpPort: DEFAULT_HTTP_PORT,
+    wsPort: DEFAULT_WS_PORT,
+    secure: false
+}
+
 /**
  * @param {WebSocketConstructor} ws
- * @param {HydraClientOptions} options
+ * @param {HydraClientOptions} [options]
  * @returns {HydraClient}
  */
-export function makeHydraClient(ws, options = {}) {
+export function makeHydraClient(
+    ws,
+    options = defaultOptions
+) {
     return new HydraClientImpl(ws, options)
 }
 
@@ -55,16 +67,28 @@ export function makeHydraClient(ws, options = {}) {
 class HydraClientImpl {
     /**
      * @private
-     * @readonly
-     * @type {WebSocketI}
+     * @type {WebSocketConstructor}
      */
-    socket
+    WS
 
     /**
      * @readonly
      * @type {HydraClientOptions}
      */
     options
+
+    /**
+     * @private
+     * @type {WebSocketI}
+     */
+    socket
+
+    /**
+     * @type {Promise<import("@helios-lang/ledger").NetworkParams>}
+     * 
+     * TODO: might need to do async parameters fetch during init, somewhere
+     */
+    parameters
 
     // TODO: maintain a snapshot of the UTXO in-memory for faster access, and event-driven abilities
     ///**
@@ -88,19 +112,47 @@ class HydraClientImpl {
     connected
 
     /**
-     * @param {WebSocketConstructor} WS
-     * @param {HydraClientOptions} [options]
+     * @private
+     * @type {((message: HydraSubMessage) => void)[]}
      */
-    constructor(WS, options = {}) {
-        this.socket = new WS(`ws://${LOCALHOST}:${DEFAULT_WS_PORT}`)
-        this.options = options
+    asyncListeners
+
+    /**
+     * @param {WebSocketConstructor} WS
+     * @param {HydraClientOptions} options
+     */
+    constructor(WS, options) {
+        this.WS = WS
+        const opts = (this.options = {
+            ...defaultOptions,
+            ...options
+        })
         this.connected = false
+        this.socket = this.initWebSocket()
         this.outgoing = []
 
         //this.snapshot = makeUTXOSnapshot()
 
-        // TODO: connection persistence
-        this.socket.addEventListener("open", (event) => {
+        // TODO: maintain a UTXO snapshot
+    }
+
+    /**
+     * @private
+     * @returns {WebSocketI}
+     */
+    initWebSocket() {
+        if (this.socket) {
+            this.connected = false
+            console.info("Reconnecting HydraClient websocket...")
+        }
+        const { hostname, httpPort, wsPort, secure } = this.options
+        const connection = new this.WS(
+            `${secure ? "wss" : "ws"}://${hostname}:${wsPort}`
+        )
+        this.socket = connection
+
+        connection.addEventListener("error", this.initWebSocket.bind(this))
+        connection.addEventListener("open", (event) => {
             let message = this.outgoing.shift()
 
             while (message) {
@@ -112,11 +164,10 @@ class HydraClientImpl {
             this.connected = true
         })
 
-        this.socket.addEventListener("message", (event) => {
+        connection.addEventListener("message", (event) => {
             this.receiveMessage(JSON.parse(event.data))
         })
-
-        // TODO: maintain a UTXO snapshot
+        return connection
     }
 
     /**
@@ -147,6 +198,11 @@ class HydraClientImpl {
         if (this.options.onReceive) {
             this.options.onReceive(message)
         }
+        if (this.asyncListeners.length > 0) {
+            this.asyncListeners.forEach((listener) => {
+                listener(message)
+            })
+        }
     }
 
     /**
@@ -154,7 +210,8 @@ class HydraClientImpl {
      * @returns {Promise<TxInput[]>}
      */
     async fetchUTXOs() {
-        const url = `http://${LOCALHOST}:${DEFAULT_HTTP_PORT}/snapshot/utxo`
+        const { hostname, httpPort, secure } = this.options
+        const url = `http${secure ? "s" : ""}://${hostname}:${httpPort}/snapshot/utxo`
 
         const response = await fetch(url, {
             method: "GET",
@@ -185,6 +242,23 @@ class HydraClientImpl {
     }
 
     /**
+     * @param {TxOutputId} id
+     * @returns {Promise<boolean>}
+     */
+    async hasUtxo(id) {
+        const allUtxos = await this.fetchUTXOs()
+
+        return allUtxos.some((utxo) => utxo.id.isEqual(id))
+    }
+
+    /**
+     * @returns {boolean}
+     */
+    isMainnet() {
+        return !!this.options.isForMainnet
+    }
+
+    /**
      * @param {Address} addr
      * @returns {Promise<TxInput[]>}
      */
@@ -206,6 +280,36 @@ class HydraClientImpl {
         const txId = tx.id()
 
         // TODO: how to await?
+        let resolve, reject
+        const promise = new Promise((res, rej) => {
+            resolve = res
+            reject = rej
+        })
+        /**
+         * @param {HydraSubMessage} event
+         */
+        const listener = (event) => {
+            console.log(
+                "seeking matched event for txId: " + txId.toHex(),
+                event
+            )
+
+            // if (...matches) {
+            // i.e. TxValid, TxInvalid, CommandFailed?
+            // probably not PostTxOnChainFailed - looks like an error about main-chain txs
+            //       ... do the right thing
+            //  call resolve(txId) or reject()
+            //      cleanup()
+            //   }
+        }
+
+        this.asyncListeners.push(listener)
+        const cleanup = () => {
+            this.asyncListeners = this.asyncListeners.filter(
+                (l) => l !== listener
+            )
+        }
+
         this.sendMessage({
             tag: "NewTx",
             transaction: {
@@ -215,8 +319,7 @@ class HydraClientImpl {
                 txId: txId.toHex()
             }
         })
-
-        return txId
+        return promise
     }
 }
 
