@@ -364,7 +364,7 @@ class BlockfrostV0ClientImpl {
 
     /**
      * Note: this requires two API calls to blockfrost, because we also need information about the tip
-     * @returns {Promise<NetworkParams>}
+     * @type {Promise<NetworkParams>}
      */
     get parameters() {
         return (async () => {

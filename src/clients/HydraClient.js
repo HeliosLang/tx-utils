@@ -13,6 +13,12 @@ import {
     UtxoNotFoundError
 } from "@helios-lang/ledger"
 import {
+    check,
+    expectArray,
+    expectDefined,
+    expectNumber
+} from "@helios-lang/type-utils"
+import {
     decodeUplcData,
     decodeUplcProgramV1FromCbor,
     decodeUplcProgramV2FromCbor,
@@ -20,8 +26,17 @@ import {
 } from "@helios-lang/uplc"
 
 /**
- * @import { Address, AssetClass, Tx, TxId, TxInput, TxOutputId, TxOutputDatum, Value } from "@helios-lang/ledger"
- * @import { JsonSafe } from "@helios-lang/type-utils"
+ * @import {
+ *   Address,
+ *   AssetClass,
+ *   NetworkParams,
+ *   Tx,
+ *   TxId,
+ *   TxInput,
+ *   TxOutputId,
+ *   TxOutputDatum,
+ *   Value
+ * } from "@helios-lang/ledger"
  * @import { UplcProgramV1, UplcProgramV2 } from "@helios-lang/uplc"
  * @import {
  *   HydraClient,
@@ -80,13 +95,6 @@ class HydraClientImpl {
      */
     socket
 
-    /**
-     * @type {Promise<import("@helios-lang/ledger").NetworkParams>}
-     *
-     * TODO: might need to do async parameters fetch during init, somewhere
-     */
-    parameters
-
     // TODO: maintain a snapshot of the UTXO in-memory for faster access, and event-driven abilities
     ///**
     // * @private
@@ -120,10 +128,10 @@ class HydraClientImpl {
      */
     constructor(WS, options) {
         this.WS = WS
-        const opts = (this.options = {
+        this.options = {
             ...defaultOptions,
             ...options
-        })
+        }
         this.connected = false
         this.socket = this.initWebSocket()
         this.outgoing = []
@@ -168,10 +176,149 @@ class HydraClientImpl {
     }
 
     /**
+     * @private
+     * @type {string}
+     */
+    get httpBaseUrl() {
+        const { hostname, httpPort, secure } = this.options
+        return `http${secure ? "s" : ""}://${hostname}:${httpPort}`
+    }
+
+    /**
      * @type {number}
      */
     get now() {
         return Date.now()
+    }
+
+    /**
+     * @type {Promise<NetworkParams>}
+     */
+    get parameters() {
+        return (async () => {
+            // what about chain slot/time ?
+
+            const response = await fetch(
+                `${this.httpBaseUrl}/protocol-parameters`,
+                {
+                    method: "GET"
+                }
+            )
+
+            const rawParams = /** @type {HydraProtocolParams} */ (
+                await response.json()
+            )
+
+            /**
+             * @type {NetworkParams}
+             */
+            const networkParams = {
+                txFeeFixed: expectNumber(
+                    expectDefined(
+                        rawParams.txFeeFixed?.lovelace,
+                        "Hydra protocol params: txFeeFixed.lovelace undefined"
+                    ),
+                    "Hydra protocol params: txFeeFixed.lovelace isn't a number"
+                ),
+                txFeePerByte: expectNumber(
+                    expectDefined(
+                        rawParams.txFeePerByte,
+                        "Hydra protocol params: txFeePerByte undefined"
+                    ),
+                    "Hydra protocol params: txFeePerByte isn't a number"
+                ),
+                exMemFeePerUnit: expectNumber(
+                    expectDefined(
+                        rawParams.executionUnitPrices?.memory,
+                        "Hydra protocol params: executionUnitPrices.memory undefined"
+                    ),
+                    "Hydra protocol params: executionUnitPrices.memory isn't a number"
+                ),
+                exCpuFeePerUnit: expectNumber(
+                    expectDefined(
+                        rawParams.executionUnitPrices?.cpu,
+                        "Hydra protocol params: executionUnitPrices.cpu undefined"
+                    ),
+                    "Hydra protocol params: executionUnitPrices.cpu isn't a number"
+                ),
+                utxoDepositPerByte: expectNumber(
+                    expectDefined(
+                        rawParams.utxoCostPerByte,
+                        "Hydra protocol params: utxoCostPerByte undefined"
+                    ),
+                    "Hydra protocol params: utxoCostPerByte isn't a number"
+                ),
+                refScriptsFeePerByte: 0, // has Hydra been updated to also work with this parameter?
+                collateralPercentage: expectNumber(
+                    expectDefined(
+                        rawParams.collateralPercentage,
+                        "Hydra protocol params: collateralPercentage undefined"
+                    ),
+                    "Hydra protocol params: collateralPercentage isn't a number"
+                ),
+                maxCollateralInputs: expectNumber(
+                    expectDefined(
+                        rawParams.maxCollateralInputs,
+                        "Hydra protocol params: maxCollateralInputs undefined"
+                    ),
+                    "Hydra protocol params: maxCollateralInputs isn't a number"
+                ),
+                maxTxExMem: expectNumber(
+                    expectDefined(
+                        rawParams.maxTxExecutionUnits?.memory,
+                        "Hydra protocol params: maxTxExecutionUnits.memory undefined"
+                    ),
+                    "Hydra protocol params: maxTxExecutionUnits.memory isn't a number"
+                ),
+                maxTxExCpu: expectNumber(
+                    expectDefined(
+                        rawParams.maxTxExecutionUnits?.cpu,
+                        "Hydra protocol params: maxTxExecutionUnits.cpu undefined"
+                    ),
+                    "Hydra protocol params: maxTxExecutionUnits.cpu isn't a number"
+                ),
+                maxTxSize: expectNumber(
+                    expectDefined(
+                        rawParams.maxTxSize,
+                        "Hydra protocol params: maxTxSize undefined"
+                    ),
+                    "Hydra protocol params: maxTxSize isn't a number"
+                ),
+                secondsPerSlot: 1, // can we get this information from Hydra?
+                stakeAddrDeposit: expectNumber(
+                    expectDefined(
+                        rawParams.stakeAddressDeposit?.lovelace,
+                        "Hydra protocol params: stakeAddressDeposit.lovelace undefined"
+                    ),
+                    "Hydra protocol params: stakeAddressDeposit.lovelace isn't a number"
+                ),
+                refTipSlot: 0,
+                refTipTime: 0,
+                costModelParamsV1: expectArray(check(expectNumber))(
+                    expectDefined(
+                        rawParams.costModels?.PlutusV1,
+                        "Hydra protocol params: costModels.PlutusV1 undefined"
+                    ),
+                    "Hydra protocol params: costModels.PlutusV1 isn't a number array"
+                ),
+                costModelParamsV2: expectArray(check(expectNumber))(
+                    expectDefined(
+                        rawParams.costModels?.PlutusV2,
+                        "Hydra protocol params: costModels.PlutusV1 undefined"
+                    ),
+                    "Hydra protocol params: costModels.PlutusV1 isn't a number array"
+                ),
+                costModelParamsV3: expectArray(check(expectNumber))(
+                    expectDefined(
+                        rawParams.costModels?.PlutusV3,
+                        "Hydra protocol params: costModels.PlutusV1 undefined"
+                    ),
+                    "Hydra protocol params: costModels.PlutusV1 isn't a number array"
+                )
+            }
+
+            return networkParams
+        })()
     }
 
     /**
@@ -207,8 +354,7 @@ class HydraClientImpl {
      * @returns {Promise<TxInput[]>}
      */
     async fetchUTXOs() {
-        const { hostname, httpPort, secure } = this.options
-        const url = `http${secure ? "s" : ""}://${hostname}:${httpPort}/snapshot/utxo`
+        const url = `${this.httpBaseUrl}/snapshot/utxo`
 
         const response = await fetch(url, {
             method: "GET",
@@ -412,3 +558,49 @@ function convertHydraValueToValue(rawValue) {
 
     return makeValue(lovelace, makeAssets(assets))
 }
+
+/**
+ * @typedef {number} LargeInt
+ */
+
+/**
+ * What is `Restricted Any`??
+ * @typedef {{lovelace: number}} RestrictedAnyLovelace
+ * @typedef {{memory: number, cpu: number}} RestrictedAnyCost
+ */
+
+/**
+ * Not used externally (immediately converted to NetworkParams)
+ * @typedef {{
+ *   protocolVersion: {
+ *     major: number
+ *     minor: number
+ *     patch?: number
+ *   }
+ *   maxBlockBodySize: number
+ *   maxBlockHeaderSize: number
+ *   maxTxSize: number
+ *   txFeeFixed: RestrictedAnyLovelace
+ *   txFeePerByte: LargeInt
+ *   stakeAddressDeposit: RestrictedAnyLovelace
+ *   stakePoolDeposit: RestrictedAnyLovelace
+ *   minPoolCost: RestrictedAnyLovelace
+ *   poolRetireMaxEpoch: LargeInt
+ *   stakePoolTargetNum: number
+ *   poolPledeInfluence: number
+ *   monetaryExpansion: number
+ *   treasuryCut: number
+ *   costModels: {
+ *     PlutusV1: number[]
+ *     PlutusV2: number[]
+ *     PlutusV3: number[]
+ *   }
+ *   executionUnitPrices: RestrictedAnyCost
+ *   maxTxExecutionUnits: RestrictedAnyCost
+ *   maxBlockExecutionUnits: RestrictedAnyCost
+ *   maxValueSize: number
+ *   collateralPercentage: number
+ *   maxCollateralInputs: number
+ *   utxoCostPerByte: RestrictedAnyLovelace
+ * }} HydraProtocolParams
+ */
