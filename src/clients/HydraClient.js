@@ -135,7 +135,7 @@ class HydraClientImpl {
         this.connected = false
         this.socket = this.initWebSocket()
         this.outgoing = []
-
+        this.asyncListeners = []
         //this.snapshot = makeUTXOSnapshot()
 
         // TODO: maintain a UTXO snapshot
@@ -215,7 +215,7 @@ class HydraClientImpl {
             const networkParams = {
                 txFeeFixed: expectNumber(
                     expectDefined(
-                        rawParams.txFeeFixed?.lovelace,
+                        rawParams.txFeeFixed,
                         "Hydra protocol params: txFeeFixed.lovelace undefined"
                     ),
                     "Hydra protocol params: txFeeFixed.lovelace isn't a number"
@@ -229,14 +229,14 @@ class HydraClientImpl {
                 ),
                 exMemFeePerUnit: expectNumber(
                     expectDefined(
-                        rawParams.executionUnitPrices?.memory,
+                        rawParams.executionUnitPrices?.priceMemory,
                         "Hydra protocol params: executionUnitPrices.memory undefined"
                     ),
                     "Hydra protocol params: executionUnitPrices.memory isn't a number"
                 ),
                 exCpuFeePerUnit: expectNumber(
                     expectDefined(
-                        rawParams.executionUnitPrices?.cpu,
+                        rawParams.executionUnitPrices?.priceSteps,
                         "Hydra protocol params: executionUnitPrices.cpu undefined"
                     ),
                     "Hydra protocol params: executionUnitPrices.cpu isn't a number"
@@ -272,7 +272,7 @@ class HydraClientImpl {
                 ),
                 maxTxExCpu: expectNumber(
                     expectDefined(
-                        rawParams.maxTxExecutionUnits?.cpu,
+                        rawParams.maxTxExecutionUnits?.steps,
                         "Hydra protocol params: maxTxExecutionUnits.cpu undefined"
                     ),
                     "Hydra protocol params: maxTxExecutionUnits.cpu isn't a number"
@@ -287,7 +287,7 @@ class HydraClientImpl {
                 secondsPerSlot: 1, // can we get this information from Hydra?
                 stakeAddrDeposit: expectNumber(
                     expectDefined(
-                        rawParams.stakeAddressDeposit?.lovelace,
+                        rawParams.stakeAddressDeposit,
                         "Hydra protocol params: stakeAddressDeposit.lovelace undefined"
                     ),
                     "Hydra protocol params: stakeAddressDeposit.lovelace isn't a number"
@@ -364,7 +364,6 @@ class HydraClientImpl {
         })
 
         const obj = await response.json()
-
         return convertHydraTxOutputsToTxInputs(/** @type {any} */ (obj))
     }
 
@@ -564,9 +563,9 @@ function convertHydraValueToValue(rawValue) {
  */
 
 /**
- * What is `Restricted Any`??
- * @typedef {{lovelace: number}} RestrictedAnyLovelace
- * @typedef {{memory: number, cpu: number}} RestrictedAnyCost
+ * @typedef {number} LovelaceOnly
+ * @typedef {{priceMemory: LovelaceOnly, priceSteps: LovelaceOnly}} CostUnits
+ * @typedef {{memory: LovelaceOnly, steps: LovelaceOnly}} MaxCostUnits
  */
 
 /**
@@ -580,14 +579,14 @@ function convertHydraValueToValue(rawValue) {
  *   maxBlockBodySize: number
  *   maxBlockHeaderSize: number
  *   maxTxSize: number
- *   txFeeFixed: RestrictedAnyLovelace
- *   txFeePerByte: LargeInt
- *   stakeAddressDeposit: RestrictedAnyLovelace
- *   stakePoolDeposit: RestrictedAnyLovelace
- *   minPoolCost: RestrictedAnyLovelace
+ *   txFeeFixed: LovelaceOnly
+ *   txFeePerByte: LovelaceOnly
+ *   stakeAddressDeposit: LovelaceOnly
+ *   stakePoolDeposit: LovelaceOnly
+ *   minPoolCost: LovelaceOnly
  *   poolRetireMaxEpoch: LargeInt
  *   stakePoolTargetNum: number
- *   poolPledeInfluence: number
+ *   poolPledgeInfluence: number
  *   monetaryExpansion: number
  *   treasuryCut: number
  *   costModels: {
@@ -595,12 +594,12 @@ function convertHydraValueToValue(rawValue) {
  *     PlutusV2: number[]
  *     PlutusV3: number[]
  *   }
- *   executionUnitPrices: RestrictedAnyCost
- *   maxTxExecutionUnits: RestrictedAnyCost
- *   maxBlockExecutionUnits: RestrictedAnyCost
- *   maxValueSize: number
+ *   executionUnitPrices: CostUnits
+ *   maxTxExecutionUnits: MaxCostUnits
+ *   maxBlockExecutionUnits: MaxCostUnits
+ *   maxValueSize: LargeInt
  *   collateralPercentage: number
  *   maxCollateralInputs: number
- *   utxoCostPerByte: RestrictedAnyLovelace
+ *   utxoCostPerByte: LovelaceOnly
  * }} HydraProtocolParams
  */
