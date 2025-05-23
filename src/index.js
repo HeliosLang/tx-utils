@@ -1122,6 +1122,13 @@ export {
  *
  * @prop {TxWitnessesEncodingConfig} [witnessesEncodingConfig]
  * Optional encoding confg for TxWitnesses
+ *
+ * @prop {TxOutput} [changeOutput]
+ * Optional changeOutput for any remaining lovelace during balancing.
+ * Specifying this avoids the creation of an additional TxOutput only for the change.
+ *
+ * If the explicit changeOutput was already previously as a regular output, it isn't added again.
+ * If the explicit changeOutput wasn't previously added, it is added as a regular output.
  */
 
 /**

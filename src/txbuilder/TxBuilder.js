@@ -408,7 +408,8 @@ class TxBuilderImpl {
             babelFeeAgent ? babelFeeAgent.address : changeAddress,
             babelFeeAgent ? babelFeeAgent.utxos.slice() : spareUtxos.slice(),
             fee,
-            config.allowDirtyChangeOutput ?? false
+            config.allowDirtyChangeOutput ?? false,
+            config.changeOutput
         )
 
         // returns 0n if babelFeeAgent is undefined
@@ -1727,7 +1728,7 @@ class TxBuilderImpl {
                     })
                 })
 
-                // If we are here and have No assets, they we're done
+                // If we are here and have No assets, then we're done
                 if (!changeAssets.isZero()) {
                     const output = makeTxOutput(
                         changeAddress,
@@ -1854,18 +1855,41 @@ class TxBuilderImpl {
      * @param {TxInput[]} spareUtxos - used when there are yet enough inputs to cover everything (eg. due to min output lovelace requirements, or fees)
      * @param {bigint} fee
      * @param {boolean} allowDirtyChange - allow the change TxOutput to contain assets
+     * @param {TxOutput | undefined} [explicitChangeOutput]
      * @returns {TxOutput} - change output, will be corrected once the final fee is known
      */
-    balanceLovelace(params, changeAddress, spareUtxos, fee, allowDirtyChange) {
+    balanceLovelace(
+        params,
+        changeAddress,
+        spareUtxos,
+        fee,
+        allowDirtyChange,
+        explicitChangeOutput = undefined
+    ) {
         // don't include the changeOutput in this value
         let nonChangeOutputValue = this.sumOutputValue()
 
-        // assume a change output is always needed
-        const changeOutput = makeTxOutput(changeAddress, makeValue(0n))
+        let explicitChangeOutputAlreadyAdded = false
+        if (explicitChangeOutput) {
+            explicitChangeOutputAlreadyAdded = this._outputs.some(
+                (o) => o == explicitChangeOutput
+            )
 
+            if (explicitChangeOutputAlreadyAdded) {
+                nonChangeOutputValue = nonChangeOutputValue.subtract(
+                    explicitChangeOutput.value
+                )
+            }
+        }
+
+        // assume a change output is always needed
+        const changeOutput =
+            explicitChangeOutput ?? makeTxOutput(changeAddress, makeValue(0n))
         changeOutput.correctLovelace(params)
 
-        this.addOutput(changeOutput)
+        if (!explicitChangeOutputAlreadyAdded) {
+            this.addOutput(changeOutput)
+        }
 
         const minLovelace = changeOutput.value.lovelace
 
@@ -1937,7 +1961,12 @@ class TxBuilderImpl {
             )
         }
 
-        changeOutput.value = diff
+        // make sure the assets of an expliticChangeOutput
+        changeOutput.value = diff.add(
+            explicitChangeOutput
+                ? makeValue(0n, explicitChangeOutput.value.assets)
+                : makeValue(0n)
+        )
 
         return changeOutput
     }

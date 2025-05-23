@@ -3,6 +3,16 @@ import { strictEqual } from "node:assert"
 import { decodeTx, makeTxInput, makeTxOutput } from "@helios-lang/ledger"
 import { makeTxBuilder } from "./TxBuilder.js"
 
+const wallet1 =
+    "addr_test1vzzcg26lxj3twnnx889lrn60pqn0z3km2yahhsz0fvpyxdcj5qp8w"
+const wallet2 =
+    "addr_test1vqzhgmkqsyyzxthk7vzxet4283wx8wwygu9nq0v94mdldxs0d56ku"
+
+const input1 = makeTxInput(
+    "d4b22d33611fb2b3764080cb349b3f12d353aef1d4319ee33e44594bbebe5e83#0",
+    makeTxOutput(wallet1, 10_000_000_000n)
+)
+
 describe("basic TxBuilder", () => {
     /**
      * send 10 tAda on preview net from wallet1 to wallet 2
@@ -17,15 +27,6 @@ describe("basic TxBuilder", () => {
     const signedRef = decodeTx(signedRefHex)
 
     it("building basic tx leads to lower or same fee than cardano-cli", async () => {
-        const wallet1 =
-            "addr_test1vzzcg26lxj3twnnx889lrn60pqn0z3km2yahhsz0fvpyxdcj5qp8w"
-        const wallet2 =
-            "addr_test1vqzhgmkqsyyzxthk7vzxet4283wx8wwygu9nq0v94mdldxs0d56ku"
-
-        const input1 = makeTxInput(
-            "d4b22d33611fb2b3764080cb349b3f12d353aef1d4319ee33e44594bbebe5e83#0",
-            makeTxOutput(wallet1, 10_000_000_000n)
-        )
         const tx = await makeTxBuilder({ isMainnet: false })
             .spendUnsafe(input1)
             .payUnsafe(wallet2, 10_000_000n)
@@ -38,5 +39,21 @@ describe("basic TxBuilder", () => {
         strictEqual(tx.body.fee <= signedRef.body.fee, true)
 
         // the txId will sadly not be the same because Helios txs in general have slightly lower fees than those produced by cardano-cli
+    })
+
+    it("single input and single output", async () => {
+        const tx = await makeTxBuilder({ isMainnet: false })
+            .spendUnsafe(input1)
+            .build({
+                changeAddress: wallet1,
+                changeOutput: makeTxOutput(wallet2, 123_123n)
+            })
+
+        strictEqual(tx.body.inputs.length, 1)
+        strictEqual(tx.body.outputs.length, 1)
+        strictEqual(
+            tx.body.inputs[0].value.lovelace,
+            tx.body.outputs[0].value.lovelace + tx.body.fee
+        )
     })
 })
