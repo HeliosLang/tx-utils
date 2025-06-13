@@ -1,9 +1,11 @@
-import { bytesToHex } from "@helios-lang/codec-utils"
+import { bytesToHex, hexToBytes } from "@helios-lang/codec-utils"
 import {
+    makeAssetClass,
     makeAssets,
     makeDatumHash,
     makeHashedTxOutputDatum,
     makeInlineTxOutputDatum,
+    makeMintingPolicyHash,
     makeTxInput,
     makeTxOutput,
     makeValue,
@@ -545,14 +547,19 @@ function convertHydraValueToValue(rawValue) {
      */
     const assets = []
 
-    for (let key in rawValue) {
-        if (key == "lovelace") {
+    for (let rawPolicy in rawValue) {
+        if (rawPolicy == "lovelace") {
             continue
         }
 
-        const ac = parseAssetClass(key)
-        const qty = BigInt(rawValue[key])
-        assets.push([ac, qty])
+        const policy = makeMintingPolicyHash(rawPolicy)
+        const tokens = rawValue[rawPolicy]
+
+        for (let rawTokenName in tokens) {
+            const ac = makeAssetClass(policy, hexToBytes(rawTokenName))
+            const qty = BigInt(tokens[rawTokenName])
+            assets.push([ac, qty])
+        }
     }
 
     return makeValue(lovelace, makeAssets(assets))

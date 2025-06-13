@@ -16,6 +16,7 @@ export {
     makeBlockfrostV0Client,
     makeCardanoClientHelper,
     makeHydraClient,
+    makeIrisClient,
     makeKoiosV0Client,
     makeReadonlyCardanoMultiClient,
     resolveBlockfrostV0Client,
@@ -465,7 +466,7 @@ export {
  *   address: string
  *   value: {
  *     lovelace: number
- *   } & Record<string, number>
+ *   } & Record<string, Record<string, number>>
  *   referenceScript: HydraRefScript | null
  *   datumHash: string | null
  *   inlineDatum: object | null
@@ -938,6 +939,17 @@ export {
  * @prop {() => boolean} isMainnet
  * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo
  * @prop {Promise<NetworkParams>} parameters
+ */
+
+/**
+ * @typedef {object} IrisClient
+ * Experimental IrisClient (REST API gateway created by Helios team)
+ * TODO: submitTx, isMainnet, hasUtxo etc..
+ *
+ * @prop {number} now
+ * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
+ * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
+ * @prop {(id: TxId) => Promise<Tx>} getTx
  */
 
 /**
