@@ -950,6 +950,7 @@ export {
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
  * @prop {(id: TxId) => Promise<Tx>} getTx
+ * @prop {(tx: Tx) => Promise<TxId>} submitTx
  */
 
 /**

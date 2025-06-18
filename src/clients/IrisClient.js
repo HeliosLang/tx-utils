@@ -1,4 +1,11 @@
-import { decodeTx, decodeTxInput, UtxoNotFoundError } from "@helios-lang/ledger"
+import { decodeMap } from "@helios-lang/cbor"
+import {
+    decodeTx,
+    decodeTxOutput,
+    decodeTxOutputId,
+    makeTxInput,
+    UtxoNotFoundError
+} from "@helios-lang/ledger"
 
 /**
  * @import {
@@ -37,6 +44,14 @@ class IrisClientImpl {
     }
 
     /**
+     * @private
+     * @type {string}
+     */
+    get baseURL() {
+        return `${this.host}/api`
+    }
+
+    /**
      * @type {number}
      */
     get now() {
@@ -48,7 +63,8 @@ class IrisClientImpl {
      * @returns {Promise<Tx>}
      */
     async getTx(id) {
-        const url = `${this.host}/tx/${id.toHex()}`
+        const url = `${this.baseURL}/tx/${id.toHex()}`
+
         const response = await fetch(url, {
             headers: {
                 Accept: "application/cbor"
@@ -85,7 +101,7 @@ class IrisClientImpl {
      * @returns {Promise<TxInput>}
      */
     async getUtxo(id) {
-        const url = `${this.host}/tx/${id.txId.toHex()}/utxo/${id.index.toString()}`
+        const url = `${this.baseURL}/tx/${id.txId.toHex()}/output/${id.index.toString()}`
 
         const response = await fetch(url, {
             headers: {
@@ -109,7 +125,14 @@ class IrisClientImpl {
 
         const cbor = Array.from(new Uint8Array(buffer))
 
-        return decodeTxInput(cbor)
+        const m = decodeMap(cbor, decodeTxOutputId, decodeTxOutput)
+        if (m.length != 1) {
+            throw new Error(
+                `IrisClient.getUtxo(): expected returned map to contain only a single entry`
+            )
+        }
+
+        return makeTxInput(id, m[0][1])
     }
 
     /**
@@ -117,7 +140,7 @@ class IrisClientImpl {
      * @returns {Promise<TxInput[]>}
      */
     async getUtxos(address) {
-        const url = `${this.host}/address/${address.toString()}/utxos`
+        const url = `${this.baseURL}/address/${address.toString()}/utxos`
 
         const response = await fetch(url, {
             headers: {
@@ -137,10 +160,39 @@ class IrisClientImpl {
 
         const buffer = await response.arrayBuffer()
 
-        const _cbor = Array.from(new Uint8Array(buffer))
+        const cbor = Array.from(new Uint8Array(buffer))
 
-        throw new Error(
-            "decoding of Iris address utxo cbor format not yet implemented"
-        )
+        const m = decodeMap(cbor, decodeTxOutputId, decodeTxOutput)
+
+        return m.map(([id, output]) => makeTxInput(id, output))
+    }
+
+    /**
+     * @param {Tx} tx
+     * @returns {Promise<TxId>}
+     */
+    async submitTx(tx) {
+        const url = `${this.baseURL}/tx`
+
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/cbor"
+            },
+            body: new Uint8Array(tx.toCbor()).buffer
+        })
+
+        if (!response.ok) {
+            throw new Error(
+                `IrisClient error in submitTx(): ${response.statusText}`
+            )
+        } else if (response.status != 200) {
+            throw new Error(
+                `IrisClient error in submitTx(): ${await response.text()}`
+            )
+        }
+
+        // TODO: get TxId from response?
+        return tx.id()
     }
 }
