@@ -943,13 +943,20 @@ export {
 
 /**
  * @typedef {object} IrisClient
- * Experimental IrisClient (REST API gateway created by Helios team)
- * TODO: submitTx, isMainnet, hasUtxo etc..
+ * Experimental IrisClient (REST API gateway created by Helios)
  *
  * @prop {number} now
+ * @prop {() => boolean} isMainnet
+ * @prop {Promise<NetworkParams>} parameters
  * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
  * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
+ * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} getUtxosWithAssetClass
+ * @prop {(assetClass: AssetClass) => Promise<{address: Address, quantity: bigint}[]>} getAddressesWithAssetClass
+ * Returns a list of addresses containing the given asset class.
+ * 
  * @prop {(id: TxId) => Promise<Tx>} getTx
+ * @prop {(id: TxId) => Promise<boolean>} hasTx
+ * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  */
 
