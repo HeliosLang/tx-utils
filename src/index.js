@@ -953,7 +953,7 @@ export {
  * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} getUtxosWithAssetClass
  * @prop {(assetClass: AssetClass) => Promise<{address: Address, quantity: bigint}[]>} getAddressesWithAssetClass
  * Returns a list of addresses containing the given asset class.
- * 
+ *
  * @prop {(id: TxId) => Promise<Tx>} getTx
  * @prop {(id: TxId) => Promise<boolean>} hasTx
  * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo

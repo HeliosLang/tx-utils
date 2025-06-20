@@ -108,7 +108,7 @@ class IrisClientImpl {
     }
 
     /**
-     * @param {TxId} id 
+     * @param {TxId} id
      * @returns {Promise<boolean>}
      */
     async hasTx(id) {
@@ -184,7 +184,7 @@ class IrisClientImpl {
 
         const response = await fetch(url, {
             headers: {
-                "Accept": "application/json"
+                Accept: "application/json"
             }
         })
 
@@ -255,7 +255,7 @@ class IrisClientImpl {
             const cbor = Array.from(new Uint8Array(buffer))
 
             throw new UtxoAlreadySpentError(
-                decodeTxInput(cbor), 
+                decodeTxInput(cbor),
                 rawConsumedBy ? makeTxId(rawConsumedBy) : undefined
             )
         } else if (!response.ok) {
@@ -270,7 +270,7 @@ class IrisClientImpl {
 
         const buffer = await response.arrayBuffer()
         const cbor = Array.from(new Uint8Array(buffer))
-        
+
         return decodeTxInput(cbor)
     }
 
@@ -305,8 +305,8 @@ class IrisClientImpl {
     }
 
     /**
-     * @param {Address} address 
-     * @param {AssetClass} assetClass 
+     * @param {Address} address
+     * @param {AssetClass} assetClass
      * @returns {Promise<TxInput[]>}
      */
     async getUtxosWithAssetClass(address, assetClass) {
