@@ -352,7 +352,7 @@ class IrisClientImpl {
 
         if (!response.ok) {
             throw new Error(
-                `IrisClient error in submitTx(): ${response.statusText}`
+                `IrisClient error in submitTx(): ${response.statusText} ${await response.text()}`
             )
         } else if (response.status != 200) {
             throw new Error(

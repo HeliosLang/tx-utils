@@ -2,19 +2,32 @@ import assert, { strictEqual } from "node:assert"
 import { describe, it } from "node:test"
 import { hexToBytes } from "@helios-lang/codec-utils"
 import {
+    addValues,
     makeAddress,
     makeAssetClass,
+    makeInlineTxOutputDatum,
     makeMintingPolicyHash,
     makeTxId,
+    makeTxInput,
+    makeTxOutputId,
+    makeValue,
     parseTxOutputId
 } from "@helios-lang/ledger"
+import { makeIntData } from "@helios-lang/uplc"
+import { makeTxChainBuilder } from "../chain/index.js"
+import { restoreRootPrivateKey } from "../keys/index.js"
+import { makeTxBuilder } from "../txbuilder/index.js"
+import { makeUnstakedSimpleWallet } from "../wallets/index.js"
 import { makeIrisClient } from "./IrisClient.js"
 
 const host = "https://ns5037712.ip-148-113-219.net"
 
+// phrase of a funded wallet
+// make empty before pushing code
+const phrase = []
+
 describe("IrisClient", async () => {
     const client = makeIrisClient(host, false)
-    //client = makeBlockfrostV0Client("preprod", "preprod0pfhlHkVoJ3Bkwn3Ap3lP1VAysoIqwFl")
 
     await it("get parameters return object with expected fields", async () => {
         const params = await client.parameters
@@ -82,7 +95,6 @@ describe("IrisClient", async () => {
 
         const utxos = await client.getUtxos(makeAddress(addr))
 
-        console.log(utxos.length)
         assert(utxos.length > 0, "expected more than 0 UTXOs, got 0")
         assert(
             utxos.every((utxo) => utxo.address.isEqual(makeAddress(addr))),
@@ -104,7 +116,11 @@ describe("IrisClient", async () => {
             makeAddress(addr),
             asset
         )
-        strictEqual(utxos.length, 1, "expected more than 0 UTXOs, got 0")
+        strictEqual(
+            utxos.length,
+            1,
+            "unexpected number of utxos at address " + addr
+        )
         assert(
             utxos.every(
                 (utxo) =>
@@ -125,7 +141,7 @@ describe("IrisClient", async () => {
 
         const addresses = await client.getAddressesWithAssetClass(asset)
 
-        strictEqual(addresses.length, 1, "expected only a single address")
+        strictEqual(addresses.length, 1, "expected exactly a single address")
 
         assert(
             addresses.every((addr) =>
@@ -137,4 +153,71 @@ describe("IrisClient", async () => {
             )
         )
     })
+
+    if (phrase.length > 0) {
+        // | n   | blockfrost | iris |
+        // | 10  | ok         | ok   |
+        // | 25  | ok         | ok   |
+        // | 50  | ok         | ok   |
+        // | 100 | ok         | ok   |
+        // | 500 | ok         | ok   |
+
+        const n = 500
+        await it(`tx chain with ${n} txs`, async () => {
+            // each tx pays everything to itself
+            const chain = makeTxChainBuilder(client)
+            const key = restoreRootPrivateKey(phrase)
+            const wallet = makeUnstakedSimpleWallet(key, chain)
+            console.log(wallet.address.toString())
+
+            // the first tx creates a ref input for the latter
+            const tx0 = await makeTxBuilder({ isMainnet: false })
+                .spendUnsafe(await wallet.utxos)
+                .payUnsafe(
+                    wallet.address,
+                    makeValue(5_000_000n),
+                    makeInlineTxOutputDatum(makeIntData(0))
+                )
+                .build({
+                    changeAddress: wallet.address
+                })
+
+            const refID = makeTxOutputId(tx0.id(), 0)
+            const ref = makeTxInput(refID, tx0.body.outputs[0])
+
+            tx0.addSignatures(await wallet.signTx(tx0))
+            await chain.submitTx(tx0)
+
+            for (let i = 1; i < n; i++) {
+                const allUtxos = (await wallet.utxos).filter(
+                    (utxo) => !utxo.id.isEqual(refID)
+                )
+
+                console.log(
+                    `Spending ${allUtxos.map((utxo) => utxo.id.toString())}`
+                )
+                const tx = await makeTxBuilder({ isMainnet: false })
+                    .refer(ref)
+                    .spendUnsafe(allUtxos)
+                    .payUnsafe(
+                        wallet.address,
+                        addValues(allUtxos).subtract(makeValue(5_000_000n))
+                    )
+                    .build({
+                        changeAddress: wallet.address
+                    })
+
+                tx.addSignatures(await wallet.signTx(tx))
+                await chain.submitTx(tx)
+            }
+
+            const txs = chain.build()
+
+            console.log(`submitting ${n} txs`)
+            for (let tx of txs.txs) {
+                const id = await client.submitTx(tx)
+                console.log("submitted " + id.toString())
+            }
+        })
+    }
 })
