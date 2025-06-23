@@ -17,7 +17,8 @@ import {
  *   Tx,
  *   TxId,
  *   TxInput,
- *   TxOutputId
+ *   TxOutputId,
+ *   Value
  * } from "@helios-lang/ledger"
  * @import { IrisClient } from "../index.js"
  */
@@ -330,6 +331,63 @@ class IrisClientImpl {
 
         const buffer = await response.arrayBuffer()
 
+        const cbor = Array.from(new Uint8Array(buffer))
+
+        return decodeList(cbor, decodeTxInput)
+    }
+
+    /**
+     * @param {Address} address
+     * @param {Value} value
+     * @param {"smallest-first" | "largest-first"} algorithm
+     * @returns {Promise<TxInput[]>}
+     */
+    async selectUtxos(address, value, algorithm = "smallest-first") {
+        const assetClasses = value.assetClasses
+        if (assetClasses.length > 1) {
+            throw new Error(
+                "doesn't yet handle more than 1 asset class besides lovelace"
+            )
+        }
+
+        const assetClass =
+            assetClasses.length == 1 ? assetClasses[0] : undefined
+        const request = {
+            lovelace: value.lovelace.toString(),
+            asset: assetClass
+                ? `${assetClass.mph.toHex()}${bytesToHex(assetClass.tokenName)}`
+                : "",
+            minQuantity: assetClass
+                ? value.assets.getAssetClassQuantity(assetClass).toString()
+                : "0",
+            algorithm
+        }
+
+        const url = `${this.baseURL}/address/${address.toString()}/utxos`
+
+        const response = await fetch(url, {
+            body: JSON.stringify(request),
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/cbor"
+            }
+        })
+
+        if (response.status == 404) {
+            throw new Error(
+                `IrisClient error in selectUtxos(): insufficient UTXOs to select from (${response.statusText})`
+            )
+        } else if (!response.ok) {
+            throw new Error(
+                `IrisClient error in selectUtxos(): (${response.statusText})`
+            )
+        } else if (response.status != 200) {
+            throw new Error(
+                `IrisClient error in selectUtxos(): ${await response.text()}`
+            )
+        }
+
+        const buffer = await response.arrayBuffer()
         const cbor = Array.from(new Uint8Array(buffer))
 
         return decodeList(cbor, decodeTxInput)

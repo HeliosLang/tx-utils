@@ -957,6 +957,9 @@ export {
  * @prop {(id: TxId) => Promise<Tx>} getTx
  * @prop {(id: TxId) => Promise<boolean>} hasTx
  * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo
+ * @prop {(address: Address, value: Value, algorithm?: "smallest-first" | "largest-first") => Promise<TxInput[]>} selectUtxos
+ * `algorithm` defaults to "smallest-first"
+ *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
  */
 
