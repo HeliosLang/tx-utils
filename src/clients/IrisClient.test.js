@@ -7,6 +7,7 @@ import {
     makeAssetClass,
     makeInlineTxOutputDatum,
     makeMintingPolicyHash,
+    makeNetworkParamsHelper,
     makeTxId,
     makeTxInput,
     makeTxOutputId,
@@ -35,6 +36,15 @@ describe("IrisClient", async () => {
         assert(
             Object.keys(params).length > 5,
             "expected at least 5 entries in network parameters"
+        )
+
+        // roundtrip time-to-slot and slot-to-time is the same
+        const helper = makeNetworkParamsHelper(params)
+        const time = 1750768620000
+        strictEqual(
+            helper.slotToTime(helper.timeToSlot(time)),
+            time,
+            "slot-to-time roundtrip not equal"
         )
     })
 
@@ -152,6 +162,23 @@ describe("IrisClient", async () => {
                 )
             )
         )
+    })
+
+    await it("getUtxosWithAssetClass() returns a known UTXO containg a datum", async () => {
+        const utxos = await client.getUtxosWithAssetClass(
+            makeAddress(
+                "addr_test1wqyp8f3s30t0kvqa3vfgq8lrhv7vtxrn9w9k9vh5s4syzacyjcr9g"
+            ),
+            makeAssetClass(
+                makeMintingPolicyHash(
+                    "1fd38a7e152b5033e6b2f45447cbb98683a7214f3ab2b71b9ffaa04b"
+                ),
+                hexToBytes("7450424720737570706c79")
+            )
+        )
+
+        assert(utxos.length == 1, "expected exactly 1 utxo")
+        console.log(utxos[0].dump())
     })
 
     if (phrase.length > 0) {

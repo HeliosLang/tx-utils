@@ -392,6 +392,7 @@ class TxBuilderImpl {
         )
 
         // balance collateral (if collateral wasn't already set manually)
+        //  changeAddress and spareUtxos are ignored if params.collateralUTXO is set
         const collateralChangeOutput = this.balanceCollateral(
             params,
             babelFeeAgent ? babelFeeAgent.address : changeAddress,
@@ -1764,12 +1765,19 @@ class TxBuilderImpl {
         if (this.addedCollatoral) {
             return this.collateralReturn
         }
+
         // don't do this step if collateral was already added explicitly outside the TxBuilder
         if (this.collateral.length > 0 || !this.hasUplcScripts()) {
             return
         }
 
         const helper = makeNetworkParamsHelper(params)
+
+        // prefer the collateral UTXO given by the params (avoids problems with transaction chaining of collateral UTXOs)
+        if (helper.defaultCollateralUTXO) {
+            this.addCollateral(helper.defaultCollateralUTXO)
+            return
+        }
 
         const minCollateral =
             (baseFee * BigInt(helper.minCollateralPct) + 100n) / 100n // integer division that rounds up
@@ -1838,6 +1846,7 @@ class TxBuilderImpl {
         collateralInputs.forEach((utxo) => {
             this.addCollateral(utxo)
         })
+
         this.addedCollatoral = true
 
         return changeOutput

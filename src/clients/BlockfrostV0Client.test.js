@@ -1,13 +1,35 @@
+import assert, { strictEqual } from "node:assert"
 import { describe, it } from "node:test"
 import { makeBlockfrostV0Client } from "./BlockfrostV0Client.js"
-import { makeTxId, parseShelleyAddress } from "@helios-lang/ledger"
-import { strict, strictEqual } from "assert"
+import {
+    makeNetworkParamsHelper,
+    makeTxId,
+    parseShelleyAddress
+} from "@helios-lang/ledger"
 
 const networkName = "preprod"
 const apiKey = "preprodYjh2RkMv6xqgWNKOBhuQ6hoazm0s0iFp"
 
 describe("BlockfrostV0Client", async () => {
     const client = makeBlockfrostV0Client(networkName, apiKey)
+
+    await it("get parameters return object with expected fields", async () => {
+        const params = await client.parameters
+
+        assert(
+            Object.keys(params).length > 5,
+            "expected at least 5 entries in network parameters"
+        )
+
+        // roundtrip time-to-slot and slot-to-time is the same
+        const helper = makeNetworkParamsHelper(params)
+        const time = 1750768620000
+        strictEqual(
+            helper.slotToTime(helper.timeToSlot(time)),
+            time,
+            "slot-to-time roundtrip not equal"
+        )
+    })
 
     await it("getTx() returns same cbor as ledger serialization", async () => {
         const txId =
