@@ -1775,7 +1775,8 @@ class TxBuilderImpl {
 
         // prefer the collateral UTXO given by the params (avoids problems with transaction chaining of collateral UTXOs)
         if (helper.defaultCollateralUTXO) {
-            this.addCollateral(helper.defaultCollateralUTXO)
+            // add as directly as possible, so the orig output doesn't need to be fetched
+            this.collateral = [helper.defaultCollateralUTXO]
             return
         }
 
