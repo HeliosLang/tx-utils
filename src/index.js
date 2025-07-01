@@ -961,6 +961,7 @@ export {
  * `algorithm` defaults to "smallest-first"
  *
  * @prop {(tx: Tx) => Promise<TxId>} submitTx
+ * tx is mutated if the server adds signatures (eg. for use of server collateral)
  */
 
 /**

@@ -1,6 +1,7 @@
 import { decodeList } from "@helios-lang/cbor"
 import { bytesToHex } from "@helios-lang/codec-utils"
 import {
+    decodeSignature,
     decodeTx,
     decodeTxInput,
     makeAddress,
@@ -31,6 +32,14 @@ import {
 export function makeIrisClient(host, isMainnet) {
     return new IrisClientImpl(host, isMainnet)
 }
+
+/**
+ * @typedef {{
+ *   txID: string
+ *   message?: string
+ *   extraSignatures?: string[]
+ * }} IrisClientSubmitTxResponse
+ */
 
 /**
  * @implements {IrisClient}
@@ -395,6 +404,8 @@ class IrisClientImpl {
 
     /**
      * @param {Tx} tx
+     * tx is mutated if the server adds signatures (eg. for use of server collateral)
+     *
      * @returns {Promise<TxId>}
      */
     async submitTx(tx) {
@@ -418,7 +429,16 @@ class IrisClientImpl {
             )
         }
 
-        // TODO: get TxId from response?
-        return tx.id()
+        const obj = /** @type {IrisClientSubmitTxResponse} */ (
+            await response.json()
+        )
+
+        if (obj.extraSignatures) {
+            for (let es of obj.extraSignatures) {
+                tx.addSignature(decodeSignature(es))
+            }
+        }
+
+        return makeTxId(obj.txID)
     }
 }
