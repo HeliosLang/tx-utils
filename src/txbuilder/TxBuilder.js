@@ -479,8 +479,8 @@ class TxBuilderImpl {
                 v1Scripts: this.v1Scripts,
                 v2Scripts: this.v2Scripts,
                 v2RefScripts: this.v2RefScripts,
-                v3Scripts: [],
-                v3RefScripts: []
+                v3Scripts: this.v3Scripts,
+                v3RefScripts: this.v3RefScripts
             }),
             true,
             metadata
@@ -1375,7 +1375,9 @@ class TxBuilderImpl {
         return (
             this.v1Scripts.length > 0 ||
             this.v2Scripts.length > 0 ||
-            this.v2RefScripts.length > 0
+            this.v2RefScripts.length > 0 ||
+            this.v3Scripts.length > 0 ||
+            this.v3RefScripts.length > 0
         )
     }
 
@@ -1555,17 +1557,25 @@ class TxBuilderImpl {
             this.v3RefScripts.push(script)
         }
 
-        // also remove from v2Scrips
+        // also remove from v3Scrips
         this.v3Scripts = this.v3Scripts.filter((s) => !equalsBytes(s.hash(), h))
     }
 
     /**
      * @private
      * @param {number[] | MintingPolicyHash | ValidatorHash | StakingValidatorHash} hash
-     * @returns {UplcProgramV1 | UplcProgramV2}
+     * @returns {UplcProgram}
      */
     getUplcScript(hash) {
         const hashBytes = Array.isArray(hash) ? hash : hash.bytes
+
+        const v3Script = this.v3Scripts
+            .concat(this.v3RefScripts)
+            .find((s) => equalsBytes(s.hash(), hashBytes))
+
+        if (v3Script) {
+            return v3Script
+        }
 
         const v2Script = this.v2Scripts
             .concat(this.v2RefScripts)
@@ -1629,7 +1639,9 @@ class TxBuilderImpl {
         return (
             this.hasV1Script(hash) ||
             this.hasV2RefScript(hash) ||
-            this.hasV2Script(hash)
+            this.hasV2Script(hash) ||
+            this.hasV3RefScript(hash) ||
+            this.hasV3Script(hash)
         )
     }
 
@@ -1665,12 +1677,32 @@ class TxBuilderImpl {
      * @param {number[]} hash
      * @returns {boolean}
      */
+    hasV3RefScript(hash) {
+        return this.v3RefScripts.some((s) => equalsBytes(s.hash(), hash))
+    }
+
+    /**
+     * @private
+     * @param {number[]} hash
+     * @returns {boolean}
+     */
+    hasV3Script(hash) {
+        return this.v3Scripts.some((s) => equalsBytes(s.hash(), hash))
+    }
+
+    /**
+     * @private
+     * @param {number[]} hash
+     * @returns {boolean}
+     */
     hasScript(hash) {
         return (
             this.hasNativeScript(hash) ||
             this.hasV1Script(hash) ||
             this.hasV2RefScript(hash) ||
-            this.hasV2Script(hash)
+            this.hasV2Script(hash) ||
+            this.hasV3RefScript(hash) ||
+            this.hasV3Script(hash)
         )
     }
 
@@ -2151,6 +2183,14 @@ class TxBuilderImpl {
 
         // filter out the ones that are known
         return allHashes.filter((h) => {
+            const v3Script = this.v3Scripts
+                .concat(this.v3RefScripts)
+                .find((s) => equalsBytes(s.hash(), h))
+
+            if (v3Script) {
+                return false
+            }
+
             const v2Script = this.v2Scripts
                 .concat(this.v2RefScripts)
                 .find((s) => equalsBytes(s.hash(), h))
@@ -2483,7 +2523,7 @@ class TxBuilderImpl {
 
     /**
      * @private
-     * @param {UplcProgramV1 | UplcProgramV2} script
+     * @param {UplcProgram} script
      * @param {Object} options
      * @param {string} options.summary
      * @param {UplcData[]} options.args
@@ -2638,6 +2678,14 @@ class TxBuilderImpl {
         }
 
         for (let s of this.v2Scripts) {
+            const found = await this.config.refScriptRegistry.find(s.hash())
+
+            if (found) {
+                this.refer(found.input)
+            }
+        }
+
+        for (let s of this.v3Scripts) {
             const found = await this.config.refScriptRegistry.find(s.hash())
 
             if (found) {
