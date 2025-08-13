@@ -2610,7 +2610,13 @@ class TxBuilderImpl {
      */
     buildScriptDataHash(params, redeemers) {
         if (redeemers.length > 0) {
-            return calcScriptDataHash(params, this.datums, redeemers)
+            return calcScriptDataHash(params, this.datums, redeemers, {
+                usesPlutusV1: this.v1Scripts.length > 0,
+                usesPlutusV2:
+                    this.v2Scripts.length > 0 || this.v2RefScripts.length > 0,
+                usesPlutusV3:
+                    this.v3Scripts.length > 0 || this.v3RefScripts.length > 0
+            })
         } else {
             return undefined
         }
