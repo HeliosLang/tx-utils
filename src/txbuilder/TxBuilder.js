@@ -46,7 +46,7 @@ import { makeUplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @import { BytesLike, IntLike } from "@helios-lang/codec-utils"
  * @import { Address, AssetClass, AssetClassLike, Assets, DatumPaymentContext, DCert, MintingContext, MintingPolicyHash, MintingPolicyHashLike, NativeScript, NetworkParams, NetworkParamsHelper, PubKeyHash, PubKeyHashLike, ShelleyAddress, ShelleyAddressLike, SpendingContext, StakingAddress, StakingAddressLike, StakingCredential, StakingContext, StakingValidatorHash, TimeLike, TokenValue, Tx, TxBody, TxInfo, TxInput, TxMetadata, TxMetadataAttr, TxOutput, TxOutputDatum, TxOutputDatumCastable, TxRedeemer, ValidatorHash, Value, ValueLike } from "@helios-lang/ledger"
  * @import { Either } from "@helios-lang/type-utils"
- * @import { CekResult, Cost, UplcLogger, UplcData, UplcProgramV1, UplcProgramV2 } from "@helios-lang/uplc"
+ * @import { CekResult, Cost, UplcLogger, UplcData, UplcProgram, UplcProgramV1, UplcProgramV2, UplcProgramV3 } from "@helios-lang/uplc"
  * @import { BabelFeeAgentOptions, ExBudgetModifier, LazyRedeemerData, TxBuilder, TxBuilderConfig, TxBuilderFinalConfig } from "../index.js"
  */
 
@@ -197,6 +197,18 @@ class TxBuilderImpl {
      * @type {UplcProgramV2[]}
      */
     v2Scripts
+
+    /**
+     * @private
+     * @type {UplcProgramV3[]}
+     */
+    v3Scripts
+
+    /**
+     * @private
+     * @type {UplcProgramV3[]}
+     */
+    v3RefScripts
 
     /**
      * @private
@@ -559,6 +571,8 @@ class TxBuilderImpl {
         this.v1Scripts = []
         this.v2RefScripts = []
         this.v2Scripts = []
+        this.v3RefScripts = []
+        this.v3Scripts = []
         this.withdrawals = []
         this.rewardingRedeemers = []
         this.certifyingRedeemers = []
@@ -679,7 +693,7 @@ class TxBuilderImpl {
     }
 
     /**
-     * @param {UplcProgramV1 | UplcProgramV2} program
+     * @param {UplcProgram} program
      * @return {TxBuilder}
      */
     attachUplcProgram(program) {
@@ -689,6 +703,9 @@ class TxBuilderImpl {
                 break
             case "PlutusScriptV2":
                 this.addV2Script(program)
+                break
+            case "PlutusScriptV3":
+                this.addV3Script(program)
                 break
             default:
                 throw new Error(`unhandled UplcProgram type`)
@@ -1035,6 +1052,8 @@ class TxBuilderImpl {
             if (refScript) {
                 if (refScript.plutusVersion == "PlutusScriptV2") {
                     this.addV2RefScript(refScript)
+                } else if (refScript.plutusVersion == "PlutusScriptV3") {
+                    this.addV3RefScript(refScript)
                 } else {
                     throw new Error(
                         "UplcProgramV1 ref scripts aren't yet handled"
@@ -1510,6 +1529,34 @@ class TxBuilderImpl {
 
         // also remove from v2Scrips
         this.v2Scripts = this.v2Scripts.filter((s) => !equalsBytes(s.hash(), h))
+    }
+
+    /**
+     * Doesn't re-add or throw an error if the script was previously added
+     * @private
+     * @param {UplcProgramV3} script
+     */
+    addV3Script(script) {
+        const h = script.hash()
+        if (!this.v3Scripts.some((prev) => equalsBytes(prev.hash(), h))) {
+            this.v3Scripts.push(script)
+        }
+    }
+
+    /**
+     * Doesn't re-add or throw an error if the script was previously added
+     * Removes the same regular script if it was added before
+     * @private
+     * @param {UplcProgramV3} script
+     */
+    addV3RefScript(script) {
+        const h = script.hash()
+        if (!this.v3RefScripts.some((prev) => equalsBytes(prev.hash(), h))) {
+            this.v3RefScripts.push(script)
+        }
+
+        // also remove from v2Scrips
+        this.v3Scripts = this.v3Scripts.filter((s) => !equalsBytes(s.hash(), h))
     }
 
     /**

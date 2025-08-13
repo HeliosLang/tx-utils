@@ -9,7 +9,6 @@ import {
     makeTxInput,
     makeTxOutput,
     makeValue,
-    parseAssetClass,
     parseShelleyAddress,
     parseTxOutputId,
     UtxoNotFoundError
@@ -39,7 +38,7 @@ import {
  *   TxOutputDatum,
  *   Value
  * } from "@helios-lang/ledger"
- * @import { UplcProgramV1, UplcProgramV2 } from "@helios-lang/uplc"
+ * @import { UplcProgram } from "@helios-lang/uplc"
  * @import {
  *   HydraClient,
  *   HydraClientOptions,
@@ -503,7 +502,7 @@ function convertHydraTxOutputToTxInput(id, output) {
             : undefined
 
     /**
-     * @type {UplcProgramV1 | UplcProgramV2 | undefined}
+     * @type {UplcProgram | undefined}
      */
     const refScript = output.referenceScript
         ? /** @param {HydraRefScript} referenceScript */ ((referenceScript) => {

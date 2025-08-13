@@ -79,7 +79,7 @@ export {
 /**
  * @import { BytesLike, IntLike } from "@helios-lang/codec-utils"
  * @import { Address, AssetClass, Assets, DatumPaymentContext, DCert, MintingContext, MintingPolicyHash, MintingPolicyHashLike, NativeScript, NetworkParams, PubKey, PubKeyHash, PubKeyHashLike, ShelleyAddress, ShelleyAddressLike, Signature, SpendingContext, SpendingCredential, StakingAddress, StakingAddressLike, StakingContext, StakingValidatorHash, TimeLike, TokenValue, Tx, TxBodyEncodingConfig, TxId, TxInfo, TxInput, TxMetadataAttr, TxOutput, TxOutputId, TxOutputDatum, TxOutputDatumCastable, TxWitnessesEncodingConfig, ValidatorHash, Value, ValueLike } from "@helios-lang/ledger"
- * @import { Cost, UplcData, UplcLogger, UplcProgramV1, UplcProgramV2 } from "@helios-lang/uplc"
+ * @import { Cost, UplcData, UplcLogger, UplcProgram } from "@helios-lang/uplc"
  */
 
 /**
@@ -1026,7 +1026,7 @@ export {
 
 /**
  * @typedef {object} ReadonlyRefScriptRegistry
- * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgramV2} | undefined>} find
+ * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgram} | undefined>} find
  */
 
 /**
@@ -1054,8 +1054,8 @@ export {
 
 /**
  * @typedef {object} RefScriptRegistry
- * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgramV2} | undefined>} find
- * @prop {(program: UplcProgramV2) => Promise<TxOutputId>} register
+ * @prop {(hash: number[]) => Promise<{input: TxInput, program: UplcProgram} | undefined>} find
+ * @prop {(program: UplcProgram) => Promise<TxOutputId>} register
  */
 
 /**
@@ -1229,7 +1229,7 @@ export {
  *   script: NativeScript
  * ) => TxBuilder} attachNativeScript
  * @prop {(
- *   program: UplcProgramV1 | UplcProgramV2
+ *   program: UplcProgram
  * ) => TxBuilder} attachUplcProgram
  *
  * @prop {(
