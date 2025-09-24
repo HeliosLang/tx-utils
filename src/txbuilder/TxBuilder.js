@@ -416,12 +416,17 @@ class TxBuilderImpl {
         this.correctOutputs(params)
 
         // balance the lovelace using maxTxFee as the fee
+        const allowDirtyChangeOutput = config.allowDirtyChangeOutput ?? false
+        const allowDirtySpareInputs =
+            config.allowDirtySpareInputs ?? allowDirtyChangeOutput
+
         const changeOutput = this.balanceLovelace(
             params,
             babelFeeAgent ? babelFeeAgent.address : changeAddress,
             babelFeeAgent ? babelFeeAgent.utxos.slice() : spareUtxos.slice(),
             fee,
-            config.allowDirtyChangeOutput ?? false,
+            allowDirtyChangeOutput,
+            allowDirtySpareInputs,
             config.changeOutput
         )
 
@@ -1941,9 +1946,24 @@ class TxBuilderImpl {
      * @private
      * @param {NetworkParams} params
      * @param {Address} changeAddress
-     * @param {TxInput[]} spareUtxos - used when there are yet enough inputs to cover everything (eg. due to min output lovelace requirements, or fees)
+     * @param {TxInput[]} spareUtxos
+     * Used when there are yet enough inputs to cover everything (eg. due to min output lovelace requirements, or fees)
+     *
      * @param {bigint} fee
-     * @param {boolean} allowDirtyChange - allow the change TxOutput to contain assets
+     * @param {boolean} allowDirtyChangeOutput
+     * Allow the change TxOutput to contain assets (if not, assets from dirty spare inputs are balanced out)
+     * It is generally recommended to keep set this to `false`
+     *
+     * @param {boolean} allowDirtySpareInputs
+     * Allow the selected spare inputs to contain assets.
+     * `allowDirtySpareInputs` allows balancing a transactions using dirty UTXOs
+     *
+     * Note:
+     *   - `allowDirtySpareInputs == false` and `allowDirtyChangeOutput == true` doesn't do anything
+     *   - `allowDirtySpareInputs == true` and `allowDirtyChangeOutput == true` can be useful when the agent wallet is dirty and is allowed to remain dirty
+     *   - `allowDirtySpareInputs == false` and `allowDirtyChangeOutput == false` limits this balancing to pure lovelace UTXOs
+     *   - `allowDirtySpreInputs == true and `allowDirtyChangeOutput == false` gradually cleans up a wallet
+     *
      * @param {TxOutput | undefined} [explicitChangeOutput]
      * @returns {TxOutput} - change output, will be corrected once the final fee is known
      */
@@ -1952,7 +1972,8 @@ class TxBuilderImpl {
         changeAddress,
         spareUtxos,
         fee,
-        allowDirtyChange,
+        allowDirtyChangeOutput,
+        allowDirtySpareInputs,
         explicitChangeOutput = undefined
     ) {
         // don't include the changeOutput in this value
@@ -2002,17 +2023,27 @@ class TxBuilderImpl {
             }
         })
 
-        // this is quite restrictive, but we really don't want to touch UTxOs containing assets just for balancing purposes
         const spareAssetUTxOs = spareUtxos.some(
             (utxo) => !utxo.value.assets.isZero()
         )
 
-        if (!allowDirtyChange) {
+        // this is quite restrictive, but we really don't want to touch UTxOs containing assets just for balancing purposes
+        // TODO: should a different boolean flag be used to allowDirtySpareInputs?
+        if (!allowDirtySpareInputs) {
             spareUtxos = spareUtxos.filter((utxo) => utxo.value.assets.isZero())
         }
 
         // use some spareUtxos if the inputValue doesn't cover the outputs and fees
         const totalOutputValue = nonChangeOutputValue.add(changeOutput.value)
+
+        // sort spareUtxos from less to more assets
+        spareUtxos = spareUtxos.slice()
+        spareUtxos.sort(
+            (a, b) =>
+                a.value.assets.assets.length - b.value.assets.assets.length
+        )
+
+        // if allowDirtyChange==true, a spare input might be added with non-lovelace assets
         while (!inputValue.isGreaterOrEqual(totalOutputValue)) {
             const spare = spareUtxos.pop()
 
@@ -2027,8 +2058,10 @@ class TxBuilderImpl {
                     inputValue = inputValue.add(spare.value)
                 }
             } else {
-                if (!allowDirtyChange && spareAssetUTxOs) {
-                    throw new Error(`UTxOs too fragmented`)
+                if (!allowDirtySpareInputs && spareAssetUTxOs) {
+                    throw new Error(
+                        `UTxOs too fragmented (hint: set allowDirtySpareInputs==true to allow balancing with dirty UTXOs)`
+                    )
                 } else {
                     throw new Error(
                         `need ${totalOutputValue.lovelace} lovelace, but only have ${inputValue.lovelace}`
@@ -2040,7 +2073,7 @@ class TxBuilderImpl {
         // use to the exact diff, which is >= minLovelace
         const diff = inputValue.subtract(nonChangeOutputValue)
 
-        if (!allowDirtyChange && !diff.assets.isZero()) {
+        if (!allowDirtySpareInputs && !diff.assets.isZero()) {
             throw new Error("unexpected unbalanced assets")
         }
 
@@ -2050,12 +2083,34 @@ class TxBuilderImpl {
             )
         }
 
-        // make sure the assets of an expliticChangeOutput
+        // make sure to add the assets of an explicitChangeOutput
         changeOutput.value = diff.add(
             explicitChangeOutput
                 ? makeValue(0n, explicitChangeOutput.value.assets)
                 : makeValue(0n)
         )
+
+        if (!allowDirtyChangeOutput && !changeOutput.value.assets.isZero()) {
+            const extraChangeOutput = makeTxOutput(
+                changeOutput.address,
+                makeValue(0n, changeOutput.value.assets)
+            )
+            extraChangeOutput.correctLovelace(params)
+
+            changeOutput.value = makeValue(
+                changeOutput.value.lovelace - extraChangeOutput.value.lovelace
+            )
+
+            if (
+                changeOutput.calcDeposit(params) > changeOutput.value.lovelace
+            ) {
+                throw new Error(
+                    "Unable to balance transaction, not enough spare lovelace to create two change outputs to have at least one clean change output"
+                )
+            }
+
+            this.addOutput(extraChangeOutput)
+        }
 
         return changeOutput
     }

@@ -1129,7 +1129,13 @@ export {
  * Defaults to the largest number of assets in one of the inputs
  *
  * @prop {boolean} [allowDirtyChangeOutput]
- * Defaults to false
+ * Defaults to false, ensuring the change output created during lovelace balancing doesn't contain assets
+ *
+ * @prop {boolean} [allowDirtySpareInputs]
+ * Defaults to `allowDirtyChangeOutput`. If `true` -> allows selecting dirty UTXOs (i.e. containing non-lovelace assets) during lovelace balancing.
+ * If this is set explicitly to `true` and combined with `allowDirtyChangeOutput == false`, two change outputs might be created during lovelace balancing:
+ *   - one containing only lovelace
+ *   - another containing the assets that were selected during balancing, and some lovelace as a deposit
  *
  * @prop {UplcLogger} [logOptions]
  * @prop {boolean} [throwBuildPhaseScriptErrors]
