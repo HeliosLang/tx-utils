@@ -1,7 +1,7 @@
 import {
+    decodeBytes,
     decodeInt,
     decodeObjectIKey,
-    encodeBytes,
     encodeInt,
     encodeObjectIKey
 } from "@helios-lang/cbor"
@@ -13,6 +13,7 @@ import { decodePubKey } from "@helios-lang/ledger"
  */
 
 /**
+ * TODO: verify kid (i.e. field 2) (kid isn't returned by Eternl, so perhaps it isn't that important)
  * @param {BytesLike} bytes
  * @returns {PubKey}
  */
@@ -24,6 +25,7 @@ export function decodeCip30CosePubKey(bytes) {
         [-2]: pubKey
     } = decodeObjectIKey(bytes, {
         1: decodeInt,
+        2: decodeBytes, // `kid`, ignored for now
         3: decodeInt,
         [-1]: decodeInt,
         [-2]: decodePubKey
