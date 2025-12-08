@@ -16,7 +16,6 @@ export {
     makeBlockfrostV0Client,
     makeCardanoClientHelper,
     makeHydraClient,
-    makeIrisClient,
     makeKoiosV0Client,
     makeReadonlyCardanoMultiClient,
     resolveBlockfrostV0Client,
@@ -939,29 +938,6 @@ export {
  * @prop {() => boolean} isMainnet
  * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo
  * @prop {Promise<NetworkParams>} parameters
- */
-
-/**
- * @typedef {object} IrisClient
- * Experimental IrisClient (REST API gateway created by Helios)
- *
- * @prop {number} now
- * @prop {() => boolean} isMainnet
- * @prop {Promise<NetworkParams>} parameters
- * @prop {(id: TxOutputId) => Promise<TxInput>} getUtxo
- * @prop {(addr: Address) => Promise<TxInput[]>} getUtxos
- * @prop {(address: Address, assetClass: AssetClass) => Promise<TxInput[]>} getUtxosWithAssetClass
- * @prop {(assetClass: AssetClass) => Promise<{address: Address, quantity: bigint}[]>} getAddressesWithAssetClass
- * Returns a list of addresses containing the given asset class.
- *
- * @prop {(id: TxId) => Promise<Tx>} getTx
- * @prop {(id: TxId) => Promise<boolean>} hasTx
- * @prop {(id: TxOutputId) => Promise<boolean>} hasUtxo
- * @prop {(address: Address, value: Value, algorithm?: "smallest-first" | "largest-first") => Promise<TxInput[]>} selectUtxos
- * `algorithm` defaults to "smallest-first"
- *
- * @prop {(tx: Tx) => Promise<TxId>} submitTx
- * tx is mutated if the server adds signatures (eg. for use of server collateral)
  */
 
 /**
