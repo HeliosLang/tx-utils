@@ -2089,6 +2089,7 @@ class TxBuilderImpl {
                 ? makeValue(0n, explicitChangeOutput.value.assets)
                 : makeValue(0n)
         )
+        changeOutput.value.assets.sort()
 
         if (!allowDirtyChangeOutput && !changeOutput.value.assets.isZero()) {
             const extraChangeOutput = makeTxOutput(
@@ -2104,9 +2105,29 @@ class TxBuilderImpl {
             if (
                 changeOutput.calcDeposit(params) > changeOutput.value.lovelace
             ) {
-                throw new Error(
-                    "Unable to balance transaction, not enough spare lovelace to create two change outputs to have at least one clean change output"
-                )
+                // try one last time to balance
+                const spare = spareUtxos
+                    .filter((utxo) => utxo.value.assets.isZero())
+                    .pop()
+
+                if (!spare) {
+                    throw new Error(
+                        "Unable to balance transaction, not enough spare lovelace to create two change outputs to have at least one clean change output"
+                    )
+                }
+
+                this.addInput(spare)
+
+                changeOutput.value = changeOutput.value.add(spare.value)
+
+                if (
+                    changeOutput.calcDeposit(params) >
+                    changeOutput.value.lovelace
+                ) {
+                    throw new Error(
+                        "Unable to balance transaction, not enough spare lovelace to create two change outputs to have at least one clean change output"
+                    )
+                }
             }
 
             this.addOutput(extraChangeOutput)
