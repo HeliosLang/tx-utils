@@ -13,12 +13,15 @@ import {
     UtxoNotFoundError
 } from "@helios-lang/ledger"
 import { expectDefined } from "@helios-lang/type-utils"
-import { decodeUplcData, decodeUplcProgramV2FromCbor } from "@helios-lang/uplc"
+import {
+    decodeUplcData,
+    decodeUplcProgramV2OrV3FromCbor
+} from "@helios-lang/uplc"
 import { SubmissionExpiryError, SubmissionUtxoError } from "./errors.js"
 
 /**
  * @import { Address, AssetClass, NetworkParams, Tx, TxId, TxInfo, TxInput, TxOutput, TxOutputId } from "@helios-lang/ledger"
- * @import { UplcProgramV2 } from "@helios-lang/uplc"
+ * @import { UplcProgramV2, UplcProgramV3 } from "@helios-lang/uplc"
  * @import { BlockfrostV0Client, ExtendedTxInfo, NetworkName, ReadonlyWallet, TxBlockInfo, TxSummary } from "../index.js"
  */
 
@@ -1004,7 +1007,7 @@ class BlockfrostV0ClientImpl {
      */
     async restoreTxInput(rawInput) {
         /**
-         * @type {UplcProgramV2 | undefined}
+         * @type {UplcProgramV2 | UplcProgramV3 | undefined}
          */
         let refScript = undefined
 
@@ -1030,7 +1033,7 @@ class BlockfrostV0ClientImpl {
             } else if (responseJson.cbor == null) {
                 console.error(`reponseJson.cbor is null`)
             } else {
-                refScript = decodeUplcProgramV2FromCbor(responseJson.cbor)
+                refScript = decodeUplcProgramV2OrV3FromCbor(responseJson.cbor)
             }
         }
 

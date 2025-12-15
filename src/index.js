@@ -1173,7 +1173,7 @@ export {
  * Builds and runs validation logic on the transaction, **throwing any validation errors found**
  * The resulting transaction may likely still require {@link Tx.addSignature} / {@link Tx.addSignatures} before
  * it is submitted to the network.
- * The {@link tx.validate|transaction-validation logic} run will throw an
+ * The {@link Tx.validate|transaction-validation logic} run will throw an
  * error if the transaction is invalid for any reason, including script errors.
  * The `config.throwBuildPhaseScriptErrors` default (true) will throw script errors
  * during the build phase, but you can set it to false to defer those errors to the validate
