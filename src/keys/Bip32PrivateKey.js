@@ -74,10 +74,13 @@ export function makeBip32PrivateKeyWithBip39Entropy(entropy, force = true) {
 
 /**
  * @param {Bip32PrivateKey} privateKey
- * @returns {[string, string]} 
+ * @returns {[string, string]}
  */
 export function generateBech32Keys(privateKey) {
-    return [encodeBech32("addr_sk", privateKey.bytes), encodeBech32("addr_vk", privateKey.derivePubKey().bytes)]
+    return [
+        encodeBech32("addr_sk", privateKey.bytes),
+        encodeBech32("addr_vk", privateKey.derivePubKey().bytes)
+    ]
 }
 
 /**

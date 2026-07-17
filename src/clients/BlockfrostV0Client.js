@@ -390,9 +390,7 @@ class BlockfrostV0ClientImpl {
 
             const rawCostModels = bfParams.cost_models_raw
             if (!rawCostModels) {
-                throw new Error(
-                    "Blockfrost response missing cost_models_raw"
-                )
+                throw new Error("Blockfrost response missing cost_models_raw")
             }
 
             /**
