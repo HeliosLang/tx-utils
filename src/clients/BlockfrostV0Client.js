@@ -41,6 +41,11 @@ import { SubmissionExpiryError, SubmissionUtxoError } from "./errors.js"
  *       PlutusV2: Record<string, number>
  *       PlutusV3: number[]
  *   }
+ *   cost_models_raw?: {
+ *       PlutusV1?: number[]
+ *       PlutusV2?: number[]
+ *       PlutusV3?: number[]
+ *   }
  *   e_max: number
  *   extra_entropy: null
  *   key_deposit: LargeNumber
@@ -383,14 +388,11 @@ class BlockfrostV0ClientImpl {
                 ).then((r) => r.json())
             )
 
-            /**
-             * @param {Record<string, number>} obj
-             * @returns {number[]}
-             */
-            const convertOldCostModels = (obj) => {
-                const keys = Object.keys(obj).sort()
-
-                return keys.map((k) => obj[k])
+            const rawCostModels = bfParams.cost_models_raw
+            if (!rawCostModels) {
+                throw new Error(
+                    "Blockfrost response missing cost_models_raw"
+                )
             }
 
             /**
@@ -399,13 +401,9 @@ class BlockfrostV0ClientImpl {
             const params = {
                 secondsPerSlot: 1,
                 collateralPercentage: bfParams.collateral_percent,
-                costModelParamsV1: convertOldCostModels(
-                    bfParams.cost_models.PlutusV1
-                ),
-                costModelParamsV2: convertOldCostModels(
-                    bfParams.cost_models.PlutusV2
-                ),
-                costModelParamsV3: bfParams.cost_models?.PlutusV3 ?? [],
+                costModelParamsV1: rawCostModels.PlutusV1 ?? [],
+                costModelParamsV2: rawCostModels.PlutusV2 ?? [],
+                costModelParamsV3: rawCostModels.PlutusV3 ?? [],
                 exCpuFeePerUnit: bfParams.price_step,
                 exMemFeePerUnit: bfParams.price_mem,
                 maxCollateralInputs: 3,
