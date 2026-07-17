@@ -3,7 +3,7 @@ import { makeBip32PrivateKey } from "./Bip32PrivateKey.js"
 import { deepEqual } from "node:assert"
 import { encodeUtf8 } from "@helios-lang/codec-utils"
 
-describe("Bip32PrivateKey", () => {
+describe("Bip32PrivateKey sign", () => {
     it('correctly signs "Hello World"', () => {
         const bytes = [
             0x60, 0xd3, 0x99, 0xda, 0x83, 0xef, 0x80, 0xd8, 0xd4, 0xf8, 0xd2,

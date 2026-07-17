@@ -5,6 +5,7 @@ import {
 } from "@helios-lang/codec-utils"
 import {
     Ed25519,
+    encodeBech32,
     generateBytes,
     hmacSha2_512,
     pbkdf2,
@@ -69,6 +70,14 @@ export function makeBip32PrivateKeyWithBip39Entropy(entropy, force = true) {
     const c = bytes.slice(64, 96)
 
     return new Bip32PrivateKeyImpl(kl.concat(kr).concat(c))
+}
+
+/**
+ * @param {Bip32PrivateKey} privateKey
+ * @returns {[string, string]} 
+ */
+export function generateBech32Keys(privateKey) {
+    return [encodeBech32("addr_sk", privateKey.bytes), encodeBech32("addr_vk", privateKey.derivePubKey().bytes)]
 }
 
 /**

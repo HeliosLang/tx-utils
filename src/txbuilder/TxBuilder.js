@@ -595,6 +595,7 @@ class TxBuilderImpl {
             utxo.forEach((utxo) => this.addCollateral(utxo))
             return this
         } else {
+            this.addedCollateral = true
             appendTxInput(this.collateral, utxo, true)
             return this
         }
@@ -1962,7 +1963,7 @@ class TxBuilderImpl {
      *   - `allowDirtySpareInputs == false` and `allowDirtyChangeOutput == true` doesn't do anything
      *   - `allowDirtySpareInputs == true` and `allowDirtyChangeOutput == true` can be useful when the agent wallet is dirty and is allowed to remain dirty
      *   - `allowDirtySpareInputs == false` and `allowDirtyChangeOutput == false` limits this balancing to pure lovelace UTXOs
-     *   - `allowDirtySpreInputs == true and `allowDirtyChangeOutput == false` gradually cleans up a wallet
+     *   - `allowDirtySpareInputs == true and `allowDirtyChangeOutput == false` gradually cleans up a wallet
      *
      * @param {TxOutput | undefined} [explicitChangeOutput]
      * @returns {TxOutput} - change output, will be corrected once the final fee is known

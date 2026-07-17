@@ -1127,7 +1127,7 @@ export {
  * Optional encoding config for TxBody
  *
  * @prop {TxWitnessesEncodingConfig} [witnessesEncodingConfig]
- * Optional encoding confg for TxWitnesses
+ * Optional encoding config for TxWitnesses
  *
  * @prop {TxOutput} [changeOutput]
  * Optional changeOutput for any remaining lovelace during balancing.

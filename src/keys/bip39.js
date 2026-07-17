@@ -2168,7 +2168,7 @@ export function convertEntropyToBip39Phrase(entropy, dict = BIP39_DICT_EN) {
     while (bits.length > 0) {
         const part = bits.slice(0, 11)
         if (part.length != 11) {
-            throw new Error("didn't slice of exactly 11 bits")
+            throw new Error("didn't slice off exactly 11 bits")
         }
 
         const i = parseInt(part, 2)
