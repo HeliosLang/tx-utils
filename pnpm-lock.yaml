@@ -18,8 +18,8 @@ importers:
         specifier: ^0.2.3
         version: 0.2.3
       '@helios-lang/ledger':
-        specifier: ^0.7.23
-        version: 0.7.23
+        specifier: ^0.7.24
+        version: 0.7.24
       '@helios-lang/type-utils':
         specifier: ^0.3.0
         version: 0.3.0
@@ -69,8 +69,8 @@ packages:
   '@helios-lang/ir@0.3.10':
     resolution: {integrity: sha512-Lx2Si3QhAHTnvuFwt7mAA+zwQusJu6dGZTShEx6GgQY9PGrzoApj0fqYKg1NI06AfHSSOFxlDZKG7rBbHFcKvA==}
 
-  '@helios-lang/ledger@0.7.23':
-    resolution: {integrity: sha512-yfWZpW1JMB6FFz4848VNZJkM41XkO4PTuMpsF4G4wGmhV+W60JyjxBJGC2dh6uzeWLsZCmYP+uxjiVouZJBf0w==}
+  '@helios-lang/ledger@0.7.24':
+    resolution: {integrity: sha512-OQ1ugthkp+n/7YNkgMTAmaphICGu0Wc9LTwnSjx8N7LbAcP9VLycyNTefngkXUax0CxeDVT9qzC4REYCqvvfuA==}
 
   '@helios-lang/type-utils@0.2.9':
     resolution: {integrity: sha512-79/aGqD9ZXNXUypDHf+tSSg4PBacovX5Q4U2GXKVcaH5a194PVZJ+Dsz2J5vLREUeSwSM7HLTEysqasyadbtEQ==}
@@ -313,7 +313,7 @@ snapshots:
       '@helios-lang/type-utils': 0.3.0
       '@helios-lang/uplc': 0.7.20
 
-  '@helios-lang/ledger@0.7.23':
+  '@helios-lang/ledger@0.7.24':
     dependencies:
       '@helios-lang/cbor': 0.3.1
       '@helios-lang/codec-utils': 0.3.4
