@@ -1,6 +1,6 @@
 {
     "name": "@helios-lang/tx-utils",
-    "version": "0.6.38",
+    "version": "0.6.39",
     "description": "Coinselection, Cardano query layer clients, emulator, wallets",
     "main": "src/index.js",
     "types": "types/index.d.ts",
@@ -10,15 +10,16 @@
         "build:docs": "typedoc --tsconfig ./jsconfig.json",
         "build:types": "tsc -p jsconfig.json --noEmit false --emitDeclarationOnly",
         "lockfile:sync": "pnpm install --ignore-workspace",
-        "prepack": "pnpm run build",
+        "prepack": "node scripts/check-debugger-ledger.mjs && pnpm run build",
         "prettify": "prettier . --write",
         "test": "pnpm run test:pretty && pnpm run test:types && pnpm run test:suite && pnpm run test:integ",
         "test:install_deps": "cd ./test/all-pure ; pnpm --ignore-workspace install",
         "test:integ": "pnpm test:install_deps && pnpm --prefix test/all-pure run test",
         "test:pretty": "prettier . --check",
-        "test:suite": "pnpm test:install_deps && node --test --experimental-test-coverage",
+        "test:suite": "node scripts/test-suite.mjs",
         "test:debug": "node --inspect-brk --test  --experimental-test-coverage",
-        "test:types": "pnpm run build:types"
+        "test:types": "pnpm run build:types",
+        "test:debugger": "node src/debugger/DebuggerService.test.js && node test/debugger/time-lock.mjs"
     },
     "author": "Christian Schmitz",
     "license": "BSD-3-Clause",
@@ -29,6 +30,7 @@
         "singleQuote": false
     },
     "devDependencies": {
+        "@helios-lang/compiler": "0.17.33",
         "@types/node": "^20.12.4",
         "prettier": "^3.3.3",
         "typedoc": "^0.26.11",
@@ -40,6 +42,13 @@
         "@helios-lang/crypto": "^0.2.3",
         "@helios-lang/ledger": "^0.7.23",
         "@helios-lang/type-utils": "^0.3.0",
-        "@helios-lang/uplc": "^0.7.20"
-    }
+        "@helios-lang/uplc": "0.7.20"
+    },
+    "files": [
+        "src",
+        "types",
+        "scripts/check-debugger-ledger.mjs",
+        "README.md",
+        "LICENSE"
+    ]
 }

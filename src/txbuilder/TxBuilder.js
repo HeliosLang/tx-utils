@@ -1,3 +1,5 @@
+import { makeAutomaticRecording } from "../debugger/AutomaticRecording.js"
+import * as ledger from "@helios-lang/ledger"
 import { bytesToHex, equalsBytes, toInt } from "@helios-lang/codec-utils"
 import {
     DEFAULT_NETWORK_PARAMS,
@@ -52,6 +54,7 @@ import { makeUplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
 
 /**
  * @typedef {Object} RedeemerExecContext
+ * @prop {import("../debugger/DebuggerService.js").RecordingSession} [recording]
  * @prop {bigint} fee
  * @prop {number | undefined} firstValidSlot
  * @prop {number | undefined} lastValidSlot
@@ -70,6 +73,17 @@ import { makeUplcDataValue, UplcRuntimeError } from "@helios-lang/uplc"
  * @returns {TxBuilder}
  */
 export function makeTxBuilder(config) {
+    if (
+        config.debugger &&
+        !(
+            "TX_EVALUATION_OBSERVER_VERSION" in ledger &&
+            ledger.TX_EVALUATION_OBSERVER_VERSION === 1
+        )
+    ) {
+        throw new Error(
+            "Debugger capture requires the ledger evaluation-observer release; update @helios-lang/ledger"
+        )
+    }
     return new TxBuilderImpl(config)
 }
 
@@ -82,6 +96,9 @@ class TxBuilderImpl {
      * @type {TxBuilderConfig}
      */
     config
+
+    /** @private @type {import("../debugger/AutomaticRecording.js").DebugProgram[]} */
+    debuggerPrograms
 
     /**
      * @private
@@ -334,6 +351,28 @@ class TxBuilderImpl {
      * @returns {Promise<Tx>}
      */
     async buildUnsafe(config) {
+        const recording =
+            this.config.debugger === false
+                ? undefined
+                : this.config.debugger
+                  ? this.config.debugger.startSession()
+                  : makeAutomaticRecording(() => this.debuggerPrograms)
+        try {
+            const tx = await this.buildUnsafeInternal(config, recording)
+            await recording?.finish(tx)
+            return tx
+        } catch (error) {
+            await recording?.finish(undefined, error)
+            throw error
+        }
+    }
+
+    /** @private
+     * @param {TxBuilderFinalConfig} config
+     * @param {import("../debugger/DebuggerService.js").RecordingSession} [recording]
+     * @returns {Promise<Tx>}
+     */
+    async buildUnsafeInternal(config, recording) {
         // extract arguments
         const changeAddress = makeAddress(await config.changeAddress)
         const throwBuildPhaseScriptErrors =
@@ -359,6 +398,18 @@ class TxBuilderImpl {
             await p
         }
 
+        if (
+            this.config.debugger !== false &&
+            this.debuggerPrograms.length &&
+            !(
+                "TX_EVALUATION_OBSERVER_VERSION" in ledger &&
+                ledger.TX_EVALUATION_OBSERVER_VERSION === 1
+            )
+        ) {
+            throw new Error(
+                "Automatic debugger capture requires the ledger evaluation-observer release; update @helios-lang/ledger"
+            )
+        }
         const { metadata, metadataHash } = this.buildMetadata()
         const { firstValidSlot, lastValidSlot } =
             this.buildValidityTimeRange(params)
@@ -445,6 +496,7 @@ class TxBuilderImpl {
         // the scripts executed at this point will not see the correct txHash nor the correct fee
         const redeemers = await this.buildRedeemers({
             networkParams: params,
+            recording,
             fee,
             firstValidSlot,
             lastValidSlot,
@@ -551,7 +603,24 @@ class TxBuilderImpl {
         if (config.beforeValidate) {
             await config.beforeValidate(tx)
         }
-        return tx.validateUnsafe(params, { ...config, strict: true })
+        return tx.validateUnsafe(params, {
+            ...config,
+            strict: true,
+            onEvaluation: recording
+                ? (event) =>
+                      recording.record({
+                          ...event,
+                          phase: "validation",
+                          args: event.args.map((a) => {
+                              if (a.kind !== "data")
+                                  throw new Error(
+                                      "Expected script data argument"
+                                  )
+                              return a.value
+                          })
+                      })
+                : undefined
+        })
     }
 
     /**
@@ -573,6 +642,7 @@ class TxBuilderImpl {
         this.spendingRedeemers = []
         this.validTo = undefined
         this.validFrom = undefined
+        this.debuggerPrograms = []
         this.v1Scripts = []
         this.v2RefScripts = []
         this.v2Scripts = []
@@ -1316,6 +1386,8 @@ class TxBuilderImpl {
      * @returns {TxBuilder}
      */
     withdrawWithLazyRedeemer(addr, lovelace, redeemer) {
+        this.attachUplcProgram(addr.stakingCredential.context.program)
+
         return this.withdrawUnsafe(addr, lovelace, async (tx) => {
             const r = redeemer(tx)
             const redeemerData = r instanceof Promise ? await r : r
@@ -1505,6 +1577,11 @@ class TxBuilderImpl {
      * @param {UplcProgramV1} script
      */
     addV1Script(script) {
+        const debugProgram =
+            /** @type {import("../debugger/AutomaticRecording.js").DebugProgram} */ (
+                script
+            )
+        if (debugProgram.$debugger) this.debuggerPrograms.push(debugProgram)
         const h = script.hash()
         if (!this.v1Scripts.some((prev) => equalsBytes(prev.hash(), h))) {
             this.v1Scripts.push(script)
@@ -1517,6 +1594,11 @@ class TxBuilderImpl {
      * @param {UplcProgramV2} script
      */
     addV2Script(script) {
+        const debugProgram =
+            /** @type {import("../debugger/AutomaticRecording.js").DebugProgram} */ (
+                script
+            )
+        if (debugProgram.$debugger) this.debuggerPrograms.push(debugProgram)
         const h = script.hash()
         if (!this.v2Scripts.some((prev) => equalsBytes(prev.hash(), h))) {
             this.v2Scripts.push(script)
@@ -1530,6 +1612,11 @@ class TxBuilderImpl {
      * @param {UplcProgramV2} script
      */
     addV2RefScript(script) {
+        const debugProgram =
+            /** @type {import("../debugger/AutomaticRecording.js").DebugProgram} */ (
+                script
+            )
+        if (debugProgram.$debugger) this.debuggerPrograms.push(debugProgram)
         const h = script.hash()
         if (!this.v2RefScripts.some((prev) => equalsBytes(prev.hash(), h))) {
             this.v2RefScripts.push(script)
@@ -1545,6 +1632,11 @@ class TxBuilderImpl {
      * @param {UplcProgramV3} script
      */
     addV3Script(script) {
+        const debugProgram =
+            /** @type {import("../debugger/AutomaticRecording.js").DebugProgram} */ (
+                script
+            )
+        if (debugProgram.$debugger) this.debuggerPrograms.push(debugProgram)
         const h = script.hash()
         if (!this.v3Scripts.some((prev) => equalsBytes(prev.hash(), h))) {
             this.v3Scripts.push(script)
@@ -1558,6 +1650,11 @@ class TxBuilderImpl {
      * @param {UplcProgramV3} script
      */
     addV3RefScript(script) {
+        const debugProgram =
+            /** @type {import("../debugger/AutomaticRecording.js").DebugProgram} */ (
+                script
+            )
+        if (debugProgram.$debugger) this.debuggerPrograms.push(debugProgram)
         const h = script.hash()
         if (!this.v3RefScripts.some((prev) => equalsBytes(prev.hash(), h))) {
             this.v3RefScripts.push(script)
@@ -2615,6 +2712,13 @@ class TxBuilderImpl {
 
         const argsData = args.map((a) => makeUplcDataValue(a))
         const profile = script.eval(argsData, { logOptions })
+        buildContext.recording?.record({
+            phase: "construction",
+            summary,
+            script,
+            args,
+            profile
+        })
         // XXX if the script fails, we signal the logger to emit the diagnostics.
         // if the script runs correctly, logging will arrive during transaction validation instead.
         if (isLeft(profile.result)) {

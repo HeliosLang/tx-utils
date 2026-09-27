@@ -1,0 +1,100 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://debugger.helios-lang.io/schema/capture-v1.json",
+    "title": "Helios debugger capture v1",
+    "type": "object",
+    "required": ["version", "captureId", "status", "evaluations"],
+    "properties": {
+        "version": { "const": 1 },
+        "captureId": { "type": "string", "format": "uuid" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "enum": ["failed", "succeeded"] },
+        "error": { "type": ["object", "string"] },
+        "transactionCbor": { "$ref": "#/$defs/hex" },
+        "sources": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+        },
+        "diagnostics": { "type": "array", "items": { "type": "string" } },
+        "evaluations": {
+            "type": "array",
+            "items": { "$ref": "#/$defs/evaluation" }
+        }
+    },
+    "$defs": {
+        "hex": { "type": "string", "pattern": "^(?:[0-9a-f]{2})+$" },
+        "evaluation": {
+            "type": "object",
+            "required": [
+                "phase",
+                "scriptHash",
+                "programCbor",
+                "plutusVersion",
+                "arguments",
+                "evaluation",
+                "result",
+                "budget"
+            ],
+            "properties": {
+                "phase": { "enum": ["construction", "validation"] },
+                "summary": { "type": "string" },
+                "scriptHash": { "type": "string", "pattern": "^[0-9a-f]{56}$" },
+                "programCbor": { "$ref": "#/$defs/hex" },
+                "plutusVersion": {
+                    "enum": [
+                        "PlutusScriptV1",
+                        "PlutusScriptV2",
+                        "PlutusScriptV3"
+                    ]
+                },
+                "arguments": {
+                    "type": "array",
+                    "items": { "$ref": "#/$defs/hex" }
+                },
+                "sourceMap": { "type": "object" },
+                "companion": {
+                    "type": "object",
+                    "required": ["programCbor", "sourceMap"],
+                    "properties": {
+                        "programCbor": { "$ref": "#/$defs/hex" },
+                        "sourceMap": { "type": "object" }
+                    }
+                },
+                "evaluation": {
+                    "type": "object",
+                    "required": ["costModel", "costModelParams", "uplcVersion"],
+                    "properties": {
+                        "costModel": { "const": "explicit" },
+                        "costModelParams": {
+                            "type": "array",
+                            "items": { "type": "integer" }
+                        },
+                        "uplcVersion": { "type": "string" }
+                    }
+                },
+                "budget": {
+                    "type": "object",
+                    "required": ["cpu", "mem"],
+                    "properties": {
+                        "cpu": { "type": "string", "pattern": "^[0-9]+$" },
+                        "mem": { "type": "string", "pattern": "^[0-9]+$" }
+                    }
+                },
+                "result": {
+                    "oneOf": [
+                        {
+                            "type": "object",
+                            "required": ["error"],
+                            "properties": { "error": { "type": "string" } }
+                        },
+                        {
+                            "type": "object",
+                            "required": ["value"],
+                            "properties": { "value": { "type": "string" } }
+                        }
+                    ]
+                }
+            }
+        }
+    }
+}

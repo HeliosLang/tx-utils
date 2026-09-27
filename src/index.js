@@ -1,3 +1,4 @@
+export { makeDebuggerService } from "./debugger/DebuggerService.js"
 export { UtxoAlreadySpentError, UtxoNotFoundError } from "@helios-lang/ledger" // TODO: get rid of this once minor verssion bump
 export {
     compareTxSummaries,
@@ -1088,6 +1089,7 @@ export {
 /**
  * @typedef {{
  *   isMainnet: boolean
+ *   debugger?: false | ReturnType<typeof import("./debugger/DebuggerService.js").makeDebuggerService>
  *   refScriptRegistry?: ReadonlyRefScriptRegistry
  * }} TxBuilderConfig
  */
