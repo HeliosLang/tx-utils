@@ -45,7 +45,10 @@ test("capture transport is one fetch with a JSON payload and bearer header", asy
     assert.equal(payload.status, "failed")
     assert.equal(payload.error.message, "script failed")
     assert.equal(payload.evaluations.length, 1)
-    assert.equal(payload.evaluations[0].programCbor, bytesToHex(script.toCbor()))
+    assert.equal(
+        payload.evaluations[0].programCbor,
+        bytesToHex(script.toCbor())
+    )
     assert.deepEqual(payload.evaluations[0].arguments, [])
     assert.deepEqual(payload.sources, { "test.hl": "testing test" })
     assert.deepEqual(payload.diagnostics, [])
