@@ -1,3 +1,6 @@
+export { validCompilationContext } from "./debugger/CompilationContext.js"
+/** @typedef {import("./debugger/CompilationContext.js").CompilationContext} CompilationContext */
+/** @typedef {import("./debugger/CompilationContext.js").CompilationOptions} CompilationOptions */
 export { makeDebuggerService } from "./debugger/DebuggerService.js"
 export { UtxoAlreadySpentError, UtxoNotFoundError } from "@helios-lang/ledger" // TODO: get rid of this once minor verssion bump
 export {

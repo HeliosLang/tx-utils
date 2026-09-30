@@ -36,7 +36,13 @@ export function makeAutomaticRecording(getPrograms) {
                         hashes: new Set(),
                         sources,
                         service,
-                        session: service.startSession()
+                        session: service.startSession(() =>
+                            getPrograms().filter(
+                                (p) =>
+                                    p.$debugger?.apiKey === context.apiKey &&
+                                    p.$debugger?.endpoint === context.endpoint
+                            )
+                        )
                     }
                     groups.set(id, group)
                 }

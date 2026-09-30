@@ -51,7 +51,7 @@ test("capture transport is one fetch with a JSON payload and bearer header", asy
     )
     assert.deepEqual(payload.evaluations[0].arguments, [])
     assert.deepEqual(payload.sources, { "test.hl": "testing test" })
-    assert.deepEqual(payload.diagnostics, [])
+    assert.match(payload.diagnostics.join(), /Compilation context unavailable/)
     assert.equal(service.deliveryStatus.state, "delivered")
     assert.equal(service.deliveryStatus.captureId, payload.captureId)
 })

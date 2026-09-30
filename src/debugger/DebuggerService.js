@@ -1,3 +1,4 @@
+import { validCompilationContext } from "./CompilationContext.js"
 import { bytesToHex } from "@helios-lang/codec-utils"
 import {
     DEFAULT_COST_MODEL_PARAMS_V1,
@@ -34,8 +35,9 @@ export function makeDebuggerService(config) {
         async flush() {
             await Promise.all([...pending])
         },
-        /** @returns {RecordingSession} */
-        startSession() {
+        /** @param {() => import("@helios-lang/uplc").UplcProgram[]} [getPrograms]
+         * @returns {RecordingSession} */
+        startSession(getPrograms = () => []) {
             const captureId = crypto.randomUUID()
             const sources = { ...config.sources }
             const evaluations = []
@@ -50,7 +52,49 @@ export function makeDebuggerService(config) {
                                 term: script.root
                             }).toJsonSafe()
                         })
+                        let compilation
+                        try {
+                            const hash = bytesToHex(event.script.hash())
+                            const candidates = [event.script, ...getPrograms()]
+                                .filter((p) => bytesToHex(p.hash()) === hash)
+                                .map((p) => /** @type {any} */ (p).$compilation)
+                                .filter((c) => c !== undefined)
+                            if (candidates.length) {
+                                const encoded = candidates.map((c) =>
+                                    JSON.stringify(c)
+                                )
+                                if (
+                                    !candidates.every(
+                                        validCompilationContext
+                                    ) ||
+                                    new Set(encoded).size !== 1
+                                )
+                                    throw new Error(
+                                        "Invalid or ambiguous compilation metadata"
+                                    )
+                                // Whitelist wire fields; never serialize arbitrary program properties or credentials.
+                                const c = candidates[0]
+                                compilation = JSON.parse(
+                                    JSON.stringify({
+                                        version: c.version,
+                                        compilerVersion: c.compilerVersion,
+                                        validator: c.validator,
+                                        parameters: c.parameters,
+                                        isTestnet: c.isTestnet,
+                                        validatorTypes: c.validatorTypes,
+                                        optimized: c.optimized,
+                                        unoptimized: c.unoptimized
+                                    })
+                                )
+                            } else
+                                diagnostics.push(
+                                    `Compilation context unavailable for ${hash}`
+                                )
+                        } catch (error) {
+                            diagnostics.push(String(error))
+                        }
                         evaluations.push({
+                            compilation,
                             phase: event.phase,
                             summary: event.summary,
                             scriptHash: bytesToHex(event.script.hash()),

@@ -5,24 +5,50 @@
     "type": "object",
     "required": ["version", "captureId", "status", "evaluations"],
     "properties": {
-        "version": { "const": 1 },
-        "captureId": { "type": "string", "format": "uuid" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "status": { "enum": ["failed", "succeeded"] },
-        "error": { "type": ["object", "string"] },
-        "transactionCbor": { "$ref": "#/$defs/hex" },
+        "version": {
+            "const": 1
+        },
+        "captureId": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "status": {
+            "enum": ["failed", "succeeded"]
+        },
+        "error": {
+            "type": ["object", "string"]
+        },
+        "transactionCbor": {
+            "$ref": "#/$defs/hex"
+        },
         "sources": {
             "type": "object",
-            "additionalProperties": { "type": "string" }
+            "additionalProperties": {
+                "type": "string"
+            }
         },
-        "diagnostics": { "type": "array", "items": { "type": "string" } },
+        "diagnostics": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
         "evaluations": {
             "type": "array",
-            "items": { "$ref": "#/$defs/evaluation" }
+            "items": {
+                "$ref": "#/$defs/evaluation"
+            }
         }
     },
     "$defs": {
-        "hex": { "type": "string", "pattern": "^(?:[0-9a-f]{2})+$" },
+        "hex": {
+            "type": "string",
+            "pattern": "^(?:[0-9a-f]{2})+$"
+        },
         "evaluation": {
             "type": "object",
             "required": [
@@ -36,10 +62,19 @@
                 "budget"
             ],
             "properties": {
-                "phase": { "enum": ["construction", "validation"] },
-                "summary": { "type": "string" },
-                "scriptHash": { "type": "string", "pattern": "^[0-9a-f]{56}$" },
-                "programCbor": { "$ref": "#/$defs/hex" },
+                "phase": {
+                    "enum": ["construction", "validation"]
+                },
+                "summary": {
+                    "type": "string"
+                },
+                "scriptHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{56}$"
+                },
+                "programCbor": {
+                    "$ref": "#/$defs/hex"
+                },
                 "plutusVersion": {
                     "enum": [
                         "PlutusScriptV1",
@@ -49,35 +84,55 @@
                 },
                 "arguments": {
                     "type": "array",
-                    "items": { "$ref": "#/$defs/hex" }
+                    "items": {
+                        "$ref": "#/$defs/hex"
+                    }
                 },
-                "sourceMap": { "type": "object" },
+                "sourceMap": {
+                    "type": "object"
+                },
                 "companion": {
                     "type": "object",
                     "required": ["programCbor", "sourceMap"],
                     "properties": {
-                        "programCbor": { "$ref": "#/$defs/hex" },
-                        "sourceMap": { "type": "object" }
+                        "programCbor": {
+                            "$ref": "#/$defs/hex"
+                        },
+                        "sourceMap": {
+                            "type": "object"
+                        }
                     }
                 },
                 "evaluation": {
                     "type": "object",
                     "required": ["costModel", "costModelParams", "uplcVersion"],
                     "properties": {
-                        "costModel": { "const": "explicit" },
+                        "costModel": {
+                            "const": "explicit"
+                        },
                         "costModelParams": {
                             "type": "array",
-                            "items": { "type": "integer" }
+                            "items": {
+                                "type": "integer"
+                            }
                         },
-                        "uplcVersion": { "type": "string" }
+                        "uplcVersion": {
+                            "type": "string"
+                        }
                     }
                 },
                 "budget": {
                     "type": "object",
                     "required": ["cpu", "mem"],
                     "properties": {
-                        "cpu": { "type": "string", "pattern": "^[0-9]+$" },
-                        "mem": { "type": "string", "pattern": "^[0-9]+$" }
+                        "cpu": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                        },
+                        "mem": {
+                            "type": "string",
+                            "pattern": "^[0-9]+$"
+                        }
                     }
                 },
                 "result": {
@@ -85,16 +140,149 @@
                         {
                             "type": "object",
                             "required": ["error"],
-                            "properties": { "error": { "type": "string" } }
+                            "properties": {
+                                "error": {
+                                    "type": "string"
+                                }
+                            }
                         },
                         {
                             "type": "object",
                             "required": ["value"],
-                            "properties": { "value": { "type": "string" } }
+                            "properties": {
+                                "value": {
+                                    "type": "string"
+                                }
+                            }
                         }
                     ]
+                },
+                "compilation": {
+                    "$ref": "#/$defs/compilation"
                 }
             }
+        },
+        "compilationOptions": {
+            "type": "object",
+            "required": ["hashDependencies", "dependsOnOwnHash"],
+            "properties": {
+                "hashDependencies": {
+                    "type": "object",
+                    "propertyNames": {
+                        "pattern": "^[A-Za-z_]\\w*$",
+                        "not": {
+                            "enum": ["__proto__", "constructor", "prototype"]
+                        }
+                    },
+                    "additionalProperties": {
+                        "type": "string",
+                        "pattern": "^(?:[a-f0-9]{56}|#(?:[a-f0-9]{56})?)$"
+                    }
+                },
+                "dependsOnOwnHash": {
+                    "type": "boolean"
+                },
+                "ownHash": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{56}$"
+                },
+                "validatorIndices": {
+                    "type": "object",
+                    "propertyNames": {
+                        "pattern": "^[A-Za-z_]\\w*$",
+                        "not": {
+                            "enum": ["__proto__", "constructor", "prototype"]
+                        }
+                    },
+                    "additionalProperties": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "additionalProperties": false
+        },
+        "compilation": {
+            "type": "object",
+            "required": [
+                "version",
+                "compilerVersion",
+                "validator",
+                "parameters",
+                "isTestnet",
+                "validatorTypes",
+                "optimized",
+                "unoptimized"
+            ],
+            "properties": {
+                "version": {
+                    "const": 1
+                },
+                "compilerVersion": {
+                    "type": "string",
+                    "pattern": "^\\d+\\.\\d+\\.\\d+(?:[-+][\\w.-]+)?$"
+                },
+                "validator": {
+                    "type": "object",
+                    "required": ["name", "purpose"],
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z_]\\w*$"
+                        },
+                        "purpose": {
+                            "enum": [
+                                "spending",
+                                "minting",
+                                "staking",
+                                "mixed",
+                                "certifying",
+                                "rewarding"
+                            ]
+                        }
+                    },
+                    "additionalProperties": false
+                },
+                "parameters": {
+                    "type": "object",
+                    "propertyNames": {
+                        "pattern": "^[A-Za-z_]\\w*(?:::[A-Za-z_]\\w*)+$",
+                        "not": {
+                            "enum": ["__proto__", "constructor", "prototype"]
+                        }
+                    },
+                    "additionalProperties": {
+                        "$ref": "#/$defs/hex"
+                    }
+                },
+                "isTestnet": {
+                    "type": "boolean"
+                },
+                "validatorTypes": {
+                    "type": "object",
+                    "propertyNames": {
+                        "pattern": "^[A-Za-z_]\\w*$",
+                        "not": {
+                            "enum": ["__proto__", "constructor", "prototype"]
+                        }
+                    },
+                    "additionalProperties": {
+                        "enum": [
+                            "ValidatorHash",
+                            "MintingPolicyHash",
+                            "StakingValidatorHash",
+                            "ScriptHash"
+                        ]
+                    }
+                },
+                "optimized": {
+                    "$ref": "#/$defs/compilationOptions"
+                },
+                "unoptimized": {
+                    "$ref": "#/$defs/compilationOptions"
+                }
+            },
+            "additionalProperties": false
         }
     }
 }

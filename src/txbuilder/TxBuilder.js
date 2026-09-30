@@ -355,7 +355,9 @@ class TxBuilderImpl {
             this.config.debugger === false
                 ? undefined
                 : this.config.debugger
-                  ? this.config.debugger.startSession()
+                  ? this.config.debugger.startSession(
+                        () => this.debuggerPrograms
+                    )
                   : makeAutomaticRecording(() => this.debuggerPrograms)
         try {
             const tx = await this.buildUnsafeInternal(config, recording)
