@@ -100,7 +100,7 @@ test("construction failures preserve original errors; buildUnsafe records valida
     })
     assert.ok(unsafe.hasValidationError)
     const capture = captures[1]
-    assert.equal(capture.transactionCbor, bytesToHex(unsafe.toCbor()))
+    assert.equal(capture.transactionCbor, undefined)
     assert.ok(capture.evaluations.some((e) => e.phase === "validation"))
     for (const e of capture.evaluations) {
         const p = decodeUplcProgramV2FromCbor(e.programCbor, {
@@ -123,6 +123,16 @@ test("unavailable service and ignored abort signal remain bounded, flush exposes
     })
     const error = new Error("original failure"),
         session = debuggerService.startSession()
+    session.record({
+        phase: "construction",
+        summary: "failed",
+        script: failing,
+        args: [],
+        profile: {
+            cost: { cpu: 0n, mem: 0n },
+            result: { left: { error: "failed", callSites: [] } }
+        }
+    })
     const start = Date.now()
     await session.finish(undefined, error)
     await debuggerService.flush()
@@ -141,7 +151,7 @@ test("reference script failures capture the resolved program", async () => {
     )
 })
 
-test("delivery failure never replaces the original builder exception", async () => {
+test("non-script build failures are not uploaded and preserve the original exception", async () => {
     const debuggerService = makeDebuggerService({
         apiKey: "test",
         fetch: async () => {
@@ -160,5 +170,5 @@ test("delivery failure never replaces the original builder exception", async () 
             }),
         (error) => error === original
     )
-    assert.equal(debuggerService.deliveryStatus.state, "failed")
+    assert.equal(debuggerService.deliveryStatus.state, "idle")
 })

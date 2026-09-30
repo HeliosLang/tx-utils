@@ -45,6 +45,11 @@ export function makeDebuggerService(config) {
             let finished = false
             return {
                 record(event) {
+                    if (
+                        config.capture !== "all" &&
+                        !("left" in event.profile.result)
+                    )
+                        return
                     try {
                         const encode = (script) => ({
                             programCbor: bytesToHex(script.toCbor()),
@@ -142,8 +147,17 @@ export function makeDebuggerService(config) {
                 async finish(tx, error) {
                     if (finished) return
                     finished = true
+                    if (config.capture !== "all" && evaluations.length === 0)
+                        return
+                    const failedEvaluation = evaluations.find(
+                        (e) => "error" in e.result
+                    )
                     const failure =
-                        error ?? (tx?.hasValidationError || undefined)
+                        error ??
+                        (tx?.hasValidationError || undefined) ??
+                        (failedEvaluation
+                            ? new Error(failedEvaluation.result.error)
+                            : undefined)
                     if (!failure && config.capture !== "all") return
                     let body
                     try {
@@ -160,9 +174,10 @@ export function makeDebuggerService(config) {
                                           stack: failure.stack
                                       }
                                     : failure,
-                            transactionCbor: tx
-                                ? bytesToHex(tx.toCbor())
-                                : undefined,
+                            transactionCbor:
+                                config.capture === "all" && tx
+                                    ? bytesToHex(tx.toCbor())
+                                    : undefined,
                             evaluations,
                             sources: { ...config.sources, ...sources },
                             diagnostics
